@@ -184,6 +184,20 @@ export interface Settings {
   darkTheme: string
   useSeparateDarkTheme: boolean
   isDarkMode: boolean
+  /**
+   * 侧边栏的显示策略。
+   *
+   * 三态而不是一个布尔值：
+   *   - `always` 始终显示——快捷键与菜单都关不掉它
+   *   - `never`  始终隐藏——同样改不了
+   *   - `toggle` 可自由切换（默认），切换结果记在 `sidebarVisible` 里
+   *
+   * 为什么需要"始终"这两档：侧边栏占着 260px 宽，写长文时有人想让它彻底
+   * 消失、且**不该被一次误按快捷键叫回来**；也有人反过来，把文件树当作
+   * 常驻导航，不希望手滑把它关了。这两种需求用"记住上次状态"都表达不了。
+   */
+  sidebarMode: 'always' | 'never' | 'toggle'
+  /** `sidebarMode` 为 `toggle` 时记住的可见状态；另外两档下这个值被忽略。 */
   sidebarVisible: boolean
   sidebarWidth: number
   sidebarTab: 'outline' | 'files' | 'articles'
@@ -265,6 +279,7 @@ export const DEFAULT_SETTINGS: Settings = {
   darkTheme: 'moon-dark',
   useSeparateDarkTheme: false,
   isDarkMode: false,
+  sidebarMode: 'toggle',
   sidebarVisible: true,
   sidebarWidth: 260,
   sidebarTab: 'outline',
@@ -310,6 +325,24 @@ export interface ThemeInfo {
 export function 生效主题(设置: Settings): string {
   if (设置.isDarkMode && 设置.useSeparateDarkTheme) return 设置.darkTheme
   return 设置.theme
+}
+
+/**
+ * 侧边栏此刻该不该显示。
+ *
+ * 收在一处而不是散着写 `settings.sidebarVisible`：有三档模式之后，
+ * 任何一处漏掉模式判断，就会出现"设了始终显示、某个入口还是能关掉它"
+ * 这种自相矛盾的状态。所有需要判断的地方都调这个函数。
+ */
+export function 侧边栏可见(设置: Settings): boolean {
+  if (设置.sidebarMode === 'always') return true
+  if (设置.sidebarMode === 'never') return false
+  return 设置.sidebarVisible
+}
+
+/** 侧边栏是否被策略锁住（锁住时切换命令应当说明原因，而不是默默无效）。 */
+export function 侧边栏被锁定(设置: Settings): boolean {
+  return 设置.sidebarMode !== 'toggle'
 }
 
 /**

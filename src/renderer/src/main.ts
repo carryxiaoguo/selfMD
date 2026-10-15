@@ -7,7 +7,7 @@ import { 移除属性, 读取前置元数据, 写入属性 } from '@shared/front
 import { 渲染Markdown为HTML } from '@shared/markdown-html'
 import { 标签管理器, type 标签 } from './services/标签'
 import { 打开快速打开面板 } from './ui/快速打开'
-import { 生效主题, type 草稿信息 } from '@shared/types'
+import { 侧边栏可见, 侧边栏被锁定, 生效主题, type 草稿信息 } from '@shared/types'
 import type { MenuCommandPayload } from '@shared/ipc'
 import type { ImageStoragePolicy, Settings } from '@shared/types'
 import {
@@ -624,9 +624,35 @@ async function 运行侧边栏自测(): Promise<string> {
 
   侧边栏.setTab('outline')
 
+  // --- 三档显示策略 -------------------------------------------------------
+  //
+  // 「始终显示 / 始终隐藏」是**策略**，必须压得过一次快捷键。
+  // 这条链路上任何一处漏掉模式判断，都会出现"设了始终隐藏、按一下快捷键
+  // 又冒出来"这种自相矛盾的状态——而它不会报错，只会让人觉得设置没用。
+  const 原模式 = settings.sidebarMode
+  const 原可见 = settings.sidebarVisible
+  const 策略结果: string[] = []
+
+  for (const [模式, 期望] of [
+    ['never', false],
+    ['always', true],
+    ['toggle', 原可见]
+  ] as const) {
+    settings = await window.selfmd.settings.patch({ sidebarMode: 模式 })
+    侧边栏.setVisible(侧边栏可见(settings))
+    await new Promise((完成) => setTimeout(完成, 40))
+    const 实际 = !宿主.hidden
+    策略结果.push(`${模式}=${实际 === 期望 ? '对' : `错(${实际})`}`)
+  }
+
+  // 收尾：把状态恢复原样，免得影响后面的用例
+  settings = await window.selfmd.settings.patch({ sidebarMode: 原模式, sidebarVisible: 原可见 })
+  侧边栏.setVisible(侧边栏可见(settings))
+
   return (
     `标题数=${标题缓存.length} 大纲项=${大纲项} 高亮项=${激活项} ` +
-    `文件树根=${侧边栏.当前根目录 ? '已定位' : '无'} 文件项=${文件项}`
+    `文件树根=${侧边栏.当前根目录 ? '已定位' : '无'} 文件项=${文件项} ` +
+    `策略=${策略结果.join(' ')}`
   )
 }
 
@@ -1756,6 +1782,10 @@ async function runCommand(payload: MenuCommandPayload): Promise<void> {
       return
 
     case 'view.articles':
+      if (settings.sidebarMode === 'never') {
+        toast('侧边栏已设为「始终隐藏」，可在偏好设置里改。')
+        return
+      }
       侧边栏?.setVisible(true)
       侧边栏?.setTab('articles')
       return
@@ -2399,14 +2429,34 @@ async function runCommand(payload: MenuCommandPayload): Promise<void> {
 
     // ---------------------------------------------------------- 侧边栏 ---
     case 'view.toggleSidebar':
+      // 被"始终显示/始终隐藏"锁住时**要说明原因**，而不是默默无效。
+      // 默默无效的后果是用户反复按快捷键、以为程序坏了。
+      if (侧边栏被锁定(settings)) {
+        toast(
+          settings.sidebarMode === 'always'
+            ? '侧边栏已设为「始终显示」，可在偏好设置里改。'
+            : '侧边栏已设为「始终隐藏」，可在偏好设置里改。'
+        )
+        return
+      }
       侧边栏?.切换()
       return
 
     case 'view.outline':
+      // 切标签页时若侧边栏正锁在"始终隐藏"，同样要说明——
+      // 否则用户点了「大纲」却什么都没发生。
+      if (settings.sidebarMode === 'never') {
+        toast('侧边栏已设为「始终隐藏」，可在偏好设置里改。')
+        return
+      }
       侧边栏?.切换('outline')
       return
 
     case 'view.fileTree':
+      if (settings.sidebarMode === 'never') {
+        toast('侧边栏已设为「始终隐藏」，可在偏好设置里改。')
+        return
+      }
       侧边栏?.切换('files')
       return
 
@@ -2997,23 +3047,29 @@ async function boot(): Promise<void> {
       保存状态: (状态) => {
         // 不比对就会形成回声：保存 → 设置变更事件 → 再保存 → …
         // 值没变时直接返回，环就断在这里。
+        //
+        // **被策略锁住时不要写回可见状态**：那会把用户选好的
+        // 「始终显示/始终隐藏」悄悄改掉，下次切回「可自由切换」时
+        // 侧边栏的状态就不是他记得的那样了。
+        const 该存的可见 = 侧边栏被锁定(settings) ? settings.sidebarVisible : 状态.可见
         if (
-          状态.可见 === settings.sidebarVisible &&
+          该存的可见 === settings.sidebarVisible &&
           状态.标签 === settings.sidebarTab &&
           状态.宽度 === settings.sidebarWidth
         ) {
           return
         }
         void window.selfmd.settings.patch({
-          sidebarVisible: 状态.可见,
+          sidebarVisible: 该存的可见,
           sidebarTab: 状态.标签,
           sidebarWidth: 状态.宽度
         })
       }
     })
     侧边栏.设置宽度(settings.sidebarWidth)
-    侧边栏.setTab(settings.sidebarTab === 'articles' ? 'files' : settings.sidebarTab)
-    侧边栏.setVisible(settings.sidebarVisible)
+    // 「文档」标签页已经实现了，不再降级映射到文件树
+    侧边栏.setTab(settings.sidebarTab)
+    侧边栏.setVisible(侧边栏可见(settings))
     刷新大纲(true)
   }
 
@@ -3051,6 +3107,7 @@ async function boot(): Promise<void> {
       next.autoWrapLongLines !== settings.autoWrapLongLines
     const 侧边变了 =
       next.sidebarVisible !== settings.sidebarVisible ||
+      next.sidebarMode !== settings.sidebarMode ||
       next.sidebarTab !== settings.sidebarTab
     settings = next
     applyTheme(settings)
@@ -3058,7 +3115,9 @@ async function boot(): Promise<void> {
     刷新模式相关界面()
     if (侧边变了 && 侧边栏) {
       侧边栏.设置宽度(settings.sidebarWidth)
-      侧边栏.setVisible(settings.sidebarVisible)
+      // 用 `侧边栏可见` 而不是直接读 sidebarVisible：
+      // 「始终显示/始终隐藏」两档下，后者是被忽略的残留值。
+      侧边栏.setVisible(侧边栏可见(settings))
       if (settings.sidebarTab !== 'articles') 侧边栏.setTab(settings.sidebarTab)
     }
     if (modeChanged) applyMode()

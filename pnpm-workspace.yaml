@@ -1,0 +1,6 @@
+# pnpm 10+ refuses to run dependency lifecycle scripts by default.
+#   electron  -> postinstall downloads the runtime binary (required to run)
+#   esbuild   -> installs the platform-native binary (required to build)
+allowBuilds:
+  electron: true
+  esbuild: true

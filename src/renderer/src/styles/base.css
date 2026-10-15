@@ -1,0 +1,1359 @@
+/* ==========================================================================
+   selfMD 基础样式表
+   --------------------------------------------------------------------------
+   所有视觉值来自设计变量。主题（<userData>/themes 下的普通 .css 文件）
+   只需覆盖变量，或直接写选择器。
+
+   ## 变量分两层
+
+   **第一层：通用变量。** 命名与默认值沿用主流 Markdown 编辑器主题的通行约定。
+   沿用的意义是**现成主题能直接迁移**：一份设了 `--bg-color: #363B40` 的
+   深色主题，放到这里同样生效，不必改一个字。
+
+   **第二层：本项目变量。** 全部由第一层派生（`--bg-primary: var(--bg-color)`）。
+   写主题时用哪一套都行：
+     - 用通用命名 → 可迁移现成主题
+     - 用本项目的名字 → 表达力更强（本项目的语义，通用命名里没有对应物）
+
+   两层都定义在这里，而不是只在主题里，原因是：主题缺失或写坏时应用仍要能用。
+   ========================================================================== */
+
+:root {
+  /* --- 通用变量：文档内容 ----------------------------------------------- */
+  --bg-color: #ffffff;
+  --text-color: #1f2328;
+  --select-text-bg-color: #b6d7ff;
+  --select-text-font-color: auto;
+  --monospace: "Cascadia Code", "JetBrains Mono", Consolas, "Courier New", monospace;
+
+  /* --- 通用变量：编辑器与 Markdown -------------------------------------- */
+  --md-char-color: #a0a8b0;
+  --meta-content-color: #5b808d;
+  --blur-text-color: #8c959f;
+  --drag-placeholder-color: #c7c5c5;
+  --table-border-color: #d1d9e0;
+  --heading-char-color: #d1d9e0;
+  --rawblock-edit-panel-bd: #f6f8fa;
+
+  /* --- 通用变量：控件与面板 --------------------------------------------- */
+  --panel-border-color: #d1d9e0;
+  --primary-color: #0969da;
+  --primary-btn-border-color: #0550ae;
+  --primary-btn-text-color: #ffffff;
+  --search-select-bg-color: #b6d7ff;
+  --search-select-text-color: #1f2328;
+  --color-popover-bg-color: #f6f8fa;
+  --control-text-color: #59636e;
+  --control-text-hover-color: #1f2328;
+  --focus-ring-color: #0969da;
+  --active-toggle-btn-color: #d1d9e0;
+
+  /* --- 通用变量：窗口与侧边栏 ------------------------------------------- */
+  --window-border: 1px solid #d1d9e0;
+  --window-border-color: #d1d9e0;
+  --side-bar-bg-color: #f6f8fa;
+  --sidebar-width: 260px;
+  --item-hover-bg-color: #eaeef2;
+  --item-hover-text-color: inherit;
+  --active-file-bg-color: #eaeef2;
+  --active-file-text-color: inherit;
+  --active-file-border-color: #8c959f;
+  --title-bar-height: 20px;
+  --mac-title-bar-height: 20px;
+
+  /* --- 本项目：全部由上面派生 ------------------------------------------ */
+  --bg-primary: var(--bg-color);
+  --bg-secondary: var(--side-bar-bg-color);
+  --bg-tertiary: var(--item-hover-bg-color);
+  --bg-overlay: rgba(0, 0, 0, 0.32);
+
+  --text-primary: var(--text-color);
+  --text-secondary: var(--control-text-color);
+  --text-muted: var(--blur-text-color);
+  --text-inverse: var(--primary-btn-text-color);
+
+  --border: var(--window-border-color);
+  --border-subtle: var(--window-border-color);
+  --quote-border: var(--window-border-color);
+
+  --accent: var(--primary-color);
+  --accent-hover: var(--primary-btn-border-color);
+  --selection: var(--select-text-bg-color);
+  --selection-inactive: var(--select-text-bg-color);
+
+  --code-bg: var(--rawblock-edit-panel-bd);
+  --code-border: var(--window-border-color);
+  --code-text: var(--text-color);
+
+  --syntax: var(--md-char-color);
+  --syntax-active: var(--control-text-color);
+  --marker-list: var(--control-text-color);
+
+  --font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei",
+    "PingFang SC", sans-serif;
+  --font-mono: var(--monospace);
+  --font-size: 16px;
+  --line-height: 1.65;
+  --content-max-width: 860px;
+
+  --radius: 6px;
+  --shadow: 0 1px 3px rgba(31, 35, 40, 0.12);
+  --focus-ring: 0 0 0 3px var(--focus-ring-color);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-body);
+  font-size: var(--font-size);
+  line-height: var(--line-height);
+  color: var(--text-primary);
+  background: var(--bg-primary);
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}
+
+#app {
+  display: flex;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+}
+
+/*
+ * 侧边栏的外观全部由 `.selfmd-sidebar` 定义（见文件末尾）。
+ * 这里只保留 `hidden` 规则——ID 选择器的优先级高于类选择器，
+ * 如果在这里写 border / background，会盖掉主题想改的值。
+ */
+#sidebar[hidden] {
+  display: none;
+}
+
+#main {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+}
+
+#editor-host {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  position: relative;
+}
+
+/* ==========================================================================
+   CodeMirror shell
+   ========================================================================== */
+
+.cm-editor {
+  height: 100%;
+  background: transparent;
+  color: var(--text-primary);
+}
+
+.cm-editor.cm-focused {
+  outline: none;
+}
+
+.cm-scroller {
+  font-family: var(--font-body);
+  line-height: var(--line-height);
+  padding: 0;
+}
+
+.cm-content {
+  padding: 3rem 0 40vh;
+  caret-color: var(--accent);
+  max-width: var(--content-max-width);
+  margin: 0 auto;
+  width: 100%;
+}
+
+.cm-line {
+  padding: 0 3rem;
+}
+
+.cm-cursor,
+.cm-dropCursor {
+  border-left-color: var(--accent);
+}
+
+.cm-selectionBackground,
+.cm-content ::selection {
+  background: var(--selection) !important;
+}
+
+.cm-editor.cm-focused .cm-selectionBackground {
+  background: var(--selection) !important;
+}
+
+.cm-activeLine {
+  background: transparent;
+}
+
+.cm-gutters {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+}
+
+.cm-foldGutter {
+  display: none;
+}
+
+/* Gutter for source mode only */
+body:not(.source-mode) .cm-gutters {
+  display: none;
+}
+
+body.source-mode .cm-content {
+  font-family: var(--font-mono);
+  font-size: 0.95em;
+}
+
+/* ==========================================================================
+   语法高亮（cm-tok-*）
+   --------------------------------------------------------------------------
+   只负责"源码形态"的着色：源码模式下的标记，以及实时预览里代码块内部的
+   语言高亮。渲染形态（标题、加粗、引用看起来像成品的样子）由装饰层用
+   cm-md-* / cm-lp-* 负责，两套前缀刻意分开。
+   ========================================================================== */
+
+.cm-tok-heading { font-weight: 600; color: var(--text-primary); }
+.cm-tok-emphasis { font-style: italic; }
+.cm-tok-strong { font-weight: 700; }
+.cm-tok-strikethrough { text-decoration: line-through; }
+.cm-tok-link { color: var(--accent); }
+.cm-tok-url { color: var(--text-muted); }
+.cm-tok-code { font-family: var(--font-mono); }
+.cm-tok-quote { color: var(--text-secondary); }
+.cm-tok-list { color: var(--marker-list); }
+.cm-tok-comment { color: var(--text-muted); font-style: italic; }
+.cm-tok-marker { color: var(--syntax); }
+
+/* ==========================================================================
+   渲染形态：行内（cm-md-*）
+   ========================================================================== */
+
+.cm-md-emphasis { font-style: italic; }
+.cm-md-strong { font-weight: 700; }
+.cm-md-strikethrough { text-decoration: line-through; color: var(--text-secondary); }
+.cm-md-link { color: var(--accent); text-decoration: none; }
+.cm-md-url { color: var(--text-muted); }
+
+.cm-md-code {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  background: var(--code-bg);
+  border: 1px solid var(--code-border);
+  border-radius: 3px;
+  padding: 0.1em 0.3em;
+  color: var(--code-text);
+}
+
+.cm-md-quote { color: var(--text-secondary); font-style: italic; }
+.cm-md-list { color: var(--marker-list); }
+.cm-md-comment { color: var(--text-muted); font-style: italic; }
+.cm-md-processing { color: var(--text-muted); }
+
+/* ==========================================================================
+   Live-preview decorations
+   --------------------------------------------------------------------------
+   Markers inside the block the caret is in stay visible (the "active line"
+   convention). Markers elsewhere are collapsed to zero
+   width but remain in the document, so the text model is never mutated.
+   ========================================================================== */
+
+body.live-preview .cm-md-marker-hidden {
+  display: inline-block;
+  width: 0;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.cm-lp-heading {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.cm-lp-h1 { font-size: 1.9em; line-height: 1.3; }
+.cm-lp-h2 { font-size: 1.6em; line-height: 1.3; }
+.cm-lp-h3 { font-size: 1.35em; line-height: 1.35; }
+.cm-lp-h4 { font-size: 1.15em; }
+.cm-lp-h5 { font-size: 1.02em; }
+.cm-lp-h6 { font-size: 0.95em; color: var(--text-secondary); }
+
+/* --- 引用块：左边框 + 次级文字色 --------------------------------------- */
+
+.cm-lp-quote {
+  border-left: 3px solid var(--quote-border);
+  padding-left: 0.9em !important;
+  color: var(--text-secondary);
+}
+
+/* --- 代码围栏：整块背景，首尾行带圆角 ---------------------------------- */
+
+.cm-lp-code {
+  background: var(--code-bg);
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+  color: var(--code-text);
+}
+
+.cm-lp-code-first {
+  border-top-left-radius: var(--radius);
+  border-top-right-radius: var(--radius);
+  padding-top: 0.35em !important;
+}
+
+.cm-lp-code-last {
+  border-bottom-left-radius: var(--radius);
+  border-bottom-right-radius: var(--radius);
+  padding-bottom: 0.35em !important;
+  margin-bottom: 0.6em;
+}
+
+/* --- 前置元数据 --------------------------------------------------------- */
+
+.cm-lp-frontmatter {
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+}
+
+/* --- 数学块 ------------------------------------------------------------- */
+
+.cm-lp-math {
+  background: var(--bg-secondary);
+  text-align: center;
+  font-family: var(--font-mono);
+  color: var(--text-primary);
+}
+
+/* --- HTML 块 ------------------------------------------------------------ */
+
+.cm-lp-html {
+  background: var(--bg-secondary);
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  color: var(--text-secondary);
+}
+
+/* --- 表格 --------------------------------------------------------------- */
+
+.cm-lp-table {
+  font-variant-numeric: tabular-nums;
+}
+
+.cm-lp-table-head {
+  font-weight: 600;
+}
+
+.cm-lp-table-sep {
+  /* 对齐定义行被折叠成零宽，用底边框充当表头分隔线 */
+  border-bottom: 2px solid var(--border);
+  font-size: 0.5em;
+  line-height: 0.5;
+}
+
+/* --- 水平线 ------------------------------------------------------------- */
+
+.cm-lp-hr {
+  font-size: 0.5em;
+  line-height: 0.5;
+}
+
+/* --- 引用定义 ----------------------------------------------------------- */
+
+.cm-md-refdef {
+  color: var(--text-muted);
+  font-size: 0.92em;
+}
+
+.cm-md-html {
+  color: var(--text-secondary);
+}
+
+/* ==========================================================================
+   内联 widget
+   ========================================================================== */
+
+/* 代码围栏的语言标签，右对齐贴在首行末尾 */
+.cm-w-lang {
+  float: right;
+  margin-right: 0.6em;
+  padding: 0 0.4em;
+  border-radius: 3px;
+  background: var(--bg-tertiary);
+  color: var(--text-muted);
+  font-family: var(--font-body);
+  font-size: 0.72em;
+  line-height: 1.7;
+  user-select: none;
+}
+
+/* 列表圆点 */
+.cm-w-bullet {
+  color: var(--marker-list);
+  font-weight: 700;
+  padding-right: 0.15em;
+}
+
+/* 任务列表复选框 */
+.cm-w-task {
+  margin: 0 0.4em 0 0;
+  vertical-align: -0.08em;
+  width: 0.95em;
+  height: 0.95em;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+/* 水平线 */
+.cm-w-hr {
+  display: inline-block;
+  width: 100%;
+  vertical-align: middle;
+  border-top: 1px solid var(--border);
+}
+
+/* 表格列分隔符 */
+.cm-w-pipe {
+  color: var(--border);
+  padding: 0 0.15em;
+  user-select: none;
+}
+
+/* ==========================================================================
+   Status bar
+   ========================================================================== */
+
+#statusbar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  height: 28px;
+  padding: 0 0.75rem;
+  font-size: 12px;
+  color: var(--text-secondary);
+  background: var(--bg-secondary);
+  border-top: 1px solid var(--border);
+  user-select: none;
+}
+
+#statusbar[hidden] {
+  display: none;
+}
+
+#statusbar .spacer {
+  flex: 1 1 auto;
+}
+
+#statusbar .stat {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+#statusbar .stat.clickable {
+  cursor: pointer;
+  border-radius: 3px;
+  padding: 0 4px;
+}
+
+#statusbar .stat.clickable:hover {
+  background: var(--bg-tertiary);
+}
+
+/* ==========================================================================
+   Toast notifications
+   ========================================================================== */
+
+#toast-host {
+  position: fixed;
+  right: 16px;
+  bottom: 44px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 1000;
+  pointer-events: none;
+}
+
+.toast {
+  pointer-events: auto;
+  max-width: 380px;
+  padding: 10px 14px;
+  border-radius: var(--radius);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+  font-size: 13px;
+  color: var(--text-primary);
+  animation: toast-in 140ms ease-out;
+}
+
+.toast.error {
+  border-color: #d1242f;
+  color: #d1242f;
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ==========================================================================
+   模态输入框
+   ========================================================================== */
+
+.selfmd-modal-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 18vh;
+  background: var(--bg-overlay);
+}
+
+.selfmd-modal {
+  width: min(520px, 88vw);
+  padding: 18px 20px 16px;
+  border-radius: var(--radius);
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.28);
+}
+
+.selfmd-modal-title {
+  margin-bottom: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.selfmd-modal-desc {
+  margin: -8px 0 12px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--blur-text-color);
+}
+
+.selfmd-modal-input {
+  width: 100%;
+  padding: 8px 10px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--text-primary);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  outline: none;
+}
+
+.selfmd-modal-input:focus {
+  border-color: var(--accent);
+  box-shadow: var(--focus-ring);
+}
+
+.selfmd-modal-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.selfmd-btn {
+  padding: 6px 14px;
+  font-size: 13px;
+  color: var(--text-primary);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.selfmd-btn:hover {
+  background: var(--bg-tertiary);
+}
+
+.selfmd-btn-primary {
+  color: var(--text-inverse);
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.selfmd-btn-primary:hover {
+  background: var(--accent-hover);
+}
+
+/* 拖放图片到编辑器时的高亮提示 */
+.cm-editor.cm-drop-target {
+  outline: 2px dashed var(--accent);
+  outline-offset: -4px;
+}
+
+/* ==========================================================================
+   数学公式
+   --------------------------------------------------------------------------
+   类名沿用通用命名：`.md-math-block` / `.md-inline-math`。
+   排版细节交给 KaTeX 自带样式表，这里只管与主题的衔接。
+   ========================================================================== */
+
+.cm-w-math-block {
+  display: block;
+  margin: 0.8em 0;
+  padding: 4px 0;
+  text-align: center;
+  overflow-x: auto;
+  overflow-y: hidden;
+  /* 公式横向溢出时允许滚动，比压缩到看不清要好 */
+}
+
+.cm-w-math-inline {
+  display: inline;
+  padding: 0 1px;
+}
+
+/* KaTeX 默认用 1.21em，在中文字号下会偏大；
+   收到 1.05em 让它与正文更协调。 */
+.cm-w-math .katex {
+  font-size: 1.05em;
+}
+
+.cm-w-math-block .katex {
+  font-size: 1.15em;
+}
+
+/* 渲染失败的那一段：KaTeX 会把它包在 .katex-error 里并涂成 errorColor。
+   这里不再覆盖颜色——红色正好提示用户"这里写错了"。 */
+.cm-w-math .katex-error {
+  background: rgba(204, 0, 0, 0.06);
+  border-radius: 2px;
+}
+
+/* ==========================================================================
+   Mermaid 图表
+   --------------------------------------------------------------------------
+   类名沿用通用命名：`.md-diagram-panel`。
+   ========================================================================== */
+
+.cm-w-diagram {
+  display: block;
+  margin: 0.8em 0;
+  padding: 10px;
+  text-align: center;
+  background: var(--rawblock-edit-panel-bd);
+  border-radius: var(--radius);
+  overflow-x: auto;
+}
+
+.cm-w-diagram svg {
+  max-width: 100%;
+  height: auto;
+}
+
+.cm-w-diagram-status {
+  padding: 6px;
+  font-size: 13px;
+  color: var(--blur-text-color);
+}
+
+/* 渲染失败时把源码一并显示出来。
+   Mermaid 的报错信息往往很抽象（"Parse error on line 3"），
+   只给一句错误提示等于让用户去猜哪一行写错了。 */
+.cm-w-diagram-error {
+  text-align: left;
+  background: rgba(204, 0, 0, 0.05);
+  border: 1px solid rgba(204, 0, 0, 0.25);
+}
+
+.cm-w-diagram-source {
+  margin: 0;
+  padding: 8px 10px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-color);
+  background: var(--bg-primary);
+  border-radius: 4px;
+  overflow-x: auto;
+  white-space: pre-wrap;
+}
+
+/* ==========================================================================
+   上下文菜单
+   ========================================================================== */
+
+.selfmd-menu {
+  position: fixed;
+  z-index: 2200;
+  min-width: 180px;
+  padding: 4px 0;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
+  user-select: none;
+}
+
+.selfmd-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 6px 12px 6px 6px;
+  font-size: 13px;
+  font-family: var(--font-body);
+  text-align: left;
+  color: var(--text-color);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+
+.selfmd-menu-item:not(.disabled):hover {
+  background: var(--primary-color);
+  color: var(--primary-btn-text-color);
+}
+
+.selfmd-menu-item.disabled {
+  color: var(--blur-text-color);
+  cursor: default;
+}
+
+.selfmd-menu-item.danger {
+  color: #c0392b;
+}
+
+.selfmd-menu-item.danger:not(.disabled):hover {
+  background: #c0392b;
+  color: #ffffff;
+}
+
+.selfmd-menu-check {
+  flex: 0 0 16px;
+  text-align: center;
+  font-size: 12px;
+}
+
+.selfmd-menu-label {
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.selfmd-menu-hint {
+  flex: 0 0 auto;
+  margin-left: 16px;
+  font-size: 11px;
+  color: var(--blur-text-color);
+}
+
+.selfmd-menu-item:hover .selfmd-menu-hint {
+  color: inherit;
+  opacity: 0.75;
+}
+
+.selfmd-menu-sep {
+  height: 1px;
+  margin: 4px 8px;
+  background: var(--window-border-color);
+}
+
+/* ==========================================================================
+   图片
+   --------------------------------------------------------------------------
+   类名沿用通用命名：`.md-image` 与 `.md-img-error`。
+   装饰层把 `![替代](地址)` 整段换成 <img>，文档一个字符都没动。
+   ========================================================================== */
+
+.cm-w-image {
+  display: inline-block;
+  max-width: 100%;
+  vertical-align: middle;
+  line-height: 0;
+}
+
+.cm-w-image img {
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--radius);
+  vertical-align: middle;
+  /* 图片本身不该被选中——选中时出现的高亮框会盖住内容 */
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+/* 独占一行的图片：居中并按块显示。
+   夹在句子中间的图片不带这个类，因此仍按行内排版。 */
+.cm-lp-image-line {
+  text-align: center;
+}
+
+.cm-lp-image-line .cm-w-image {
+  display: block;
+  margin: 0.6em auto;
+}
+
+/* 加载失败与地址解析失败都用这个类。
+   刻意显示文字而不是一个破图图标：破图会让人以为图片文件坏了，
+   而真实原因常常是"文档还没保存，相对路径没有基准目录"。 */
+.cm-w-image.md-img-error {
+  display: inline-block;
+  padding: 6px 12px;
+  font-size: 13px;
+  color: var(--blur-text-color);
+  background: var(--rawblock-edit-panel-bd);
+  border: 1px dashed var(--window-border-color);
+  border-radius: var(--radius);
+  user-select: none;
+  cursor: default;
+}
+
+/* ==========================================================================
+   偏好设置面板
+   --------------------------------------------------------------------------
+   界面完全照着 @shared/settings-schema 渲染，这里只管外观。
+   ========================================================================== */
+
+.selfmd-prefs-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 2100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-overlay);
+}
+
+.selfmd-prefs {
+  display: flex;
+  width: min(880px, 94vw);
+  height: min(620px, 88vh);
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.3);
+  overflow: hidden;
+}
+
+.prefs-side {
+  flex: 0 0 168px;
+  display: flex;
+  flex-direction: column;
+  padding: 10px 0;
+  background: var(--bg-secondary);
+  border-right: var(--window-border);
+  overflow-y: auto;
+}
+
+.prefs-title {
+  padding: 4px 14px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--control-text-color);
+}
+
+.prefs-tab {
+  padding: 7px 14px;
+  font-size: 13px;
+  text-align: left;
+  color: var(--text-color);
+  background: transparent;
+  border: none;
+  border-left: 3px solid transparent;
+  cursor: pointer;
+}
+
+.prefs-tab:hover {
+  background: var(--item-hover-bg-color);
+}
+
+.prefs-tab.active {
+  color: var(--primary-color);
+  background: var(--active-file-bg-color);
+  border-left-color: var(--primary-color);
+}
+
+.prefs-main {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.prefs-search-row {
+  display: flex;
+  gap: 8px;
+  padding: 12px 16px;
+  border-bottom: var(--window-border);
+}
+
+.prefs-search {
+  flex: 1 1 auto;
+  padding: 6px 10px;
+  font-size: 13px;
+  color: var(--text-color);
+  background: var(--bg-secondary);
+  border: 1px solid var(--window-border-color);
+  border-radius: 4px;
+  outline: none;
+}
+
+.prefs-search:focus {
+  border-color: var(--primary-color);
+  box-shadow: var(--focus-ring);
+}
+
+.prefs-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 8px 16px 24px;
+}
+
+.prefs-section {
+  margin-bottom: 20px;
+}
+
+.prefs-section h3 {
+  margin: 16px 0 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--control-text-color);
+  text-transform: none;
+}
+
+.prefs-note {
+  margin: 0 0 8px;
+  font-size: 12px;
+  color: var(--blur-text-color);
+  line-height: 1.6;
+}
+
+.prefs-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--window-border-color);
+}
+
+.prefs-row:last-child {
+  border-bottom: none;
+}
+
+.prefs-label {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.prefs-name {
+  font-size: 13px;
+  color: var(--text-color);
+}
+
+.prefs-source {
+  display: inline-block;
+  margin-top: 2px;
+  padding: 0 5px;
+  font-size: 11px;
+  color: var(--blur-text-color);
+  background: var(--bg-secondary);
+  border-radius: 3px;
+}
+
+.prefs-hint {
+  margin-top: 3px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--blur-text-color);
+}
+
+.prefs-control {
+  flex: 0 0 260px;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+}
+
+.prefs-control input[type='text'],
+.prefs-control input[type='number'],
+.prefs-control select {
+  width: 100%;
+  padding: 5px 8px;
+  font-size: 13px;
+  font-family: var(--font-body);
+  color: var(--text-color);
+  background: var(--bg-secondary);
+  border: 1px solid var(--window-border-color);
+  border-radius: 4px;
+  outline: none;
+}
+
+.prefs-control input:focus,
+.prefs-control select:focus {
+  border-color: var(--primary-color);
+  box-shadow: var(--focus-ring);
+}
+
+.prefs-control input[type='checkbox'] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--primary-color);
+  cursor: pointer;
+}
+
+/* 只读项：视觉上要能看出"这里改不了"，否则用户会一直点它 */
+.prefs-readonly {
+  color: var(--blur-text-color) !important;
+  cursor: default;
+}
+
+.prefs-number {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.prefs-unit {
+  flex: 0 0 auto;
+  font-size: 12px;
+  color: var(--blur-text-color);
+}
+
+.prefs-empty {
+  padding: 32px 0;
+  text-align: center;
+  color: var(--blur-text-color);
+}
+
+/* ==========================================================================
+   专注模式与打字机模式
+   --------------------------------------------------------------------------
+   类名沿用通用命名：body 上的 `on-focus-mode` / `selfmd-typewriter-mode`，
+   当前块上的 `md-focus`（内置主题里出现 37 次，是除 `#write` 之外最常被
+   主题挂钩的选择器）。主题想改淡化程度，覆盖下面两条即可。
+   ========================================================================== */
+
+body.on-focus-mode .cm-line {
+  opacity: 0.28;
+  transition: opacity 0.15s ease-out;
+}
+
+body.on-focus-mode .cm-line.md-focus {
+  opacity: 1;
+}
+
+/* 关掉过渡：用户刚关掉专注模式时不该看到一段渐变动画 */
+body:not(.on-focus-mode) .cm-line {
+  transition: none;
+}
+
+/* 打字机模式的居中靠 scrollIntoView 完成，本身不需要样式。
+   加这个类一是给主题留挂钩，二是调试时能一眼看出状态。 */
+body.selfmd-typewriter-mode .cm-scroller {
+  scroll-behavior: auto;
+}
+
+/* ==========================================================================
+   侧边栏
+   --------------------------------------------------------------------------
+   类名沿用通用的选择器命名（.selfmd-sidebar / .outline-item /
+   .outline-expander / .file-list-item …），这样针对它们写的主题规则有机会生效。
+   所有视觉值走变量，主题不必改选择器就能换配色。
+   ========================================================================== */
+
+.selfmd-sidebar {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 auto;
+  min-width: 160px;
+  max-width: 520px;
+  height: 100%;
+  background: var(--side-bar-bg-color);
+  border-right: var(--window-border);
+  color: var(--text-color);
+  font-size: 13px;
+  user-select: none;
+}
+
+.sidebar-tabs {
+  display: flex;
+  flex: 0 0 auto;
+  border-bottom: var(--window-border);
+}
+
+.sidebar-tab {
+  flex: 1 1 0;
+  padding: 8px 4px;
+  font-size: 13px;
+  color: var(--control-text-color);
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+}
+
+.sidebar-tab:hover {
+  color: var(--control-text-hover-color);
+  background: var(--item-hover-bg-color);
+}
+
+.sidebar-tab.active {
+  color: var(--primary-color);
+  border-bottom-color: var(--primary-color);
+}
+
+.sidebar-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: 6px 0;
+}
+
+.sidebar-empty {
+  padding: 18px 14px;
+  color: var(--blur-text-color);
+  line-height: 1.6;
+}
+
+/* 拖拽调整宽度时锁住光标与文本选中 */
+body.resizing-sidebar {
+  cursor: col-resize;
+  user-select: none;
+}
+
+.sidebar-resizer {
+  position: absolute;
+  top: 0;
+  right: -3px;
+  width: 6px;
+  height: 100%;
+  cursor: col-resize;
+  z-index: 5;
+}
+
+.sidebar-resizer:hover {
+  background: var(--primary-color);
+  opacity: 0.35;
+}
+
+/* ---------------------------------------------------------------- 大纲 ---- */
+
+/* 缩进由 --outline-level 决定，主题想改间距覆盖这个乘数即可 */
+.outline-item {
+  display: flex;
+  align-items: baseline;
+  gap: 2px;
+  padding: 3px 10px 3px calc(10px + var(--outline-level, 0) * 14px);
+  line-height: 1.5;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.outline-item:hover {
+  background: var(--item-hover-bg-color);
+  color: var(--item-hover-text-color);
+}
+
+.outline-item.active {
+  background: var(--active-file-bg-color);
+  color: var(--active-file-text-color);
+}
+
+.outline-expander {
+  display: inline-block;
+  flex: 0 0 auto;
+  width: 12px;
+  color: var(--blur-text-color);
+}
+
+.outline-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* -------------------------------------------------------------- 文件树 ---- */
+
+.file-tree-root {
+  padding: 6px 12px;
+  font-weight: 600;
+  color: var(--control-text-color);
+  border-bottom: var(--window-border);
+  margin-bottom: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-list-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px 3px calc(8px + var(--tree-depth, 0) * 14px);
+  line-height: 1.6;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.file-list-item:hover {
+  background: var(--item-hover-bg-color);
+  color: var(--item-hover-text-color);
+}
+
+.file-list-item.active {
+  background: var(--active-file-bg-color);
+  color: var(--active-file-text-color);
+  border-left: 2px solid var(--active-file-border-color);
+}
+
+.file-node-expander {
+  display: inline-block;
+  flex: 0 0 auto;
+  width: 12px;
+  color: var(--blur-text-color);
+}
+
+.file-node-content {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+
+.file-node-icon {
+  flex: 0 0 auto;
+  font-size: 11px;
+}
+
+.file-node-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ==========================================================================
+   查找 / 替换面板
+   --------------------------------------------------------------------------
+   文案**不在这里**——CodeMirror 有官方的本地化 Facet（`EditorState.phrases`），
+   面板里的每个按钮与标签都是通过 `phrase(view, "next")` 取词的。
+   在 `editor/本地化.ts` 里注册中文即可，比用 CSS 的 `::after` 覆盖原生文字
+   干净得多（伪元素方案还会破坏可访问性：读屏软件读到的仍是英文）。
+
+   这里只负责配色与间距。
+   ========================================================================== */
+
+.cm-panels {
+  background: var(--bg-secondary);
+  border-color: var(--window-border-color);
+  color: var(--text-color);
+  font-family: var(--font-body);
+  font-size: 13px;
+}
+
+.cm-panels.cm-panels-top {
+  border-bottom: var(--window-border);
+}
+
+.cm-panel.cm-search {
+  padding: 6px 8px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.cm-panel.cm-search input,
+.cm-panel.cm-search button,
+.cm-panel.cm-search label {
+  font-size: 13px;
+  font-family: var(--font-body);
+}
+
+.cm-panel.cm-search input[type='text'] {
+  padding: 3px 6px;
+  color: var(--text-color);
+  background: var(--bg-primary);
+  border: 1px solid var(--window-border-color);
+  border-radius: 3px;
+  outline: none;
+}
+
+.cm-panel.cm-search input[type='text']:focus {
+  border-color: var(--primary-color);
+  box-shadow: var(--focus-ring);
+}
+
+.cm-panel.cm-search button {
+  padding: 3px 10px;
+  color: var(--text-color);
+  background: var(--bg-primary);
+  border: 1px solid var(--window-border-color);
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.cm-panel.cm-search button:hover {
+  background: var(--item-hover-bg-color);
+}
+
+.cm-panel.cm-search label {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--control-text-color);
+}
+
+.cm-panel.cm-search input[name='replace'] {
+  min-width: 160px;
+}
+
+/* "查找" 与 "查找和替换" 共用一个面板（CodeMirror 没有"仅查找"模式）。
+   前者打开时给 body 加 no-replace，把替换那一行藏起来，
+   这样两个菜单项的行为差异对用户是可见的。 */
+body.no-replace .cm-panel.cm-search input[name='replace'],
+body.no-replace .cm-panel.cm-search button[name='replace'],
+body.no-replace .cm-panel.cm-search button[name='replaceAll'] {
+  display: none;
+}
+
+/* 搜索匹配高亮：与选区区分开，否则"全选"之后看不出哪条是当前项 */
+.cm-searchMatch {
+  background: var(--search-select-bg-color);
+  outline: 1px solid var(--window-border-color);
+}
+
+.cm-searchMatch-selected {
+  background: var(--primary-color);
+  color: var(--primary-btn-text-color);
+}

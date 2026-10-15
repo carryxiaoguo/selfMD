@@ -1,0 +1,79 @@
+{
+  "name": "selfmd",
+  "version": "0.1.0",
+  "description": "一款所见即所得的 Markdown 编辑器（个人自用）",
+  "author": "selfMD",
+  "license": "UNLICENSED",
+  "private": true,
+  "main": "./out/main/index.js",
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "start": "electron-vite preview",
+    "build": "npm run typecheck && electron-vite build",
+    "smoke": "electron-vite build && node scripts/smoke.mjs",
+    "verify": "npm run typecheck && node scripts/check-encoding.mjs && node scripts/check-i18n.mjs && node scripts/检查品牌痕迹.mjs && electron-vite build && node scripts/verify.mjs",
+    "check:i18n": "node scripts/check-i18n.mjs",
+    "check:encoding": "node scripts/check-encoding.mjs",
+    "check:brand": "node scripts/检查品牌痕迹.mjs",
+    "icons": "python scripts/生成图标.py",
+    "typecheck:node": "tsc --noEmit -p tsconfig.node.json --composite false",
+    "typecheck:web": "tsc --noEmit -p tsconfig.web.json --composite false",
+    "typecheck": "npm run typecheck:node && npm run typecheck:web"
+  },
+  "build": {
+    "appId": "io.selfmd.app",
+    "productName": "selfMD",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "out/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "resources/icon",
+        "to": "icon",
+        "filter": [
+          "*.png",
+          "*.ico"
+        ]
+      }
+    ],
+    "win": {
+      "icon": "resources/icon/icon.ico",
+      "target": [
+        "nsis"
+      ]
+    },
+    "mac": {
+      "icon": "resources/icon/icon-512.png"
+    },
+    "linux": {
+      "icon": "resources/icon/icon-512.png",
+      "category": "Office"
+    }
+  },
+  "dependencies": {
+    "electron-updater": "^6.3.9",
+    "katex": "^0.19.0",
+    "mermaid": "^12.2.0"
+  },
+  "devDependencies": {
+    "@codemirror/autocomplete": "^6.18.4",
+    "@codemirror/commands": "^6.7.1",
+    "@codemirror/lang-markdown": "^6.3.1",
+    "@codemirror/language": "^6.10.8",
+    "@codemirror/language-data": "^6.5.1",
+    "@codemirror/search": "^6.5.8",
+    "@codemirror/state": "^6.5.0",
+    "@codemirror/view": "^6.36.1",
+    "@lezer/highlight": "^1.2.1",
+    "@lezer/markdown": "^1.4.2",
+    "@types/node": "^22.10.5",
+    "electron": "^33.3.1",
+    "electron-vite": "^2.3.0",
+    "typescript": "^5.7.3",
+    "vite": "^5.4.11"
+  }
+}

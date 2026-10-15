@@ -1,0 +1,85 @@
+import type { Decoration } from '@codemirror/view'
+import type { 语法节点 } from '../syntax-node'
+
+/**
+ * 装饰层内部共用的数据类型。
+ *
+ * 之所以不在遍历语法树时直接往 RangeSet 里塞，是因为加入的区间必须
+ * **按起点升序**，同一位置上行装饰（Decoration.line）必须排在标记装饰之前，
+ * 否则 CodeMirror 会拒绝整份装饰。所以先收集成数组，统一排序后再构建。
+ */
+
+/** 语法节点类型定义在 ../syntax-node.ts，这里转出，方便装饰层内部统一从本文件取。 */
+export type { 语法节点 }
+
+export interface 装饰条目 {
+  from: number
+  to: number
+  deco: Decoration
+  /**
+   * 同一 from 上的排序权重，越小越靠前。
+   * -1：行装饰（必须最先）
+   *  0：内容标记（加粗、斜体等）
+   *  1：隐藏型替换装饰
+   */
+  rank: number
+}
+
+export interface 构建上下文 {
+  /** 光标所在行（1 基）。这些行上的语法标记保持可见。 */
+  活动行: Set<number>
+  /** 已经加过行装饰的位置，避免同一行被重复加类。 */
+  行装饰已用: Set<number>
+  条目: 装饰条目[]
+}
+
+/** 把一条行装饰加入收集器；同一位置只保留第一条。 */
+export function 加行装饰(
+  上下文: 构建上下文,
+  行首: number,
+  装饰: Decoration
+): void {
+  if (上下文.行装饰已用.has(行首)) return
+  上下文.行装饰已用.add(行首)
+  上下文.条目.push({ from: 行首, to: 行首, deco: 装饰, rank: -1 })
+}
+
+// ---------------------------------------------------------------------------
+// 影响"哪些语法被渲染"的设置
+// ---------------------------------------------------------------------------
+
+/**
+ * 行内公式（`$…$`）是否渲染。
+ *
+ * 用模块级开关而不是把设置塞进 `构建上下文`：装饰层里用得到设置的目前只有
+ * 这一处，为它给每个节点都背上一个 settings 对象不划算。
+ * 用 `types.ts` 承载是为了避免 block.ts 与 index.ts 之间的循环导入——
+ * 两个模块都从这里取。
+ *
+ * 改这个值之后要**手动重绘**（`view.dispatch({})`），装饰不会自己更新。
+ */
+let 行内公式启用 = true
+
+export function 设置行内公式启用(启用: boolean): void {
+  行内公式启用 = 启用
+}
+
+export function 行内公式已启用(): boolean {
+  return 行内公式启用
+}
+
+/**
+ * "渲染时转换"是否启用。
+ *
+ * 与行内公式同理：它决定的是"装饰怎么建"而不是"怎么显示"，
+ * 改完必须重绘（`view.dispatch({})`）才会生效。
+ */
+let 渲染标点启用 = false
+
+export function 设置渲染标点启用(启用: boolean): void {
+  渲染标点启用 = 启用
+}
+
+export function 渲染标点已启用(): boolean {
+  return 渲染标点启用
+}

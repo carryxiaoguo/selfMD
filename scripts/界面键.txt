@@ -1,0 +1,1 @@
+Untitled,Save,Cancel,Discard,Discard Changes,Saved,Undo,Close,OK,Yes,No,Continue,Select,Search,Replace,All,Loading,Error,Confirm,Dismiss,Finish Editing,Open Folder...,File Name,Path,Total,Delete,Rename,Overwrite,Learn More,Action,Open,Failed to load file,Save File Failed!,Menu,Back,Contact,Recent Documents,Export As...,More Formats,Copy Content

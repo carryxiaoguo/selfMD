@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="zh-Hans">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!--
+      内容安全策略。
+
+      `selfmd:` 必须出现在**每一个**可能用到它的指令里，漏一个就会出现
+      "主题加载了但某样东西不对"的静默故障。这几处是踩过的坑：
+
+        style-src   主题样式表本体
+        font-src    主题里 url('./主题名/xxx.woff2') 引用的字体
+        img-src     主题里引用的背景图
+        connect-src 主题自测与运行时 fetch
+
+      尤其是 font-src：漏掉它时样式表照常生效，只有字体悄悄回退成系统字体，
+      肉眼很难发现是策略拦的。
+    -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' selfmd:; img-src 'self' selfmd: data: blob: https:; font-src 'self' selfmd: data:; connect-src 'self' selfmd: ws: wss: http://localhost:* https:; media-src 'self' selfmd: blob:;"
+    />
+    <title>selfMD</title>
+    <link rel="stylesheet" href="./src/styles/base.css" />
+    <!--
+      三层主题级联，顺序即优先级：
+        1. 主题本体      <主题名>.css
+        2. 全局自定义    base.user.css        （对所有主题生效）
+        3. 主题专属自定义 <主题名>.user.css     （只对该主题生效）
+      后两个文件不存在也没关系——浏览器对 404 的样式表静默忽略，
+      所以不需要任何存在性检查。这是通行做法。
+    -->
+    <link rel="stylesheet" id="theme-css" href="" />
+    <link rel="stylesheet" id="base-user-css" href="" />
+    <link rel="stylesheet" id="theme-user-css" href="" />
+  </head>
+  <body>
+    <div id="app">
+      <div id="sidebar" hidden></div>
+      <main id="main">
+        <div id="editor-host"></div>
+        <div id="statusbar"></div>
+      </main>
+    </div>
+    <div id="toast-host"></div>
+    <script type="module" src="./src/main.ts"></script>
+  </body>
+</html>

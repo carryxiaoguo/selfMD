@@ -1,0 +1,10 @@
+import fs from 'node:fs';
+const f = process.argv[2];
+const t = fs.readFileSync(f, 'utf8');
+const count = (re) => (t.match(re) || []).length;
+console.log('registerDynamic( total :', count(/\$__System\.registerDynamic\(/g));
+console.log('registerDynamic("id",[ :', count(/\$__System\.registerDynamic\("[^"]+",\[/g));
+console.log('$__System.register(     :', count(/\$__System\.register\(/g));
+const urls = [...new Set(t.match(/https?:\/\/[0-9a-zA-Z.\-:/]+/g) || [])].sort();
+console.log('distinct URLs           :', urls.length);
+console.log(urls.join('\n'));

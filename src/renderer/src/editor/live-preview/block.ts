@@ -1,0 +1,368 @@
+import type { EditorState } from '@codemirror/state'
+import { 扫描行内公式 } from '@shared/数学'
+import { 块级行样式, 标题行装饰, 隐藏, 插入, 替换为 } from './decorations'
+import type { 构建上下文, 语法节点 } from './types'
+import { 加行装饰, 行内公式已启用 } from './types'
+import { 列表圆点, 水平线, 数学公式, 表格分隔, 任务框, 语言标签, 计算层级 } from './widgets'
+
+/**
+ * 块级装饰。
+ *
+ * 分两步：
+ *   1. **手工扫描**——YAML 前置元数据与 `$$` 数学块在 Lezer 语法树里
+ *      *没有任何节点*（已用 scripts/dump-tree.mjs 证实：首尾 `---` 被解析成
+ *      HorizontalRule，元数据正文被解析成普通段落）。所以这两类只能按行扫描。
+ *   2. **语法树遍历**——其余块级语法都有真实节点，按节点名分派。
+ *
+ * 手工扫描先跑，它占用的行会被记进 `行装饰已用`，语法树阶段自然跳过，
+ * 于是前置元数据不会被误画成水平线。
+ */
+
+// ---------------------------------------------------------------------------
+// 手工扫描：前置元数据
+// ---------------------------------------------------------------------------
+
+interface 手工块 {
+  from: number
+  to: number
+  /** 该块覆盖的行号（0 基下标存进数组，便于二分判断）。 */
+  行号集合: Set<number>
+}
+
+/** 首行 `---` 开头、后续某行 `---` 或 `...` 收尾，即视为 YAML 前置元数据。 */
+function 检测前置元数据(状态: EditorState): 手工块 | null {
+  if (状态.doc.lines < 2) return null
+  const 首行 = 状态.doc.line(1)
+  if (首行.text.trim() !== '---') return null
+
+  for (let 号 = 2; 号 <= 状态.doc.lines; 号++) {
+    const 行 = 状态.doc.line(号)
+    const 文本 = 行.text.trim()
+    if (文本 === '---' || 文本 === '...') {
+      const 行号集合 = new Set<number>()
+      for (let n = 1; n <= 号; n++) 行号集合.add(n)
+      return { from: 首行.from, to: 行.to, 行号集合 }
+    }
+  }
+  return null
+}
+
+// ---------------------------------------------------------------------------
+// 手工扫描：数学块
+// ---------------------------------------------------------------------------
+
+/** `$$` 独占一行开始，到下一个含 `$$` 的行结束；`$$x$$` 单行闭合也算。 */
+export function 检测数学块(状态: EditorState): 手工块[] {
+  const 结果: 手工块[] = []
+  for (let 号 = 1; 号 <= 状态.doc.lines; 号++) {
+    const 行 = 状态.doc.line(号)
+    const 文本 = 行.text.trim()
+    if (!文本.startsWith('$$')) continue
+    // 单行闭合：形如 `$$E=mc^2$$`（长度必须大于 4，以排除 `$$` 本身）。
+    if (文本.length > 4 && 文本.endsWith('$$')) {
+      结果.push({ from: 行.from, to: 行.to, 行号集合: new Set([号]) })
+      continue
+    }
+    for (let 终号 = 号 + 1; 终号 <= 状态.doc.lines; 终号++) {
+      const 终行 = 状态.doc.line(终号)
+      if (!终行.text.trim().endsWith('$$')) continue
+      const 行号集合 = new Set<number>()
+      for (let n = 号; n <= 终号; n++) 行号集合.add(n)
+      结果.push({ from: 行.from, to: 终行.to, 行号集合 })
+      号 = 终号
+      break
+    }
+  }
+  return 结果
+}
+
+function 落在手工块内(位置: number, 手工块列表: 手工块[]): boolean {
+  for (const 块 of 手工块列表) {
+    if (位置 >= 块.from && 位置 <= 块.to) return true
+  }
+  return false
+}
+
+// ---------------------------------------------------------------------------
+// 块级入口
+// ---------------------------------------------------------------------------
+
+export interface 手工扫描结果 {
+  前置元数据: 手工块 | null
+  数学块: 手工块[]
+  全部块: 手工块[]
+}
+
+/** 第一遍：处理语法树里不存在的两类块，并把它们占用的行登记好。 */
+export function 扫描手工块(状态: EditorState, 上下文: 构建上下文): 手工扫描结果 {
+  const 前置元数据 = 检测前置元数据(状态)
+  const 数学块 = 检测数学块(状态)
+
+  const 全部块: 手工块[] = []
+  if (前置元数据) 全部块.push(前置元数据)
+  全部块.push(...数学块)
+
+  for (const 号 of 前置元数据?.行号集合 ?? []) {
+    加行装饰(上下文, 状态.doc.line(号).from, 块级行样式.前置元数据)
+  }
+  for (const 块 of 数学块) {
+    for (const 号 of 块.行号集合) {
+      加行装饰(上下文, 状态.doc.line(号).from, 块级行样式.数学块)
+    }
+    // 块级公式的**替换**装饰不在这里加。
+    //
+    // CodeMirror 禁止插件提供块级装饰（"Block decorations may not be
+    // specified via plugins"），而跨行的替换必须带 `block: true`。
+    // 所以那部分挪到了 `live-preview/数学字段.ts` 的 StateField 里——
+    // StateField 才能提供块级装饰。
+    //
+    // 这里保留行装饰：它对插件是合法的，且与替换装饰互不冲突。
+  }
+
+  return { 前置元数据, 数学块, 全部块 }
+}
+
+/** 第二遍：按语法树节点名分派块级装饰。返回是否已处理该节点。 */
+export function 处理块级(
+  节点: 语法节点,
+  状态: EditorState,
+  上下文: 构建上下文,
+  手工: 手工扫描结果
+): boolean {
+  // 落在手工块内部的节点交给手工扫描处理（主要是别把 `---` 画成水平线）。
+  if (落在手工块内(节点.from, 手工.全部块)) return true
+
+  const 行号 = 状态.doc.lineAt(节点.from).number
+  const 在活动行 = 上下文.活动行.has(行号)
+
+  switch (节点.name) {
+    // ---------------------------------------------------------- 段落 ----
+    case 'Paragraph': {
+      // 行内公式的扫描挂在这里，而不是像块级那样做全文档手工扫描：
+      // 段落是语法树里唯一承载普通文本的块级节点，从这里扫天然排除了
+      // 代码块、围栏、表格单元格里的 `$`——那些地方不该出现公式。
+      const 光标 = 状态.selection.main
+      const 段落起 = 节点.from
+      const 原文 = 状态.sliceDoc(节点.from, 节点.to)
+      if (原文.includes('$')) {
+        for (const 区间 of 扫描行内公式(原文, 段落起, 行内公式已启用())) {
+          // 光标落在公式内部时露出源码，方便修改
+          if (光标.from >= 区间.from && 光标.to <= 区间.to + 1) continue
+          上下文.条目.push({
+            from: 区间.from,
+            to: 区间.to + 1, // 含结尾的 `$`
+            deco: 替换为(new 数学公式(区间.公式, false)),
+            rank: 2
+          })
+        }
+      }
+      return true
+    }
+
+    // ------------------------------------------------------------- 标题 --
+    case 'ATXHeading1':
+    case 'ATXHeading2':
+    case 'ATXHeading3':
+    case 'ATXHeading4':
+    case 'ATXHeading5':
+    case 'ATXHeading6': {
+      const 级 = Number(节点.name.slice(-1))
+      加行装饰(上下文, 状态.doc.lineAt(节点.from).from, 标题行装饰(级))
+      return false // 继续下沉，让 HeaderMark 被行内逻辑折叠
+    }
+
+    case 'SetextHeading1':
+    case 'SetextHeading2': {
+      const 级 = Number(节点.name.slice(-1))
+      加行装饰(上下文, 状态.doc.lineAt(节点.from).from, 标题行装饰(级))
+      return false
+    }
+
+    case 'HeaderMark': {
+      const 父名 = 节点.parent?.name ?? ''
+      if (父名.startsWith('ATXHeading') || 父名.startsWith('SetextHeading')) {
+        if (!在活动行) {
+          上下文.条目.push({ from: 节点.from, to: 节点.to, deco: 隐藏, rank: 1 })
+        }
+        return true
+      }
+      return false
+    }
+
+    // ------------------------------------------------------------- 引用 --
+    case 'Blockquote': {
+      // 引用块可能跨多行，逐行加左边框样式。
+      const 首行 = 状态.doc.lineAt(节点.from)
+      const 末行 = 状态.doc.lineAt(Math.max(节点.from, 节点.to - 1))
+      for (let n = 首行.number; n <= 末行.number; n++) {
+        加行装饰(上下文, 状态.doc.line(n).from, 块级行样式.引言)
+      }
+      return false
+    }
+
+    case 'QuoteMark': {
+      if (!在活动行) {
+        上下文.条目.push({ from: 节点.from, to: 节点.to, deco: 隐藏, rank: 1 })
+      }
+      return true
+    }
+
+    // ------------------------------------------------------------- 列表 --
+    case 'ListMark': {
+      const 祖父 = 节点.parent?.parent?.name
+      if (祖父 === 'BulletList') {
+        // 无序列表：把 `-` 换成圆点。活动行保留原字符，方便看清语法。
+        if (!在活动行) {
+          上下文.条目.push({
+            from: 节点.from,
+            to: 节点.to,
+            deco: 替换为(new 列表圆点(计算层级(状态, 节点.from))),
+            rank: 1
+          })
+        }
+      }
+      return true
+    }
+
+    // --------------------------------------------------------- 代码围栏 --
+    case 'FencedCode': {
+      const 首行 = 状态.doc.lineAt(节点.from)
+      const 末行 = 状态.doc.lineAt(Math.max(节点.from, 节点.to - 1))
+      for (let n = 首行.number; n <= 末行.number; n++) {
+        const 样式 =
+          n === 首行.number
+            ? 块级行样式.代码块首行
+            : n === 末行.number
+              ? 块级行样式.代码块末行
+              : 块级行样式.代码块中间行
+        加行装饰(上下文, 状态.doc.line(n).from, 样式)
+      }
+      return false
+    }
+
+    case 'CodeMark': {
+      // 只有围栏代码块的两个 ``` 需要折叠；行内代码的反引号在 inline.ts 处理。
+      if (节点.parent?.name === 'FencedCode' && !在活动行) {
+        上下文.条目.push({ from: 节点.from, to: 节点.to, deco: 隐藏, rank: 1 })
+      }
+      return true
+    }
+
+    case 'CodeInfo': {
+      // 语言标识折叠掉，改由行尾的标签 widget 呈现。
+      if (!在活动行) {
+        上下文.条目.push({ from: 节点.from, to: 节点.to, deco: 隐藏, rank: 1 })
+      }
+      return true
+    }
+
+    case 'CodeText': {
+      // CodeText 的父节点是 FencedCode，用它拿到首行位置来挂语言标签。
+      const 父 = 节点.parent
+      if (!父) return true
+      const 语言节点 = 找子节点(父, 'CodeInfo')
+      const 语言 = 语言节点 ? 状态.sliceDoc(语言节点.from, 语言节点.to).trim() : ''
+      const 行尾 = 状态.doc.lineAt(父.from).to
+      上下文.条目.push({
+        from: 行尾,
+        to: 行尾,
+        deco: 插入(new 语言标签(语言 || '文本'), 1),
+        rank: 2
+      })
+      return true
+    }
+
+    // --------------------------------------------------------- 水平线 ----
+    case 'HorizontalRule': {
+      const 行 = 状态.doc.lineAt(节点.from)
+      加行装饰(上下文, 行.from, 块级行样式.水平线行)
+      if (!在活动行) {
+        上下文.条目.push({
+          from: 节点.from,
+          to: 节点.to,
+          deco: 替换为(new 水平线()),
+          rank: 1
+        })
+      }
+      return true
+    }
+
+    // ----------------------------------------------------------- 表格 ----
+    case 'TableHeader': {
+      加行装饰(上下文, 状态.doc.lineAt(节点.from).from, 块级行样式.表头行)
+      return false
+    }
+
+    case 'TableRow': {
+      加行装饰(上下文, 状态.doc.lineAt(节点.from).from, 块级行样式.表格)
+      return false
+    }
+
+    case 'TableDelimiter': {
+      const 父名 = 节点.parent?.name
+      if (父名 === 'Table') {
+        // 对齐定义行（`| :--- | :--: |`）整行折叠，只留一条分隔视觉。
+        加行装饰(上下文, 状态.doc.lineAt(节点.from).from, 块级行样式.表格分隔行)
+        if (!在活动行) {
+          上下文.条目.push({ from: 节点.from, to: 节点.to, deco: 隐藏, rank: 1 })
+        }
+      } else {
+        // 单元格之间的 `|`，淡化成视觉分隔而不是删除，方便判断列边界。
+        if (!在活动行) {
+          上下文.条目.push({
+            from: 节点.from,
+            to: 节点.to,
+            deco: 替换为(new 表格分隔('│')),
+            rank: 1
+          })
+        }
+      }
+      return true
+    }
+
+    // ------------------------------------------------------- 任务列表 ----
+    case 'TaskMarker': {
+      if (节点.parent?.name !== 'Task') return false
+      // 整行挂 `md-task-list-item`：这是通用的类名，
+      // 挂上之后针对它写的规则（缩进、行高、完成态淡化）可直接生效。
+      加行装饰(上下文, 状态.doc.lineAt(节点.from).from, 块级行样式.任务项行)
+      const 原文 = 状态.sliceDoc(节点.from, 节点.to)
+      const 已勾选 = /\[[xX]\]/.test(原文)
+      // 复选框始终替换，即使光标在本行——否则勾选后光标会把标记"撑开"。
+      上下文.条目.push({
+        from: 节点.from,
+        to: 节点.to,
+        deco: 替换为(new 任务框(已勾选, 节点.from)),
+        rank: 1
+      })
+      return true
+    }
+
+    // ------------------------------------------------------- HTML 块 ----
+    case 'HTMLBlock': {
+      const 首行 = 状态.doc.lineAt(节点.from)
+      const 末行 = 状态.doc.lineAt(Math.max(节点.from, 节点.to - 1))
+      for (let n = 首行.number; n <= 末行.number; n++) {
+        加行装饰(上下文, 状态.doc.line(n).from, 块级行样式.HTML块)
+      }
+      return true
+    }
+
+    default:
+      return false
+  }
+}
+
+/** 在直接子节点中按名字查找。 */
+function 找子节点(父: 语法节点, 名字: string): 语法节点 | null {
+  const 带子节点 = 父 as 语法节点 & { firstChild?: 语法节点 | null; nextSibling?: 语法节点 | null }
+  let 当前 = 带子节点.firstChild ?? null
+  while (当前) {
+    if (当前.name === 名字) return 当前
+    当前 = (当前 as 语法节点 & { nextSibling?: 语法节点 | null }).nextSibling ?? null
+  }
+  return null
+}
+
+/** 导出给插件用。 */
+export type { 手工块 }

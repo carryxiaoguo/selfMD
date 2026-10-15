@@ -96,6 +96,10 @@ export const CH = {
   exportDoc: 'export:doc',
   /** 把文档渲染成图片并放进剪贴板。 */
   editCopyAsImage: 'edit:copyAsImage',
+  /** 查询 Markdown 文件关联的当前状态。 */
+  appFileAssoc: 'app:fileAssoc',
+  /** 打开系统的「默认应用」设置页。 */
+  appOpenDefaultApps: 'app:openDefaultApps',
   /** 打印当前窗口。 */
   appPrint: 'app:print',
 
@@ -445,6 +449,25 @@ export interface SelfMdApi {
     }): Promise<{ 路径: string | null; 错误: string | null }>
   }
   print(): Promise<{ 成功: boolean; 错误: string | null }>
+  /**
+   * Markdown 文件关联的当前状态。
+   *
+   * 做成可读的而不是只给一个"设置"按钮：用户以为设好了、其实没有，
+   * 是这件事上最常见的误会。让他看得见当前是什么，比反复点按钮有用。
+   */
+  fileAssoc(): Promise<{
+    当前: string
+    是默认: boolean
+    有新建菜单: boolean
+    程序路径: string
+  }>
+  /**
+   * 打开系统的「默认应用」设置页。
+   *
+   * Win10 起默认程序只能由用户亲自选，安装程序改不了——
+   * 所以这里不是"一键设为默认"，而是把用户送到那一页。
+   */
+  openDefaultApps(): Promise<void>
   /**
    * 把 Markdown 渲染成图片并写入剪贴板。
    *

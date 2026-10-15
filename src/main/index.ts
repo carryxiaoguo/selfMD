@@ -9,6 +9,7 @@ import { whenDocumentOpened, whenRendererReady } from './ipc/app'
 import { registerPrivilegedSchemes, registerProtocolHandlers } from './protocol'
 import { rebuildMenu, 菜单摘要, 设置Pandoc可用 } from './menu'
 import { 检测Pandoc, 执行导出 } from './export'
+import { 取关联状态 } from './services/文件关联'
 import {
   写草稿,
   列出草稿,
@@ -502,6 +503,15 @@ async function runSmokeTest(): Promise<void> {  const target = smokeOpenPath()
   }
 
   console.log(`[selfMD] 全屏自测：${await 运行全屏自测()}`)
+  // 文件关联是可读的状态而不是"设好了没有"的布尔值：
+  // 用户以为设好了、其实没有，是这件事上最常见的误会。
+  {
+    const 关联 = 取关联状态()
+    console.log(
+      `[selfMD] 文件关联：当前=${关联.当前 || '（未设置）'} ` +
+        `是默认=${关联.是默认} 有新建菜单=${关联.有新建菜单}`
+    )
+  }
 
   clearTimeout(timer)
   清理主题素材()

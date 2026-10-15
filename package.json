@@ -51,6 +51,29 @@
         "nsis"
       ]
     },
+    "fileAssociations": [
+      {
+        "ext": "md",
+        "name": "Markdown 文档",
+        "description": "Markdown 文档",
+        "icon": "resources/icon/icon.ico",
+        "role": "Editor"
+      },
+      {
+        "ext": "markdown",
+        "name": "Markdown 文档",
+        "description": "Markdown 文档",
+        "icon": "resources/icon/icon.ico",
+        "role": "Editor"
+      },
+      {
+        "ext": "mdown",
+        "name": "Markdown 文档",
+        "description": "Markdown 文档",
+        "icon": "resources/icon/icon.ico",
+        "role": "Editor"
+      }
+    ],
     "mac": {
       "icon": "resources/icon/icon-512.png"
     },
@@ -66,7 +89,8 @@
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "selfMD",
-      "artifactName": "selfMD-安装程序-${version}.${ext}"
+      "artifactName": "selfMD-安装程序-${version}.${ext}",
+      "include": "build/markdown-assoc.nsh"
     }
   },
   "devDependencies": {

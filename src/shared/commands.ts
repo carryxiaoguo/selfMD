@@ -163,6 +163,7 @@ export const COMMANDS: CommandDef[] = [
   { id: 'theme.revealFolder', label: '打开主题文件夹', category: 'View', implemented: true },
 
   // ---------------------------------------------------------------- 帮助 ----
+  { id: 'help.defaultApp', label: '设为 Markdown 默认程序', category: 'Help', implemented: true },
   { id: 'help.about', label: '关于', category: 'Help', implemented: true },
   { id: 'help.website', label: '官方网站', category: 'Help', implemented: true },
   { id: 'help.feedback', label: '反馈', category: 'Help', implemented: true }

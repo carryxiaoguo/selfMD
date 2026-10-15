@@ -42,6 +42,7 @@ import {
 import { getAppPaths } from '../util/paths'
 import { closeWindow, createWindow, takePendingPath } from '../window'
 import { rebuildMenu } from '../menu'
+import { 打开默认应用设置, 本程序路径, 取关联状态 } from '../services/文件关联'
 
 /** 向所有渲染进程广播事件。 */
 export function broadcast(channel: string, payload: unknown): void {
@@ -310,6 +311,19 @@ export function registerAppIpc(): void {
       )
     }
   )
+
+  // ------------------------------------------------------- 文件关联 --
+  // 做成"可读 + 引导"而不是"一键设为默认"：Win10 起默认程序只能由用户
+  // 在系统设置里亲自选，任何程序都改不了（UserChoice 带防篡改校验）。
+  // 与其给一个注定失败的按钮，不如把当前状态如实报出来，再把人送过去。
+  ipcMain.handle(CH.appFileAssoc, () => ({
+    ...取关联状态(),
+    程序路径: 本程序路径()
+  }))
+
+  ipcMain.handle(CH.appOpenDefaultApps, async () => {
+    await 打开默认应用设置()
+  })
 
   // --------------------------------------------------------------- 打印 --
   // 走 `webContents.print` 而不是渲染层的 `window.print()`：前者能指定

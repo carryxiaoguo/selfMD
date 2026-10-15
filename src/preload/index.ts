@@ -102,6 +102,11 @@ const api: SelfMdApi = {
       invoke<{ 路径: string | null; 错误: string | null }>(CH.exportDoc, 请求)
   },
   print: () => invoke<{ 成功: boolean; 错误: string | null }>(CH.appPrint),
+  fileAssoc: () =>
+    invoke<{ 当前: string; 是默认: boolean; 有新建菜单: boolean; 程序路径: string }>(
+      CH.appFileAssoc
+    ),
+  openDefaultApps: () => invoke<void>(CH.appOpenDefaultApps),
   copyAsImage: (请求: { 源: string; 文档路径: string | null; 宽度?: number }) =>
     invoke<{ 成功: boolean; 宽: number; 高: number; 已截断: boolean; 错误: string | null }>(
       CH.editCopyAsImage,

@@ -522,6 +522,8 @@ function helpMenu(): MenuItemConstructorOptions {
     role: 'help',
     label: 分类显示名.Help,
     submenu: [
+      toItem(pick('Help', 'help.defaultApp')),
+      { type: 'separator' },
       toItem(pick('Help', 'help.about'), {
         click: () => {
           const win = BrowserWindow.getFocusedWindow()

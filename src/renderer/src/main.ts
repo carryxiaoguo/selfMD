@@ -2599,6 +2599,36 @@ async function runCommand(payload: MenuCommandPayload): Promise<void> {
       return
     }
 
+    case 'help.defaultApp': {
+      // **不做"一键设为默认"**：Windows 10 起默认程序由用户的 UserChoice
+      // 决定，且带防篡改校验，任何程序都改不了。给一个注定失败的按钮
+      // 比不给更糟——用户点几次没反应，会以为整个程序有问题。
+      //
+      // 能做的是：如实报出当前状态，再把人送到系统设置那一页。
+      const 关联 = await window.selfmd.fileAssoc()
+      const 详情 =
+        `当前默认程序：${关联.当前 || '（未设置）'}\n` +
+        `本程序：${关联.程序路径}\n` +
+        `「新建」菜单项：${关联.有新建菜单 ? '已注册' : '未注册'}` +
+        (关联.是默认
+          ? ''
+          : '\n\nWindows 不允许程序自己改默认打开方式，需要在系统设置里选一次。' +
+            '点「打开设置」跳到那一页，找到 .md 后选 selfMD。')
+
+      const 结果 = await window.selfmd.dialog.message({
+        type: 'info',
+        title: 'Markdown 文件关联',
+        message: 关联.是默认 ? '已经是 Markdown 的默认程序' : '尚未设为默认',
+        detail: 详情,
+        buttons: 关联.是默认 ? ['确定'] : ['打开设置', '取消'],
+        defaultId: 0,
+        cancelId: 1
+      })
+
+      if (!关联.是默认 && 结果.response === 0) await window.selfmd.openDefaultApps()
+      return
+    }
+
     case 'help.website':
     case 'help.feedback': {
       // 本项目没有对外站点。指向一个不存在的网址比什么都不做更糟——

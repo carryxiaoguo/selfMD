@@ -75,7 +75,44 @@ const markdownHighlight = HighlightStyle.define([
   { tag: t.contentSeparator, class: 'cm-tok-marker' },
   { tag: t.labelName, class: 'cm-tok-link' },
   { tag: t.escape, class: 'cm-tok-marker' },
-  { tag: t.invalid, color: '#d1242f' }
+  { tag: t.invalid, color: '#d1242f' },
+
+  // --- 编程语言（围栏代码块内部）----------------------------------------
+  //
+  // **这一段是必须的，不是锦上添花。**
+  //
+  // `syntaxHighlighting(markdownHighlight)` 是**非 fallback** 的，而
+  // CodeMirror 的取值逻辑是：
+  //
+  //     let main = state.facet(highlighterFacet)
+  //     return main.length ? main : state.facet(fallbackHighlighter)
+  //
+  // 也就是"只要有非 fallback 的风格，fallback 就整个不生效"。
+  // 于是之前那份 `syntaxHighlighting(defaultHighlightStyle, { fallback: true })`
+  // **一行都没起作用**——围栏里的语言被识别了、解析器也跑了，
+  // 但 keyword / string / comment 这些标签没有任何样式，**一个颜色都不上**。
+  //
+  // 颜色走变量而不是写死：同一份代码要在浅色主题上深、在深色主题上浅，
+  // 写死一套必然有一边看不清。这也让主题作者能自己调代码配色。
+  { tag: [t.keyword, t.moduleKeyword, t.controlKeyword, t.operatorKeyword], class: 'cm-tok-keyword' },
+  { tag: [t.string, t.special(t.string), t.regexp], class: 'cm-tok-string' },
+  { tag: [t.number, t.bool, t.null, t.atom], class: 'cm-tok-number' },
+  { tag: [t.typeName, t.className, t.namespace], class: 'cm-tok-type' },
+  {
+    tag: [t.function(t.variableName), t.function(t.propertyName), t.function(t.definition(t.variableName))],
+    class: 'cm-tok-function'
+  },
+  { tag: [t.propertyName, t.attributeName], class: 'cm-tok-property' },
+  { tag: [t.variableName, t.definition(t.variableName)], class: 'cm-tok-variable' },
+  { tag: [t.operator, t.punctuation, t.separator, t.bracket, t.derefOperator], class: 'cm-tok-punct' },
+  { tag: [t.tagName, t.angleBracket, t.attributeValue], class: 'cm-tok-tag' },
+  { tag: [t.meta, t.annotation], class: 'cm-tok-meta' },
+  { tag: t.self, class: 'cm-tok-keyword' },
+  { tag: t.constant(t.variableName), class: 'cm-tok-number' },
+  { tag: t.definitionKeyword, class: 'cm-tok-keyword' },
+  { tag: t.modifier, class: 'cm-tok-keyword' },
+  { tag: t.operatorKeyword, class: 'cm-tok-keyword' },
+  { tag: t.unit, class: 'cm-tok-number' }
 ])
 
 /**

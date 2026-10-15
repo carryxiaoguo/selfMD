@@ -99,6 +99,26 @@
   --radius: 6px;
   --shadow: 0 1px 3px rgba(31, 35, 40, 0.12);
   --focus-ring: 0 0 0 3px var(--focus-ring-color);
+
+  /* --- 代码语法配色（围栏代码块内部）------------------------------------
+     这些不是可选项：编辑器只挂了一个**非 fallback** 的高亮风格，
+     而 CodeMirror 的取值逻辑是"有非 fallback 的就不用 fallback"，
+     所以内置的默认配色被整个跳过——不在这里给出颜色，
+     代码块就是一片单色，语言识别了也白搭。
+
+     颜色放变量而不是写死：同一份代码要在浅色主题上深、在深色主题上浅，
+     写死一套必然有一边看不清。三款内置主题各给了一套。 */
+  --code-keyword: #a626a4;
+  --code-string: #50a14f;
+  --code-comment: #a0a1a7;
+  --code-number: #986801;
+  --code-type: #c18401;
+  --code-function: #4078f2;
+  --code-property: #e45649;
+  --code-variable: #383a42;
+  --code-punct: #52607a;
+  --code-tag: #e45649;
+  --code-meta: #986801;
 }
 
 *,
@@ -244,6 +264,27 @@ body.source-mode .cm-content {
 .cm-tok-list { color: var(--marker-list); }
 .cm-tok-comment { color: var(--text-muted); font-style: italic; }
 .cm-tok-marker { color: var(--syntax); }
+
+/* --- 编程语言（围栏代码块内部）--------------------------------------------
+   代码注释用 `--code-comment` 而不是 `--text-muted`：注释是代码的一部分，
+   应当与主题的代码配色同一族，而不是跟着界面文案的灰度走。 */
+.cm-tok-keyword { color: var(--code-keyword); }
+.cm-tok-string { color: var(--code-string); }
+.cm-tok-number { color: var(--code-number); }
+.cm-tok-type { color: var(--code-type); }
+.cm-tok-function { color: var(--code-function); }
+.cm-tok-property { color: var(--code-property); }
+.cm-tok-variable { color: var(--code-variable); }
+.cm-tok-punct { color: var(--code-punct); }
+.cm-tok-tag { color: var(--code-tag); }
+.cm-tok-meta { color: var(--code-meta); }
+
+/* 代码块内的注释覆盖上面那条通用规则：Markdown 注释与代码注释共用
+   `t.comment` 这个标签，但两者该有不同的颜色。 */
+.cm-lp-code .cm-tok-comment,
+.md-fences .cm-tok-comment {
+  color: var(--code-comment);
+}
 
 /* ==========================================================================
    渲染形态：行内（cm-md-*）

@@ -2394,7 +2394,16 @@ async function openPath(path: string): Promise<void> {
         // 分开数才能区分"没渲染"与"渲染了但加载失败"——两者的修复方向完全不同。
         图片: '.cm-w-image img',
         图片失败: '.cm-w-image.md-img-error',
-        独占行图片: '.cm-lp-image-line'
+        独占行图片: '.cm-lp-image-line',
+        // 代码块内部的语法着色。**分语言标签统计**而不是只数一个总数：
+        // 只数总数的话，"只有注释上了色、关键字没上"也会显示成通过。
+        代码关键字: '.cm-tok-keyword',
+        代码字符串: '.cm-tok-string',
+        代码注释: '.cm-tok-comment',
+        代码函数: '.cm-tok-function',
+        代码数字: '.cm-tok-number',
+        代码类型: '.cm-tok-type',
+        代码着色总数: '.cm-lp-code [class*="cm-tok-"]'
       }
       domCounts = {}
       for (const [名, 选择器] of Object.entries(待统计)) {

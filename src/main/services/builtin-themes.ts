@@ -104,6 +104,20 @@ export const BUILTIN_THEMES: BuiltinTheme[] = [
   /* 书页是方的，圆角一大就不像纸了 */
   --radius: 3px;
   --shadow: 0 1px 2px rgba(58, 49, 38, 0.1);
+
+  /* --- 代码配色：纸上不能用霓虹色。整体压暗、降饱和，
+         像用钢笔和两种墨水写下来的，而不是屏幕上的发光体 --- */
+  --code-keyword: #7b3f8c;
+  --code-string: #4a7c3f;
+  --code-comment: #9c8c6f;
+  --code-number: #a8622a;
+  --code-type: #8a6a1f;
+  --code-function: #2f5d8a;
+  --code-property: #9c3b26;
+  --code-variable: #3a3126;
+  --code-punct: #6b5c44;
+  --code-tag: #9c3b26;
+  --code-meta: #8a6a1f;
 }
 
 /* --- 以下直接写选择器 ------------------------------------------------- */
@@ -199,6 +213,19 @@ export const BUILTIN_THEMES: BuiltinTheme[] = [
   --content-max-width: 800px;
   --radius: 8px;
   --shadow: 0 1px 3px rgba(42, 49, 80, 0.1);
+
+  /* --- 代码配色：白底上要压深才够对比 --- */
+  --code-keyword: #8250df;
+  --code-string: #1a7f37;
+  --code-comment: #8f9ab8;
+  --code-number: #953800;
+  --code-type: #9a6700;
+  --code-function: #0550ae;
+  --code-property: #cf222e;
+  --code-variable: #2a3150;
+  --code-punct: #5b6688;
+  --code-tag: #cf222e;
+  --code-meta: #9a6700;
 }
 `
   },
@@ -257,6 +284,20 @@ export const BUILTIN_THEMES: BuiltinTheme[] = [
   --radius: 8px;
   /* 深色下的阴影要更重才看得出层次，浅色的那点阴影在这里等于没有 */
   --shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
+
+  /* --- 代码配色：黑底上要提亮，但别用纯饱和色——
+         在暗背景上高饱和度的文字会"发光"，久看刺痛 --- */
+  --code-keyword: #c792ea;
+  --code-string: #98d982;
+  --code-comment: #66719a;
+  --code-number: #f0a45d;
+  --code-type: #e5c07b;
+  --code-function: #7aa2f7;
+  --code-property: #ef8f8f;
+  --code-variable: #c7cfe4;
+  --code-punct: #8b97b8;
+  --code-tag: #ef8f8f;
+  --code-meta: #e5c07b;
 }
 `
   }

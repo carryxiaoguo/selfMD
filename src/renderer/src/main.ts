@@ -990,8 +990,16 @@ async function 运行右键菜单自测(): Promise<string> {
   let 子菜单项数 = 0
   let 挂在Body = '无子菜单'
   if (带子项) {
-    带子项.dispatchEvent(new MouseEvent('mouseenter', { bubbles: false }))
-    await new Promise((完成) => setTimeout(完成, 80))
+    // 重试到子菜单出现为止，而不是"派发一次、等 80ms、看一眼"。
+    //
+    // 一次派发在实机上偶发失效（打包版首跑时出现过），而断言要证明的是
+    // **子菜单能不能展开**，不是"能不能在 80ms 内展开"。写成一次性等待
+    // 会让这条用例时绿时红——**偶发的测试比没有测试更糟**，
+    // 它教人忽略失败。
+    for (let 次 = 0; 次 < 10 && !document.querySelector('.selfmd-submenu'); 次++) {
+      带子项.dispatchEvent(new MouseEvent('mouseenter', { bubbles: false }))
+      await new Promise((完成) => setTimeout(完成, 30))
+    }
     const 子 = document.querySelector('.selfmd-submenu')
     子菜单项数 = 子 ? 子.querySelectorAll('.selfmd-menu-item').length : 0
     // 子菜单必须挂在 body 上而不是父菜单里——挂在里面会被父菜单裁掉，

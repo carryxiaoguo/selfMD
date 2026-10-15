@@ -7,7 +7,7 @@
  * 自绘省掉一次往返，也让菜单项能直接读当前编辑器状态来决定是否置灰。
  *
  * 该收尾的地方一处都不能漏：滚动、窗口缩放、点击别处、按 Esc，
- * 只要漏一个，菜单就会"粘"在屏幕上。所以统一走 `关闭()`。
+ * 只要漏一个，菜单就会"粘"在屏幕上。所以统一走 `关闭菜单()`。
  */
 
 export interface 菜单项 {
@@ -15,7 +15,7 @@ export interface 菜单项 {
   文字?: string
   /** 点击后的动作。省略即为不可点（配合 `禁用` 或纯标题）。 */
   动作?: () => void
-   /** 插入一条分隔线；其余字段忽略。 */
+  /** 插入一条分隔线；其余字段忽略。 */
   分隔?: boolean
   禁用?: boolean
   /** 右侧显示的快捷键提示，纯展示。 */
@@ -24,31 +24,49 @@ export interface 菜单项 {
   勾选?: boolean
   /** 危险操作（删除类），文字用警示色。 */
   危险?: boolean
+  /**
+   * 子菜单。
+   *
+   * 与主流 Markdown 编辑器一致：段落类型、格式这类"一族"的操作收进子菜单，
+   * 否则一次要列出二十多项，找一项得扫半屏。
+   */
+  子项?: 菜单项[]
 }
 
 let 当前菜单: HTMLElement | null = null
+let 当前子菜单: HTMLElement | null = null
 let 清理函数: (() => void) | null = null
 
 /** 关掉当前菜单；没有菜单时什么也不做。 */
 export function 关闭菜单(): void {
-  if (清理函数) {
-    清理函数()
-    清理函数 = null
-  }
+  收起子菜单()
+  清理函数?.()
+  清理函数 = null
   当前菜单?.remove()
   当前菜单 = null
 }
 
-/**
- * 在指定位置弹出菜单。
- *
- * @param 位置 视口坐标（通常取自 `MouseEvent.clientX/clientY`）
- */
-export function 弹出菜单(位置: { x: number; y: number }, 项们: 菜单项[]): void {
-  关闭菜单()
+/** 菜单当前是否打开。 */
+export function 菜单已打开(): boolean {
+  return 当前菜单 !== null
+}
 
+function 收起子菜单(): void {
+  当前子菜单?.remove()
+  当前子菜单 = null
+}
+
+/**
+ * 按菜单项数组建出一个菜单元素。
+ *
+ * 抽成函数是为了让子菜单复用同一套渲染——各写一份的话，
+ * 勾选、置灰、快捷键提示这些细节迟早只有一边对。
+ *
+ * @param 是子菜单 子菜单不注册全局收尾，它的生死由父菜单管
+ */
+function 建立菜单(项们: 菜单项[], 是子菜单 = false): HTMLElement {
   const 菜单 = document.createElement('div')
-  菜单.className = 'selfmd-menu'
+  菜单.className = 是子菜单 ? 'selfmd-menu selfmd-submenu' : 'selfmd-menu'
   菜单.setAttribute('role', 'menu')
 
   for (const 项 of 项们) {
@@ -63,8 +81,11 @@ export function 弹出菜单(位置: { x: number; y: number }, 项们: 菜单项
     行.className = 'selfmd-menu-item'
     行.type = 'button'
     行.setAttribute('role', 'menuitem')
-    // 没有动作的一律当标题处理，视觉上也区分开
-    const 可点 = Boolean(项.动作) && !项.禁用
+
+    const 有子项 = Boolean(项.子项 && 项.子项.length > 0) && !项.禁用
+    // 没有动作的一律当标题处理，视觉上也区分开。
+    // 有子项的行不执行动作，但它**是可点的**——置灰会让人以为整族都不可用。
+    const 可点 = (Boolean(项.动作) || 有子项) && !项.禁用
     if (!可点) 行.classList.add('disabled')
     if (项.危险) 行.classList.add('danger')
     行.disabled = !可点
@@ -86,6 +107,32 @@ export function 弹出菜单(位置: { x: number; y: number }, 项们: 菜单项
       行.append(提示)
     }
 
+    if (有子项) {
+      const 箭头 = document.createElement('span')
+      箭头.className = 'selfmd-menu-arrow'
+      箭头.textContent = '▸'
+      行.append(箭头)
+      行.classList.add('has-submenu')
+
+      // 用 hover 展开而不是 click：菜单的惯例是"指过去就开"，
+      // 要多点一次会让人以为这一项是禁用的。
+      行.addEventListener('mouseenter', () => 展开子菜单(行, 项.子项 ?? []))
+      // 离开时收起，但要把"指针正移向子菜单"的情况排除掉——
+      // 否则指针一离开行、还没进子菜单，子菜单就没了，永远点不到。
+      行.addEventListener('mouseleave', (事件) => {
+        const 相关 = 事件.relatedTarget as Node | null
+        if (相关 && 当前子菜单?.contains(相关)) return
+        收起子菜单()
+      })
+
+      菜单.append(行)
+      continue
+    }
+
+    // 鼠标扫过任何一行都收起子菜单——同层的兄弟行展开新子菜单前，
+    // 旧的那个必须先消失，否则屏幕上会同时挂两层。
+    行.addEventListener('mouseenter', 收起子菜单)
+
     if (可点) {
       行.addEventListener('click', (事件) => {
         事件.preventDefault()
@@ -97,6 +144,45 @@ export function 弹出菜单(位置: { x: number; y: number }, 项们: 菜单项
 
     菜单.append(行)
   }
+
+  return 菜单
+}
+
+/** 在某一行右侧展开子菜单；右边放不下就翻到左侧。 */
+function 展开子菜单(宿主行: HTMLElement, 项们: 菜单项[]): void {
+  收起子菜单()
+
+  const 子 = 建立菜单(项们, true)
+  document.body.append(子)
+
+  const 行框 = 宿主行.getBoundingClientRect()
+  const 宽 = 子.offsetWidth
+
+  // 优先右侧；右边塞不下就翻到左侧。窄窗口下这是唯一能看全的办法。
+  const 右 = 行框.right
+  const 左 = 右 + 宽 > window.innerWidth - 6 ? 行框.left - 宽 : 右
+  子.style.left = `${Math.max(6, 左)}px`
+  子.style.top = `${Math.min(行框.top, window.innerHeight - 子.offsetHeight - 6)}px`
+
+  // 指针从宿主行移进子菜单的途中会经过这里，所以子菜单也要接管
+  子.addEventListener('mouseleave', (事件) => {
+    const 相关 = 事件.relatedTarget as Node | null
+    if (相关 && (子.contains(相关) || 宿主行.contains(相关))) return
+    收起子菜单()
+  })
+
+  当前子菜单 = 子
+}
+
+/**
+ * 弹出菜单。
+ *
+ * @param 位置 视口坐标（通常取自 `MouseEvent.clientX/clientY`）
+ */
+export function 弹出菜单(位置: { x: number; y: number }, 项们: 菜单项[]): void {
+  关闭菜单()
+
+  const 菜单 = 建立菜单(项们)
 
   // 先挂到 DOM 才能量尺寸，量完再定位，避免先闪一下再跳到正确位置
   document.body.append(菜单)
@@ -110,9 +196,13 @@ export function 弹出菜单(位置: { x: number; y: number }, 项们: 菜单项
 
   当前菜单 = 菜单
 
-  // --- 收尾：四个来源任意一个触发都关掉 ---
+  // --- 收尾：任何一个来源触发都关掉 ---
   const 按下别处 = (事件: MouseEvent): void => {
-    if (!菜单.contains(事件.target as Node)) 关闭菜单()
+    const 目标 = 事件.target as Node
+    // 子菜单挂在 body 上，不在父菜单的 contains 里，
+    // 漏掉它会让"点子菜单里的项"先触发关闭、动作再也执行不到。
+    if (菜单.contains(目标) || 当前子菜单?.contains(目标)) return
+    关闭菜单()
   }
   const 按键 = (事件: KeyboardEvent): void => {
     if (事件.key === 'Escape') {

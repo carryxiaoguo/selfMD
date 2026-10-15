@@ -850,6 +850,167 @@ async function 运行图片菜单自测(): Promise<string> {
 }
 
 /**
+ * 编辑器里的右键菜单。
+ *
+ * 与主流 Markdown 编辑器对齐：分「编辑动作 → 段落 → 格式 → 插入 → 查找」
+ * 几组，段落与格式收进子菜单——平铺出来二十多项，找一项得扫半屏。
+ *
+ * 全部走 `runCommand`，与菜单栏、快捷键**同一条路径**。各写一套的话，
+ * 右键"加粗"和 Ctrl+B 迟早会在边界情况上分叉（比如空选区时一个生效一个不生效）。
+ *
+ * 置灰的判断也来自真实状态：没选区就不能剪切复制，只读时不能粘贴。
+ */
+function 构建编辑器右键菜单(): 菜单项[] {
+  const 区 = view.state.selection.main
+  const 有选区 = 区.from !== 区.to
+  const 只读 = view.state.readOnly
+
+  const 转 = (id: string, 文字: string, 提示?: string, 禁用?: boolean): 菜单项 => ({
+    文字,
+    提示,
+    禁用,
+    动作: () => void runCommand({ command: id })
+  })
+
+  return [
+    转('edit.undo', '撤消', 'Ctrl+Z'),
+    转('edit.redo', '重做', 'Ctrl+Shift+Z'),
+    { 分隔: true },
+    转('edit.cut', '剪切', 'Ctrl+X', !有选区),
+    转('edit.copy', '复制', 'Ctrl+C', !有选区),
+    转('edit.paste', '粘贴', 'Ctrl+V', 只读),
+    转('edit.pasteAsPlainText', '粘贴为纯文本', 'Ctrl+Shift+V', 只读),
+    { 分隔: true },
+
+    {
+      文字: '段落',
+      子项: [
+        转('para.h1', '一级标题', 'Ctrl+1'),
+        转('para.h2', '二级标题', 'Ctrl+2'),
+        转('para.h3', '三级标题', 'Ctrl+3'),
+        转('para.h4', '四级标题'),
+        转('para.h5', '五级标题'),
+        转('para.h6', '六级标题'),
+        { 分隔: true },
+        转('para.headingUp', '提升标题级别'),
+        转('para.headingDown', '降低标题级别'),
+        { 分隔: true },
+        转('para.quote', '引用'),
+        转('para.unorderedList', '无序列表'),
+        转('para.orderedList', '有序列表'),
+        转('para.taskList', '任务列表'),
+        { 分隔: true },
+        转('para.codeFences', '代码块', 'Ctrl+Shift+K'),
+        转('para.mathBlock', '公式块'),
+        转('para.table', '表格'),
+        转('para.horizontalLine', '水平分割线')
+      ]
+    },
+
+    {
+      文字: '格式',
+      子项: [
+        转('fmt.strong', '加粗', 'Ctrl+B'),
+        转('fmt.emphasis', '斜体', 'Ctrl+I'),
+        转('fmt.underline', '下划线'),
+        转('fmt.strike', '删除线', 'Alt+Shift+5'),
+        转('fmt.highlight', '高亮'),
+        转('fmt.code', '行内代码', 'Ctrl+Shift+`'),
+        转('fmt.inlineMath', '行内公式'),
+        { 分隔: true },
+        转('fmt.superscript', '上标'),
+        转('fmt.subscript', '下标'),
+        { 分隔: true },
+        转('fmt.hyperlink', '超链接', 'Ctrl+K'),
+        转('fmt.clear', '清除格式')
+      ]
+    },
+
+    {
+      文字: '插入',
+      子项: [
+        转('image.insertLocal', '插入本地图片'),
+        转('image.insertFromUrl', '插入网络图片'),
+        { 分隔: true },
+        转('edit.copyAsMarkdown', '复制为 Markdown'),
+        转('edit.copyAsHtmlCode', '复制为 HTML 代码'),
+        转('edit.copyAsImage', '复制为图片')
+      ]
+    },
+
+    { 分隔: true },
+    转('edit.selectAll', '全选', 'Ctrl+A'),
+    转('edit.selectBlock', '选择段落或块'),
+    { 分隔: true },
+    转('edit.find', '查找', 'Ctrl+F'),
+    转('edit.findAndReplace', '查找和替换', 'Ctrl+H')
+  ]
+}
+
+/**
+ * 编辑器右键菜单自测。
+ *
+ * 右键菜单是"点了没反应也看不出来"的典型：回调没接上、子菜单展不开、
+ * 点完菜单不关——三种情况在界面上都只表现为"右键不好使"。
+ *
+ * 断言：
+ *   1. 真的在编辑器上派发一次 contextmenu，数顶层项与子菜单
+ *   2. 无选区时"剪切/复制"必须置灰（否则点了没反应，用户以为坏了）
+ *   3. 展开子菜单后确实多出一层，且挂在 body 上
+ *   4. 按 Esc 之后 DOM 里不留残余
+ */
+async function 运行右键菜单自测(): Promise<string> {
+  // 先清空选区，好验证置灰逻辑
+  view.dispatch({ selection: { anchor: 0 } })
+  await new Promise((完成) => setTimeout(完成, 60))
+
+  const 事件 = new MouseEvent('contextmenu', {
+    bubbles: true,
+    cancelable: true,
+    clientX: 200,
+    clientY: 200
+  })
+  view.dom.dispatchEvent(事件)
+  await new Promise((完成) => setTimeout(完成, 80))
+
+  const 菜单 = document.querySelector('.selfmd-menu')
+  if (!菜单) return '菜单未弹出'
+
+  const 顶层项 = 菜单.querySelectorAll('.selfmd-menu-item').length
+  // 没有选区时，剪切与复制应当置灰
+  const 置灰数 = 菜单.querySelectorAll('.selfmd-menu-item.disabled').length
+  const 有子菜单 = 菜单.querySelectorAll('.selfmd-menu-item.has-submenu').length
+  const 被拦截 = 事件.defaultPrevented ? '是' : '否'
+
+  // 展开第一个可用的子菜单
+  const 带子项 = Array.from(菜单.querySelectorAll('.selfmd-menu-item.has-submenu')).find(
+    (el) => !el.classList.contains('disabled')
+  ) as HTMLElement | undefined
+
+  let 子菜单项数 = 0
+  let 挂在Body = '无子菜单'
+  if (带子项) {
+    带子项.dispatchEvent(new MouseEvent('mouseenter', { bubbles: false }))
+    await new Promise((完成) => setTimeout(完成, 80))
+    const 子 = document.querySelector('.selfmd-submenu')
+    子菜单项数 = 子 ? 子.querySelectorAll('.selfmd-menu-item').length : 0
+    // 子菜单必须挂在 body 上而不是父菜单里——挂在里面会被父菜单裁掉，
+    // 也会被"点空白处关闭"的逻辑误判成点到了外面
+    挂在Body = 子 ? (子.parentElement === document.body ? '是' : '否') : '无子菜单'
+  }
+
+  // Esc 关闭并检查残留
+  document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+  await new Promise((完成) => setTimeout(完成, 60))
+  const 残留 = document.querySelectorAll('.selfmd-menu, .selfmd-submenu').length
+
+  return (
+    `顶层项=${顶层项} 置灰=${置灰数} 有子菜单=${有子菜单} ` +
+    `子菜单项=${子菜单项数} 挂在Body=${挂在Body} 拦截默认菜单=${被拦截} 关闭后残留=${残留}`
+  )
+}
+
+/**
  * 代码块交互自测。
  *
  * 盯的是用户实际踩到的那个坑：**光标在代码块里，但屏幕上看起来像在外面**。
@@ -2655,6 +2816,7 @@ async function openPath(path: string): Promise<void> {
     let 标点结果: Record<string, string> | undefined
     let 交互结果: string | undefined
     let 代码块结果: string | undefined
+    let 右键结果: string | undefined
     let 匹配结果: Record<string, string> | undefined
     let 侧边栏结果: string | undefined
     let 标签结果: string | undefined
@@ -2673,6 +2835,7 @@ async function openPath(path: string): Promise<void> {
       上传结果 = 运行上传自测()
       数学结果 = 运行数学自测()
       标点结果 = 运行渲染标点自测()
+      右键结果 = await 运行右键菜单自测()
       代码块结果 = await 运行代码块自测()
       交互结果 = await 运行交互自测()
       匹配结果 = 运行模糊匹配自测()
@@ -2707,6 +2870,7 @@ async function openPath(path: string): Promise<void> {
       sidebarResult: 侧边栏结果,
       tabResult: 标签结果,
       codeBlockResult: 代码块结果,
+      contextMenuResult: 右键结果,
       interactionResult: 交互结果,
       imageCopyResult: 图片复制结果,
       modeResult: 模式结果,
@@ -2786,6 +2950,18 @@ async function boot(): Promise<void> {
   view = new EditorView({
     state: EditorState.create({ doc: '', extensions: 编辑器扩展() }),
     parent: host
+  })
+
+  // --- 编辑器右键菜单 -----------------------------------------------------
+  //
+  // 挂在 `view.dom` 上而不是文档级：只有编辑器内容需要这套段落/格式菜单。
+  // 侧边栏、状态栏各有各的右键语境，混在一起会出现"在文件树上右键却弹出加粗"。
+  //
+  // 必须 `preventDefault`，否则 Chromium 会再弹一层自己的默认菜单
+  // （剪切/复制/粘贴 + 拼写建议），两层叠在一起。
+  view.dom.addEventListener('contextmenu', (事件) => {
+    事件.preventDefault()
+    弹出菜单({ x: 事件.clientX, y: 事件.clientY }, 构建编辑器右键菜单())
   })
 
   // 侧边栏要在 view 建好之后才能建：它依赖 view 做跳转与取文档路径。

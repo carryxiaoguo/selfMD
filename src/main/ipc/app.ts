@@ -501,6 +501,7 @@ export function registerAppIpc(): void {
         imageCopyResult?: string
         interactionResult?: string
         codeBlockResult?: string
+        contextMenuResult?: string
         matchResults?: Record<string, string>
         mode?: string
       }
@@ -579,6 +580,9 @@ export function registerAppIpc(): void {
         for (const [名, 输出] of Object.entries(info.mathResults)) {
           console.log(`    ${名}  =>  ${输出}`)
         }
+      }
+      if (info.contextMenuResult) {
+        console.log(`[selfMD] 右键菜单自测：${info.contextMenuResult}`)
       }
       if (info.codeBlockResult) {
         console.log(`[selfMD] 代码块交互自测：${info.codeBlockResult}`)

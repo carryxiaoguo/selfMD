@@ -931,6 +931,42 @@ body.live-preview .cm-md-marker-hidden {
   color: var(--primary-btn-text-color);
 }
 
+/* --- 子菜单 -----------------------------------------------------------------
+   子菜单挂在 body 上（不是宿主行的子节点），所以它自己也要定位与层级。
+   放大 z-index：两层菜单叠在一起时，子菜单必须压在父菜单上面。 */
+.selfmd-submenu {
+  z-index: 2201;
+  min-width: 150px;
+  /* 展开时有一点位移与淡入，否则两层菜单会"啪"地出现 */
+  animation: 子菜单展开 var(--dur-quick) var(--ease);
+}
+
+@keyframes 子菜单展开 {
+  from {
+    opacity: 0;
+    transform: translateX(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* 有子菜单的行的悬停态**不能**用主色填充：
+   它不执行动作，填成主色会让人以为点了就会发生什么。 */
+.selfmd-menu-item.has-submenu:not(.disabled):hover {
+  background: var(--item-hover-bg-color);
+  color: var(--control-text-hover-color);
+}
+
+.selfmd-menu-arrow {
+  margin-left: auto;
+  padding-left: 12px;
+  font-size: 10px;
+  line-height: 1;
+  opacity: 0.7;
+}
+
 .selfmd-menu-item.disabled {
   color: var(--blur-text-color);
   cursor: default;

@@ -57,6 +57,16 @@
     "linux": {
       "icon": "resources/icon/icon-512.png",
       "category": "Office"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "allowElevation": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "selfMD",
+      "artifactName": "selfMD-安装程序-${version}.${ext}"
     }
   },
   "devDependencies": {

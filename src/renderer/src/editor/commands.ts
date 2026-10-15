@@ -1,6 +1,8 @@
 import { isolateHistory } from '@codemirror/commands'
+import { syntaxTree } from '@codemirror/language'
 import { EditorSelection, type ChangeSpec, type EditorState } from '@codemirror/state'
 import type { EditorView } from '@codemirror/view'
+import type { 语法节点 } from './syntax-node'
 
 /**
  * 段落与格式编辑命令。
@@ -403,5 +405,63 @@ export function 清除格式(view: EditorView): boolean {
 
   if (变更.length === 0) return false
   view.dispatch({ changes: 变更, userEvent: 'input.clearFormat', annotations: 独立撤销 })
+  return true
+}
+
+/**
+ * 从代码围栏里跳出去。
+ *
+ * 光标落在围栏内时，把它移到**闭合围栏之后**；文档末尾没有那一行就补一行。
+ *
+ * ## 为什么必须有这个命令
+ *
+ * 围栏的可见性按"光标是否在这段围栏内"判断——只要还在块里，两个 ```
+ * 就一直看得见，边界不会看丢。但反过来说，**站在块内末尾时屏幕上没有任何
+ * 提示说"你还在块里"**：最后一行代码之后紧接着就是下一个段落，
+ * 看起来完全一样。用户以为已经跳出去了，一打字却插进了代码块。
+ *
+ * 与其让用户去猜边界在哪，不如给一个明确的出口。这也正是 Typora 的行为。
+ *
+ * @returns 光标不在围栏内时返回 false，把 Escape 让给别的处理器
+ *          （关面板、清选区、退出全屏……）。
+ */
+export function 跳出代码块(view: EditorView): boolean {
+  const 状态 = view.state
+  const 光标 = 状态.selection.main
+
+  // 找包含光标的最内层围栏。`resolveInner` 给的是最深的节点，
+  // 沿 parent 往上找，第一个 FencedCode 就是它。
+  let 围栏: 语法节点 | null = null
+  let 节点: 语法节点 | null = syntaxTree(状态).resolveInner(光标.head, -1) as unknown as 语法节点
+  while (节点) {
+    if (节点.name === 'FencedCode') {
+      围栏 = 节点
+      break
+    }
+    节点 = 节点.parent
+  }
+  if (!围栏) return false
+
+  const 末行 = 状态.doc.lineAt(围栏.to)
+
+  // 围栏已经是最后一行：补一个空行再落上去。
+  // 不补的话光标无处可去，用户会觉得"退不出去"——那比原来更糟。
+  if (末行.number >= 状态.doc.lines) {
+    const 末尾 = 状态.doc.length
+    view.dispatch({
+      changes: { from: 末尾, insert: '\n' },
+      selection: { anchor: 末尾 + 1 },
+      scrollIntoView: true,
+      userEvent: 'select'
+    })
+    return true
+  }
+
+  const 下一行 = 状态.doc.line(末行.number + 1)
+  view.dispatch({
+    selection: { anchor: 下一行.from },
+    scrollIntoView: true,
+    userEvent: 'select'
+  })
   return true
 }

@@ -36,6 +36,7 @@ import { tags as t } from '@lezer/highlight'
 import type { Settings } from '@shared/types'
 import { livePreview } from './live-preview'
 import { 按设置构建智能标点 } from './smart-punctuation'
+import { 跳出代码块 } from './commands'
 
 /**
  * CodeMirror 6 装配。
@@ -212,6 +213,10 @@ export function baseExtensions(options: EditorOptions): Extension[] {
     highlightSelectionMatches(),
     search({ top: true }),
     keymap.of([
+      // Esc 跳出代码围栏。**必须排在内置键位表之前**：CodeMirror 的键位表
+      // 按顺序取第一个返回 true 的处理器，排在后面就永远轮不到。
+      // 光标不在围栏里时它返回 false，Escape 会继续往下传（关面板等）。
+      { key: 'Escape', run: 跳出代码块 },
       ...closeBracketsKeymap,
       ...defaultKeymap,
       ...searchKeymap,

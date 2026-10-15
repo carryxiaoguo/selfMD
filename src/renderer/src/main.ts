@@ -20,6 +20,7 @@ import {
   插入数学块,
   插入表格,
   插入链接,
+  跳出代码块,
   清除格式,
   调整标题级别,
   调整缩进,
@@ -846,6 +847,75 @@ async function 运行图片菜单自测(): Promise<string> {
   const 关闭后残留 = document.querySelectorAll('.selfmd-menu').length
 
   return `本地=${本地统计} 远程=${远程统计} 关闭后残留=${关闭后残留}`
+}
+
+/**
+ * 代码块交互自测。
+ *
+ * 盯的是用户实际踩到的那个坑：**光标在代码块里，但屏幕上看起来像在外面**。
+ * 原因是围栏的 ``` 按"光标是否在这一行"隐藏，于是站在最后一行代码上时，
+ * 闭合围栏消失了——"块内末尾"和"块外"看起来一模一样，
+ * 一打字就插进了代码块。
+ *
+ * 两条断言：
+ *   1. 光标在块内时，**闭合围栏可见**（边界始终看得见）
+ *   2. Escape 把光标移到**闭合围栏之后**，且在那里打字不进代码块
+ */
+async function 运行代码块自测(): Promise<string> {
+  const 原文 = ['开头段落。', '', '```js', 'const 甲 = 1', 'const 乙 = 2', '```', '', '结尾段落。'].join(
+    '\n'
+  )
+
+  // 用独立的临时文档，测完恢复现场
+  const 备份 = view.state
+  view.setState(EditorState.create({ doc: 原文, extensions: 编辑器扩展() }))
+  设置文档目录(null)
+  await new Promise((完成) => setTimeout(完成, 80))
+
+  // 语法树里找围栏，取最后一行代码的位置（不是围栏行）
+  const 树 = syntaxTree(view.state)
+  let 围栏: { from: number; to: number } | null = null
+  树.iterate({
+    enter: (n) => {
+      if (n.name === 'FencedCode' && !围栏) 围栏 = { from: n.from, to: n.to }
+    }
+  })
+
+  let 围栏可见 = '未测'
+  let 跳出后位置 = '未测'
+  let 跳出后打字不进块 = '未测'
+
+  if (围栏) {
+    const 块 = 围栏 as { from: number; to: number }
+    // 光标落在**最后一行代码**上——正是用户会以为自己"已经在外面"的位置
+    const 最后代码位置 = view.state.doc.lineAt(块.to).from - 1
+    view.dispatch({ selection: { anchor: Math.max(块.from, 最后代码位置) } })
+    await new Promise((完成) => setTimeout(完成, 80))
+
+    // 闭合围栏那一行的 DOM 里还看得见 ``` 吗
+    const 代码行 = Array.from(document.querySelectorAll('.cm-lp-code'))
+    const 末行文本 = 代码行.length > 0 ? (代码行[代码行.length - 1].textContent ?? '') : ''
+    围栏可见 = 末行文本.includes('```') ? '是' : '否'
+
+    // Escape 跳出
+    const 成功 = 跳出代码块(view)
+    await new Promise((完成) => setTimeout(完成, 80))
+    const 新光标 = view.state.selection.main.head
+    跳出后位置 = 成功 && 新光标 > 块.to ? '围栏之后' : `否(${新光标} vs ${块.to})`
+
+    // 在跳出去的位置打一个字，再确认它落在代码块之外
+    view.dispatch({ changes: { from: 新光标, insert: '尾' } })
+    await new Promise((完成) => setTimeout(完成, 60))
+    const 打完 = view.state.doc.toString()
+    const 块末 = 打完.indexOf('```', 打完.indexOf('```') + 3)
+    跳出后打字不进块 = 块末 >= 0 && 打完.indexOf('尾') > 块末 ? '是' : '否'
+  }
+
+  // 恢复现场
+  view.setState(备份)
+  await new Promise((完成) => setTimeout(完成, 60))
+
+  return `闭合围栏可见=${围栏可见} 跳出后位置=${跳出后位置} 跳出后打字不进块=${跳出后打字不进块}`
 }
 
 /**
@@ -2584,6 +2654,7 @@ async function openPath(path: string): Promise<void> {
     let 数学结果: Record<string, string> | undefined
     let 标点结果: Record<string, string> | undefined
     let 交互结果: string | undefined
+    let 代码块结果: string | undefined
     let 匹配结果: Record<string, string> | undefined
     let 侧边栏结果: string | undefined
     let 标签结果: string | undefined
@@ -2602,6 +2673,7 @@ async function openPath(path: string): Promise<void> {
       上传结果 = 运行上传自测()
       数学结果 = 运行数学自测()
       标点结果 = 运行渲染标点自测()
+      代码块结果 = await 运行代码块自测()
       交互结果 = await 运行交互自测()
       匹配结果 = 运行模糊匹配自测()
       imageInsertResult = await 运行图片插入自测(path)
@@ -2634,6 +2706,7 @@ async function openPath(path: string): Promise<void> {
       matchResults: 匹配结果,
       sidebarResult: 侧边栏结果,
       tabResult: 标签结果,
+      codeBlockResult: 代码块结果,
       interactionResult: 交互结果,
       imageCopyResult: 图片复制结果,
       modeResult: 模式结果,

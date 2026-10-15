@@ -500,6 +500,7 @@ export function registerAppIpc(): void {
         tabResult?: string
         imageCopyResult?: string
         interactionResult?: string
+        codeBlockResult?: string
         matchResults?: Record<string, string>
         mode?: string
       }
@@ -578,6 +579,9 @@ export function registerAppIpc(): void {
         for (const [名, 输出] of Object.entries(info.mathResults)) {
           console.log(`    ${名}  =>  ${输出}`)
         }
+      }
+      if (info.codeBlockResult) {
+        console.log(`[selfMD] 代码块交互自测：${info.codeBlockResult}`)
       }
       if (info.interactionResult) {
         console.log(`[selfMD] 交互反馈自测：${info.interactionResult}`)

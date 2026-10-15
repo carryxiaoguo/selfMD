@@ -40,8 +40,8 @@
         "from": "resources/icon",
         "to": "icon",
         "filter": [
-          "*.png",
-          "*.ico"
+          "icon*.png",
+          "icon.ico"
         ]
       }
     ],
@@ -59,7 +59,6 @@
       "category": "Office"
     }
   },
-  "dependencies": {},
   "devDependencies": {
     "@codemirror/autocomplete": "^6.18.4",
     "@codemirror/commands": "^6.7.1",
@@ -73,6 +72,7 @@
     "@lezer/markdown": "^1.4.2",
     "@types/node": "^22.10.5",
     "electron": "^33.3.1",
+    "electron-builder": "^26.15.3",
     "electron-vite": "^2.3.0",
     "katex": "^0.19.0",
     "mermaid": "^12.2.0",

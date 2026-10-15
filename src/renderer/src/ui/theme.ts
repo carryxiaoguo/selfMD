@@ -19,9 +19,38 @@ import { 生效主题, type Settings } from '@shared/types'
 
 let 已应用的链接: Record<string, string> = {}
 
+/**
+ * 取（必要时创建）某一层的 `<link>`，并保证它排在 `<head>` 的最后。
+ *
+ * ## 为什么必须在运行时创建，而不是写在 index.html 里
+ *
+ * 最初这三行是静态写在 `index.html` 的 `<head>` 里的，位置在基础样式表之后，
+ * 层叠上是对的。但**构建工具会把它自己打包出来的 CSS 注入到 `<head>` 末尾**：
+ *
+ *     <link id="theme-css" href="...">                  ← 主题
+ *     <link rel="stylesheet" href="./assets/index-*.css">  ← 打包后的 base.css
+ *
+ * 于是基础样式的 `:root` 反而排在主题后面。两者选择器相同（都是 `:root`），
+ * **后加载的赢**——主题加载了、解析了、规则也在，然后被整个盖掉。
+ * 表现就是"切换主题没有任何变化"，而协议自测全绿（它测的是能不能取到）。
+ *
+ * 所以链接必须**追加到 head 末尾**，才能压过构建产物。
+ * 三层的先后顺序也由追加顺序保证，那是层叠契约的一部分。
+ */
+function 取链接(id: string): HTMLLinkElement {
+  let el = document.getElementById(id) as HTMLLinkElement | null
+  if (!el) {
+    el = document.createElement('link')
+    el.rel = 'stylesheet'
+    el.id = id
+    // append 而不是 insertBefore：永远排在最后，压过打包产物
+    document.head.append(el)
+  }
+  return el
+}
+
 function 设置链接(id: string, href: string): void {
-  const el = document.getElementById(id) as HTMLLinkElement | null
-  if (!el) return
+  const el = 取链接(id)
   // 同一个 URL 重复赋值不会触发重新加载；主题切换本来就会换 URL，
   // 但"重新加载主题"命令需要绕过这一点，所以由调用方负责改 URL。
   if (el.getAttribute('href') === href) return
@@ -42,8 +71,8 @@ export function 重新加载主题(settings: Settings): void {
     ['base-user-css', 全局自定义样式Url()],
     ['theme-user-css', 主题自定义样式Url(id)]
   ] as const) {
-    const el = document.getElementById(元素) as HTMLLinkElement | null
-    if (el) el.setAttribute('href', '')
+    // 清空再设：同一个 URL 不会触发重新拉取，必须先断开
+    取链接(元素).setAttribute('href', '')
     设置链接(元素, href)
   }
 }
@@ -59,13 +88,19 @@ export function applyTheme(settings: Settings): void {
   document.body.classList.toggle('source-mode', !settings.livePreview)
 
   // 切主题时必须先清掉内联变量覆盖再重新设值。
-  // 内联样式优先级高于任何样式表，残留一版旧值会让新主题"换不动"——
-  // 切换主题时同样要把内联覆盖清空再重设。
+  // 内联样式优先级高于任何样式表，残留一版旧值会让新主题"换不动"。
+  //
+  // **0 / 空字符串表示"跟随主题"**，此时必须把内联值清掉而不是设成 0：
+  // 设成 0 会得到 `0px` 这种无效值，而清掉之后主题与基础样式才有机会生效。
   const 根 = document.documentElement
-  根.style.setProperty('--font-size', `${settings.fontSize}px`)
-  根.style.setProperty('--line-height', String(settings.lineHeight))
-  根.style.setProperty('--font-body', settings.fontFamily || '')
-  根.style.setProperty('--font-mono', settings.monospaceFontFamily || '')
+  const 设或清 = (名: string, 值: string): void => {
+    if (值) 根.style.setProperty(名, 值)
+    else 根.style.removeProperty(名)
+  }
+  设或清('--font-size', settings.fontSize > 0 ? `${settings.fontSize}px` : '')
+  设或清('--line-height', settings.lineHeight > 0 ? String(settings.lineHeight) : '')
+  设或清('--font-body', settings.fontFamily || '')
+  设或清('--font-mono', settings.monospaceFontFamily || '')
 }
 
 /** 用户没有固定模式时，跟随操作系统的配色方案。 */

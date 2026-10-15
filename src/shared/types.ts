@@ -86,9 +86,17 @@ export interface DirEntry {
 
 export interface Settings {
   // --- 编辑器 ---------------------------------------------------------------
+  /**
+   * 正文字号（px）。**0 表示跟随主题。**
+   *
+   * 用 0 作哨兵而不是拿 16 当"默认值"：主题也要定字号（书籍主题要更大的
+   * 字号与行距），而内联样式优先级高于样式表——只要这里永远写一个具体数，
+   * 主题定的字号就永远被盖掉，表现为"换了主题只是颜色变了、排版没变"。
+   */
   fontSize: number
   fontFamily: string | null
   monospaceFontFamily: string | null
+  /** 行高。**0 表示跟随主题**，理由同 `fontSize`。 */
   lineHeight: number
   /** 在源码视图中对长行自动折行。 */
   autoWrapLongLines: boolean
@@ -201,10 +209,12 @@ export interface Settings {
 }
 
 export const DEFAULT_SETTINGS: Settings = {
-  fontSize: 16,
+  // 0 = 跟随主题。主题理应能决定正文的排版（书籍主题要更大字号、更松行距），
+  // 而内联样式压得过任何样式表——所以"我不表态"必须是可表达的。
+  fontSize: 0,
   fontFamily: null,
   monospaceFontFamily: null,
-  lineHeight: 1.6,
+  lineHeight: 0,
   autoWrapLongLines: true,
   indentFirstLine: false,
   preserveSingleLineBreak: false,

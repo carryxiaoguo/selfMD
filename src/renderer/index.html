@@ -28,12 +28,14 @@
         1. 主题本体      <主题名>.css
         2. 全局自定义    base.user.css        （对所有主题生效）
         3. 主题专属自定义 <主题名>.user.css     （只对该主题生效）
-      后两个文件不存在也没关系——浏览器对 404 的样式表静默忽略，
-      所以不需要任何存在性检查。这是通行做法。
+
+      **这三层不在这里写死，由 `ui/theme.ts` 在运行时追加到 head 末尾。**
+      原因是踩过的坑：构建工具会把它打包出来的 CSS 注入到 head 末尾，
+      静态写在这里的主题链接反而排在基础样式**之前**——两者都是 `:root`，
+      后加载的赢，于是主题被整个盖掉，表现为"切换主题没有任何变化"。
+
+      后两个文件不存在也没关系，浏览器对 404 的样式表静默忽略。
     -->
-    <link rel="stylesheet" id="theme-css" href="" />
-    <link rel="stylesheet" id="base-user-css" href="" />
-    <link rel="stylesheet" id="theme-user-css" href="" />
   </head>
   <body>
     <div id="app">

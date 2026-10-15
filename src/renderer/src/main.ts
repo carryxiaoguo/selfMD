@@ -511,10 +511,87 @@ async function 运行主题自测(): Promise<string> {
     })
   )
 
+  // --- 主题到底生效了没有 -------------------------------------------------
+  //
+  // 上面那几行只证明"样式表能通过协议取到"。**取到 ≠ 生效**：
+  // link 的 href 可能没被设上、样式表可能解析失败、也可能被优先级更高的
+  // 规则整个盖掉。所以这里读**计算后的值**，而不是读文件内容。
+  //
+  // 这是被真实反馈逼出来的：主题切换后界面"看起来没变化"，
+  // 而协议自测全绿——因为它测的是"能不能取到"，不是"有没有生效"。
+  const 根样式 = getComputedStyle(document.documentElement)
+  const 取值 = (名: string): string => 根样式.getPropertyValue(名).trim()
+  const 主题链接 = document.getElementById('theme-css') as HTMLLinkElement | null
+  const 生效值 = [
+    `底色=${取值('--bg-color')}`,
+    `文字=${取值('--text-color')}`,
+    `字号=${取值('--font-size')}`,
+    `行高=${取值('--line-height')}`,
+    `版心=${取值('--content-max-width')}`
+  ].join(' ')
+
+  // 样式表是否真的解析出了规则。跨源样式表读 cssRules 会抛，
+  // 但 ours 是同源协议，读得到——读不到就说明它根本没加载成功。
+  //
+  // **逐个列出**而不是只报一个数：三层里有两层（base.user / <主题>.user）
+  // 默认是不存在的文件，只报一个总数会分不清"哪一层出问题"。
+  const 样式表 = Array.from(document.styleSheets).map((s) => {
+    const 名 = (s.href ?? '(内联)').split('/').slice(-1)[0] || '(内联)'
+    let 数 = '?'
+    try {
+      数 = String(s.cssRules.length)
+    } catch {
+      数 = 'X'
+    }
+    return `${名}:${数}`
+  })
+  const 规则数 = 样式表.join(',')
+
+  // 主题那份样式表里第一条规则到底写了什么——如果它解析成了空规则，
+  // 这里会露出来，而不是仅仅表现为"颜色没变"。
+  let 首条规则 = '无'
+  try {
+    const 片 = Array.from(document.styleSheets).find(
+      (s) => s.href && s.href.includes('/theme/') && s.cssRules.length > 0
+    )
+    if (片) 首条规则 = 片.cssRules[0].cssText.slice(0, 60).replace(/\s+/g, ' ')
+  } catch {
+    首条规则 = '异常'
+  }
+
+  // --- 切换主题，计算值真的会变吗 -----------------------------------------
+  //
+  // 这条才是"主题功能有没有用"的直接证据。上面那些只证明**样式表被加载了**，
+  // 而加载 ≠ 生效：静态写在 index.html 里的主题链接会排在构建产物**之前**，
+  // 两者都是 `:root`，后加载的赢——主题解析了、规则也在，然后被整个盖掉。
+  // 曾经就是这个原因导致"切换主题没有任何变化"，而协议自测全绿。
+  const 原主题 = settings.theme
+  const 采样: string[] = []
+  for (const 试 of ['moon-light', 'parchment', 'moon-dark']) {
+    settings = await window.selfmd.settings.patch({ theme: 试 })
+    applyTheme(settings)
+    // 等样式表应用：link 是异步加载的，不等会读到上一份的值
+    await new Promise((完成) => setTimeout(完成, 150))
+    const 值 = getComputedStyle(document.documentElement).getPropertyValue('--bg-color').trim()
+    采样.push(`${试}=${值}`)
+  }
+  settings = await window.selfmd.settings.patch({ theme: 原主题 })
+  applyTheme(settings)
+  await new Promise((完成) => setTimeout(完成, 150))
+
+  // 三款主题的底色**互不相同**才算"切换真的生效"。
+  // 有一对相同就可能只是巧合（比如两款都被人改成了同一个颜色），
+  // 但三者全同必然说明主题根本没起作用。
+  const 底色们 = 采样.map((s) => s.split('=')[1])
+  const 互不相同 = new Set(底色们).size === 底色们.length
+
   return (
     `主题本体=${主题本体} 子目录资源=${子目录资源} ` +
     `缺失文件=${不存在} 目录穿越=${穿越} ` +
-    `内置=${内置.length} 明细=${描述} 全部可读=${可读.every(Boolean)}`
+    `内置=${内置.length} 明细=${描述} 全部可读=${可读.every(Boolean)} ` +
+    `链接=${主题链接?.getAttribute('href') ? '已设' : '空'} 规则=${规则数} ${生效值} ` +
+    `切换=${采样.join(' ')} 互不相同=${互不相同} ` +
+    `首条=${首条规则}`
   )
 }
 

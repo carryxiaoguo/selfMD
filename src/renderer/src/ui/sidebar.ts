@@ -13,7 +13,15 @@ import type { 标题项 } from './outline'
  * 每次启动都回到默认值很烦人。
  */
 
-export type 侧边栏标签 = 'outline' | 'files'
+export type 侧边栏标签 = 'outline' | 'files' | 'articles'
+
+/** 文档列表里的一项。 */
+export interface 文档列表项 {
+  标识: number
+  名字: string
+  脏: boolean
+  当前: boolean
+}
 
 export interface 侧边栏依赖 {
   /** 当前文档路径；未保存时为 null。 */
@@ -22,6 +30,10 @@ export interface 侧边栏依赖 {
   跳转到: (位置: number) => void
   /** 点击文件树项时打开该文件。 */
   打开文件: (路径: string) => void
+  /** 点击文档列表项时切换到该文档。 */
+  点击文档: (标识: number) => void
+  /** 点击文档列表项的关闭按钮。 */
+  关闭文档: (标识: number) => void
   /** 折叠 / 展开大纲某一段（当前不做折叠，保留接口）。 */
   保存状态: (状态: { 可见: boolean; 标签: 侧边栏标签; 宽度: number }) => void
 }
@@ -37,6 +49,9 @@ export class 侧边栏 {
   private 可见 = false
   private 大纲面板!: HTMLElement
   private 文件面板!: HTMLElement
+  private 文档面板!: HTMLElement
+  /** 已打开的文档列表。由外层在多文档变化时推送。 */
+  private 文档列表: 文档列表项[] = []
   private 标签按钮 = new Map<侧边栏标签, HTMLButtonElement>()
   private 当前高亮下标 = -1
   /** 已展开的目录路径。文件树每次重绘都读它，折叠状态才不会丢。 */
@@ -60,7 +75,8 @@ export class 侧边栏 {
 
     for (const [值, 文字] of [
       ['outline', '大纲'],
-      ['files', '文件']
+      ['files', '文件'],
+      ['articles', '文档']
     ] as const) {
       const 按钮 = document.createElement('button')
       按钮.className = 'sidebar-tab'
@@ -82,7 +98,11 @@ export class 侧边栏 {
     this.文件面板.className = 'file-list'
     this.文件面板.dataset.panel = 'files'
 
-    主体.append(this.大纲面板, this.文件面板)
+    this.文档面板 = document.createElement('div')
+    this.文档面板.className = 'article-list'
+    this.文档面板.dataset.panel = 'articles'
+
+    主体.append(this.大纲面板, this.文件面板, this.文档面板)
 
     const 拖柄 = document.createElement('div')
     拖柄.className = 'sidebar-resizer'
@@ -96,7 +116,9 @@ export class 侧边栏 {
     for (const [值, 按钮] of this.标签按钮) 按钮.classList.toggle('active', 值 === this.标签)
     this.大纲面板.hidden = this.标签 !== 'outline'
     this.文件面板.hidden = this.标签 !== 'files'
+    this.文档面板.hidden = this.标签 !== 'articles'
     if (this.标签 === 'files') void this.刷新文件树()
+    if (this.标签 === 'articles') this.重绘文档列表()
   }
 
   // ------------------------------------------------------------- 交互 ----
@@ -229,6 +251,8 @@ export class 侧边栏 {
 
   /** 文件树以"当前文档所在目录"为根。没有文档时显示提示。 */
   private 文件树根: string | null = null
+  /** 用户显式打开的根目录；非 null 时覆盖"跟随文档"的行为。 */
+  private 手动根目录: string | null = null
   private 刷新序号 = 0
 
   async 刷新文件树(): Promise<void> {
@@ -239,20 +263,26 @@ export class 侧边栏 {
     const 序号 = ++this.刷新序号
     const 片段 = document.createDocumentFragment()
 
+    // 用户显式打开过文件夹时以它为准；否则跟随当前文档所在目录。
+    // 两种模式都要有：跟随文档是默认（打开一个文件就想看到它的邻居），
+    // 而显式打开一个文件夹之后，切到别处的文档不该把树根也带走。
     const 文档 = this.依赖.取文档路径()
-    if (!文档) {
+    let 根: string | null
+    if (this.手动根目录) {
+      根 = this.手动根目录
+    } else if (!文档) {
       this.文件树根 = null
       片段.append(this.建提示('尚未保存的文档没有所在目录'))
       this.提交文件树(片段, 序号)
       return
-    }
-
-    const 根 = await window.selfmdExtra.path.dirname(文档)
-    if (序号 !== this.刷新序号) return
-    if (!根) {
-      片段.append(this.建提示('无法定位所在目录'))
-      this.提交文件树(片段, 序号)
-      return
+    } else {
+      根 = await window.selfmdExtra.path.dirname(文档)
+      if (序号 !== this.刷新序号) return
+      if (!根) {
+        片段.append(this.建提示('无法定位所在目录'))
+        this.提交文件树(片段, 序号)
+        return
+      }
     }
 
     this.文件树根 = 根
@@ -277,9 +307,84 @@ export class 侧边栏 {
     this.文件面板.append(片段)
   }
 
-  /** 文件树的根目录；没有可用根时为 null。 */
+  /**
+   * 文档列表的根目录；没有可用根时为 null。 */
   get 当前根目录(): string | null {
     return this.文件树根
+  }
+
+  // --------------------------------------------------------- 文档列表 ----
+
+  /** 推送已打开的文档列表并重绘。 */
+  设置文档列表(列表: 文档列表项[]): void {
+    this.文档列表 = 列表
+    if (this.标签 === 'articles') this.重绘文档列表()
+  }
+
+  private 重绘文档列表(): void {
+    this.文档面板.textContent = ''
+
+    if (this.文档列表.length === 0) {
+      this.文档面板.append(this.建提示('没有打开的文档'))
+      return
+    }
+
+    for (const 项 of this.文档列表) {
+      const 行 = document.createElement('div')
+      行.className = 'article-list-item'
+      if (项.当前) 行.classList.add('is-active')
+      // 数据属性而不是闭包变量：重绘后仍然能通过点击事件反查是哪一个，
+      // 不必为每一行重新绑一次监听器。
+      行.dataset.标识 = String(项.标识)
+      行.title = 项.名字
+
+      const 名 = document.createElement('span')
+      名.className = 'article-name'
+      名.textContent = 项.名字
+      行.append(名)
+
+      // 未保存的标记。只是一个点，但它是"这个文档还有改动没落盘"的唯一提示，
+      // 而文档列表恰恰是多文档下最容易忘记存盘的地方。
+      if (项.脏) {
+        const 点 = document.createElement('span')
+        点.className = 'article-dirty'
+        点.textContent = '•'
+        点.title = '有未保存的改动'
+        行.append(点)
+      }
+
+      // 只有一个文档时不给关闭按钮：关掉就没有编辑器了
+      if (this.文档列表.length > 1) {
+        const 关 = document.createElement('button')
+        关.className = 'article-close'
+        关.type = 'button'
+        关.textContent = '×'
+        关.title = '关闭'
+        关.addEventListener('click', (事件) => {
+          事件.stopPropagation()
+          this.依赖.关闭文档(项.标识)
+        })
+        行.append(关)
+      }
+
+      行.addEventListener('click', () => this.依赖.点击文档(项.标识))
+      this.文档面板.append(行)
+    }
+  }
+
+  /**
+   * 显式指定文件树根目录。
+   *
+   * 设过之后文件树不再跟随当前文档——这正是"打开文件夹"该有的语义：
+   * 用户要的是浏览那个文件夹，切文档不该把树根也带走。
+   */
+  设根目录(路径: string): void {
+    this.手动根目录 = 路径
+  }
+
+  /** 清除显式根，回到跟随当前文档的模式。 */
+  清除根目录(): void {
+    this.手动根目录 = null
   }
 
   private 建提示(文字: string): HTMLElement {

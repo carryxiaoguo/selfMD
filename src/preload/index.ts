@@ -102,7 +102,11 @@ const api: SelfMdApi = {
       invoke<{ 路径: string | null; 错误: string | null }>(CH.exportDoc, 请求)
   },
   print: () => invoke<{ 成功: boolean; 错误: string | null }>(CH.appPrint),
-
+  copyAsImage: (请求: { 源: string; 文档路径: string | null; 宽度?: number }) =>
+    invoke<{ 成功: boolean; 宽: number; 高: number; 已截断: boolean; 错误: string | null }>(
+      CH.editCopyAsImage,
+      请求
+    ),
   draft: {
     save: (原路径, 内容) => invoke<boolean>(CH.draftSave, 原路径, 内容),
     list: () => invoke<草稿信息[]>(CH.draftList),
@@ -180,7 +184,19 @@ const extras = {
     remove: (path: string) => invoke<RecentEntry[]>(CH.recentRemove, path)
   },
   path: {
-    dirname: (p: string) => invoke<string>(CH.pathDirname, p)
+    dirname: (p: string) => invoke<string>(CH.pathDirname, p),
+    basename: (p: string) => invoke<string>(CH.pathBasename, p),
+    join: (...段: string[]) => invoke<string>(CH.pathJoin, 段)
+  },
+  file: {
+    copy: (from: string, to: string) => invoke<void>(CH.fileCopy, from, to),
+    move: (from: string, to: string) => invoke<void>(CH.fileMove, from, to),
+    rename: (from: string, to: string) => invoke<void>(CH.fileRename, from, to),
+    walk: (根: string, 选项?: { 上限?: number; 深度?: number }) =>
+      invoke<{
+        文件: { 路径: string; 名字: string; 修改时间: number; 大小: number }[]
+        已截断: boolean
+      }>(CH.fileWalk, 根, 选项)
   },
   task: {
     report: (payload: TaskProgress) => invoke<void>(CH.taskProgress, payload)

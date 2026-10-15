@@ -148,6 +148,31 @@ export class DocumentService {
     void window.selfmd.doc.setDirty(true)
     this.emit()
   }
+
+  // ------------------------------------------------------- 多文档换入换出 ---
+
+  /**
+   * 导出当前状态的一份副本。
+   *
+   * 供标签管理器在切换文档时把"这一份"存回标签里。
+   * 返回副本而不是引用：调用方拿到之后不该有能力改到内部状态。
+   */
+  导出状态(): DocState {
+    return { ...this.state }
+  }
+
+  /**
+   * 整体采用另一份状态。
+   *
+   * 与 `adoptPath` 的区别：那个只换路径，这个把名字、脏标记、编码、
+   * 换行符一起换掉——切换文档时这些都要跟着走，否则会出现
+   * "切过去了但标题还写着上一个文件名""编码显示成上一个文档的"这类错位。
+   */
+  采用状态(状态: DocState): void {
+    this.state = { ...状态 }
+    void window.selfmd.doc.setDirty(this.state.dirty)
+    this.emit()
+  }
 }
 
 export function baseName(path: string): string {

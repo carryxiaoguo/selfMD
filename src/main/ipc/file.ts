@@ -171,6 +171,90 @@ export function registerFileIpc(): void {
     await fsp.copyFile(from, to)
   })
 
+  /**
+   * 递归列出一个目录下的全部文件，供"快速打开"建索引。
+   *
+   *
+   *   1. **跳过隐藏目录与常见的大目录**（`node_modules`、`.git`）；
+   *   2. **文件数上限** —— 超过就停，宁可索引不全也不能让界面失去响应；
+   *   3. **深度上限** —— 符号链接成环时深度限制是唯一的护栏。
+   *
+   * 用同步 API 是有意的：这个调用发生在用户按下 Ctrl+P 之后，
+   * 结果要立刻用来填列表；异步反而要处理"列表先空后满"的闪烁。
+   * 上限保证了它不会长时间阻塞。
+   */
+  ipcMain.handle(CH.fileWalk, (_e, 根: string, 选项?: { 上限?: number; 深度?: number }) => {
+    const 上限 = Math.min(选项?.上限 ?? 4000, 20000)
+    const 最大深度 = Math.min(选项?.深度 ?? 8, 16)
+    const 跳过 = new Set([
+      'node_modules',
+      '.git',
+      '.svn',
+      '.hg',
+      'dist',
+      'out',
+      'build',
+      'release',
+      '__pycache__',
+      '.cache',
+      '.next',
+      'target'
+    ])
+
+    const 结果: { 路径: string; 名字: string; 修改时间: number; 大小: number }[] = []
+    let 已截断 = false
+
+    const 走 = (目录: string, 深度: number): void => {
+      if (已截断 || 深度 > 最大深度) return
+      let 条目
+      try {
+        条目 = readdirSync(目录, { withFileTypes: true })
+      } catch {
+        // 权限不足或目录被删：跳过，不让整次遍历失败
+        return
+      }
+      for (const 项 of 条目) {
+        if (已截断) return
+        if (项.name.startsWith('.')) continue
+        if (项.isDirectory() && 跳过.has(项.name)) continue
+        const 全路径 = join(目录, 项.name)
+        if (项.isDirectory()) {
+          走(全路径, 深度 + 1)
+          continue
+        }
+        if (!项.isFile()) continue
+        if (结果.length >= 上限) {
+          已截断 = true
+          return
+        }
+        let 信息
+        try {
+          信息 = statSync(全路径)
+        } catch {
+          continue
+        }
+        结果.push({
+          路径: 全路径,
+          名字: 项.name,
+          修改时间: 信息.mtimeMs,
+          大小: 信息.size
+        })
+      }
+    }
+
+    走(根, 0)
+    return { 文件: 结果, 已截断 }
+  })
+
+
+  // --- 路径拼接与取文件名 ---
+  //
+  // 放在主进程做，而不是在渲染层用字符串切：Windows 上 `\` 与 `/` 混用、
+  // 盘符、UNC 路径（`\\服务器\共享`）都会让手写的切分出错。
+  // node:path 已经把这些情况都处理过了。
+  ipcMain.handle(CH.pathBasename, (_e, p: string) => basename(p))
+  ipcMain.handle(CH.pathJoin, (_e, 段: string[]) => join(...段))
+
   ipcMain.handle(CH.fileTrash, async (_e, path: string) => {
     // 优先使用系统回收站，这样误删还能找回来——删除图片文件时
     // 也是同样的选择（shell.trashItem）。

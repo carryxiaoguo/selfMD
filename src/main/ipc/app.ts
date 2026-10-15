@@ -5,6 +5,7 @@ import type { AppInfo, AppPaths, TaskProgress } from '@shared/ipc'
 import { CH, EV } from '@shared/ipc'
 import { 生效主题, type Settings } from '@shared/types'
 import { 可用格式, 执行导出, 取Pandoc版本 } from '../export'
+import { 复制为图片 } from '../export/图片'
 import {
   写草稿,
   列出草稿,
@@ -259,7 +260,14 @@ export function registerAppIpc(): void {
     CH.exportDoc,
     async (
       e,
-      请求: { 格式: string; 源: string; 文档路径: string | null; 默认文件名: string }
+      请求: {
+        格式: string
+        源: string
+        文档路径: string | null
+        默认文件名: string
+        附大纲?: boolean
+        内嵌图片?: boolean
+      }
     ) => {
       const 扩展名 = 格式扩展名(请求.格式)
       const win = windowOf(e)
@@ -281,12 +289,25 @@ export function registerAppIpc(): void {
         源: 请求.源,
         文档路径: 请求.文档路径,
         格式: 请求.格式 as never,
-        // 导出时附上侧边目录：长文档转成 HTML 后没有目录很难导航。
-        // 也有这个选项（导出面板里的「Include outline」）。
-        附大纲: true,
-        内嵌图片: true
+        // 导出选项由渲染层按设置传入；没传时用这里的默认值。
+        附大纲: 请求.附大纲 ?? true,
+        内嵌图片: 请求.内嵌图片 ?? false
       })
       return { 路径: 结果.路径, 错误: 结果.错误 }
+    }
+  )
+
+  // ------------------------------------------------------- 复制为图片 --
+  // 走离屏窗口加载**导出的 HTML** 再截图：渲染结果与导出完全一致，
+  // 因为它们走的是同一条路。在 Canvas 上重画一遍等于把渲染器再实现一次，
+  // 公式、图表、代码高亮都得重做，而且两边迟早不一致。
+  ipcMain.handle(
+    CH.editCopyAsImage,
+    async (_e, 请求: { 源: string; 文档路径: string | null; 宽度?: number }) => {
+      return 复制为图片(
+        { 目标: '', 源: 请求.源, 文档路径: 请求.文档路径, 格式: 'html' },
+        请求.宽度
+      )
     }
   )
 
@@ -471,6 +492,10 @@ export function registerAppIpc(): void {
         uploadResults?: Record<string, string>
         imageMenuResult?: string
         mathResults?: Record<string, string>
+        punctResults?: Record<string, string>
+        tabResult?: string
+        imageCopyResult?: string
+        matchResults?: Record<string, string>
         mode?: string
       }
     ) => {
@@ -546,6 +571,20 @@ export function registerAppIpc(): void {
       if (info.mathResults) {
         console.log('[selfMD] 数学公式自测：')
         for (const [名, 输出] of Object.entries(info.mathResults)) {
+          console.log(`    ${名}  =>  ${输出}`)
+        }
+      }
+      if (info.tabResult) console.log(`[selfMD] 多文档标签自测：${info.tabResult}`)
+      if (info.imageCopyResult) console.log(`[selfMD] 复制为图片自测：${info.imageCopyResult}`)
+      if (info.matchResults) {
+        console.log('[selfMD] 模糊匹配自测：')
+        for (const [名, 输出] of Object.entries(info.matchResults)) {
+          console.log(`    ${名}  =>  ${输出}`)
+        }
+      }
+      if (info.punctResults) {
+        console.log('[selfMD] 渲染标点自测：')
+        for (const [名, 输出] of Object.entries(info.punctResults)) {
           console.log(`    ${名}  =>  ${输出}`)
         }
       }

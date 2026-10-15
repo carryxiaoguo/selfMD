@@ -160,7 +160,10 @@ function 导出子菜单(): MenuItemConstructorOptions[] {
     项('file.exportRtf', 有Pandoc),
     项('file.exportOdt', 有Pandoc),
     { type: 'separator' },
-    项('file.exportHtmlPlain')
+    项('file.exportHtmlPlain'),
+    // 导出设置放在最后：它是"调整"而不是"执行"，
+    // 混在格式列表中间会让人以为点了就开始导出。
+    项('file.exportSetting')
   ]
 
   if (!有Pandoc) {
@@ -265,24 +268,37 @@ function editMenu(): MenuItemConstructorOptions {
  */
 function smartPunctuationSubmenu(): MenuItemConstructorOptions[] {
   const s = getSettings()
+  // "何时转换"是**三选一**：输入时 / 渲染时 / 关闭。
+  // 这三者互斥，所以用 radio 而不是 checkbox——用 checkbox 会让人以为
+  // 可以同时开两个，而实际只有后设的那个生效。
+  const 模式项 = (
+    id: string,
+    值: 'input' | 'rendering' | 'none'
+  ): MenuItemConstructorOptions => ({
+    label: pick('Edit', id).label,
+    type: 'radio',
+    checked: s.smartPunctuationMode === 值,
+    click: () => send(id)
+  })
+
   return [
-    {
-      label: pick('Edit', 'edit.smartPunctuationInput').label,
-      type: 'checkbox',
-      checked: s.smartPunctuationMode === 'input',
-      click: () => send('edit.smartPunctuationInput')
-    },
-    toItem(pick('Edit', 'edit.smartPunctuationRendering')),
+    模式项('edit.smartPunctuationInput', 'input'),
+    模式项('edit.smartPunctuationRendering', 'rendering'),
+    模式项('edit.smartPunctuationOff', 'none'),
     { type: 'separator' },
+    // 下面两个是"转换什么"，与上面的"何时转换"正交——
+    // 只勾引号不勾破折号是完全合理的用法，所以用 checkbox。
     {
       label: pick('Edit', 'edit.smartQuotes').label,
       type: 'checkbox',
+      enabled: s.smartPunctuationMode !== 'none',
       checked: s.smartQuotes,
       click: () => send('edit.smartQuotes')
     },
     {
       label: pick('Edit', 'edit.smartDashes').label,
       type: 'checkbox',
+      enabled: s.smartPunctuationMode !== 'none',
       checked: s.smartDashes,
       click: () => send('edit.smartDashes')
     }
@@ -436,8 +452,30 @@ function viewMenu(): MenuItemConstructorOptions {
         checked: settings.livePreview,
         click: () => send('view.livePreview')
       },
-      toItem(pick('View', 'view.focusMode')),
-      toItem(pick('View', 'view.typewriterMode')),
+      // 专注与打字机是**开关**，不是一次性动作——菜单上要能看出当前状态。
+      // 用 checkbox 而不是普通项：它们各自对应 body 上的一个类，
+      // 勾选状态直接由设置推导。
+      //
+      // 加速键仍从注册表读，不在这里另写一份——两处各写一份迟早会不一致，
+      // 而"菜单显示 F8、实际按 F8 没反应"这种问题极难被发现。
+      {
+        label: pick('View', 'view.focusMode').label,
+        type: 'checkbox',
+        checked: settings.focusMode,
+        ...(pick('View', 'view.focusMode').accelerator
+          ? { accelerator: pick('View', 'view.focusMode').accelerator }
+          : {}),
+        click: () => send('view.focusMode')
+      },
+      {
+        label: pick('View', 'view.typewriterMode').label,
+        type: 'checkbox',
+        checked: settings.typewriterMode,
+        ...(pick('View', 'view.typewriterMode').accelerator
+          ? { accelerator: pick('View', 'view.typewriterMode').accelerator }
+          : {}),
+        click: () => send('view.typewriterMode')
+      },
       { type: 'separator' },
       toItem(pick('View', 'view.toggleSidebar')),
       toItem(pick('View', 'view.outline')),

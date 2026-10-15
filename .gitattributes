@@ -1,0 +1,24 @@
+# 统一按 LF 检出。
+#
+# 项目里有行尾符一致性检查（scripts/check-encoding.mjs），而 git 在 Windows 上
+# 默认会把 LF 转成 CRLF——那样别的机器 clone 下来，检查会直接失败，
+# 而失败原因与被改的代码毫无关系。
+#
+# 与其让检查去迁就平台，不如在这里钉死：仓库里存 LF，检出的也是 LF。
+* text=auto eol=lf
+
+# 二进制文件不参与行尾符转换，也不做 diff
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.otf binary
+*.pdf binary
+
+# 锁文件在合并时噪音极大，且没有任何手工合并的意义
+pnpm-lock.yaml -diff merge=binary

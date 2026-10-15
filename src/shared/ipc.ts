@@ -43,6 +43,7 @@ export const CH = {
   fileStat: 'file:stat',
   fileExists: 'file:exists',
   fileListDir: 'file:listDir',
+  fileWalk: 'file:walk',
   fileMkdirp: 'file:mkdirp',
   fileRename: 'file:rename',
   fileMove: 'file:move',
@@ -93,6 +94,8 @@ export const CH = {
   exportFormats: 'export:formats',
   /** 导出当前文档：弹保存对话框并执行。 */
   exportDoc: 'export:doc',
+  /** 把文档渲染成图片并放进剪贴板。 */
+  editCopyAsImage: 'edit:copyAsImage',
   /** 打印当前窗口。 */
   appPrint: 'app:print',
 
@@ -139,6 +142,8 @@ export const CH = {
 
   // --- 杂项 -----------------------------------------------------------------
   pathDirname: 'path:dirname',
+  pathBasename: 'path:basename',
+  pathJoin: 'path:join',
   taskProgress: 'task:progress',
 
   // --- 图片 -----------------------------------------------------------------
@@ -381,6 +386,14 @@ export interface SelfMdApi {
       imageMenuResult?: string
       /** 仅冒烟测试模式：数学公式扫描与块级识别自测结果。 */
       mathResults?: Record<string, string>
+      /** 仅冒烟测试模式：渲染时转换的标点扫描自测结果。 */
+      punctResults?: Record<string, string>
+      /** 仅冒烟测试模式：多文档标签自测结果。 */
+      tabResult?: string
+      /** 仅冒烟测试模式：复制为图片自测结果。 */
+      imageCopyResult?: string
+      /** 仅冒烟测试模式：模糊匹配自测结果。 */
+      matchResults?: Record<string, string>
       mode?: string
     }): Promise<void>
   }
@@ -419,9 +432,31 @@ export interface SelfMdApi {
       源: string
       文档路径: string | null
       默认文件名: string
+      /** 导出结果里是否附带侧边目录。省略时用主进程的默认值。 */
+      附大纲?: boolean
+      /** 是否把本地图片内嵌成 base64。省略时用主进程的默认值。 */
+      内嵌图片?: boolean
     }): Promise<{ 路径: string | null; 错误: string | null }>
   }
   print(): Promise<{ 成功: boolean; 错误: string | null }>
+  /**
+   * 把 Markdown 渲染成图片并写入剪贴板。
+   *
+   * 渲染走的是导出那条路（离屏窗口加载导出 HTML 后截图），
+   * 因此**公式、图表、代码高亮的呈现与导出完全一致**。
+   */
+  copyAsImage(请求: {
+    源: string
+    文档路径: string | null
+    宽度?: number
+  }): Promise<{
+    成功: boolean
+    宽: number
+    高: number
+    /** 内容超过高度上限时为 true——图被截断了，必须如实告诉用户。 */
+    已截断: boolean
+    错误: string | null
+  }>
   draft: {
     /** 写一份草稿。返回是否成功；失败不抛异常（自动保存是后台行为）。 */
     save(原路径: string | null, 内容: string): Promise<boolean>
@@ -517,6 +552,26 @@ export interface SelfMdExtraApi {
   }
   path: {
     dirname(path: string): Promise<string>
+    basename(path: string): Promise<string>
+    /** 拼接路径片段。在主进程用 node:path 做，避免手写切分踩到盘符与 UNC 路径。 */
+    join(...段: string[]): Promise<string>
+  }
+  file: {
+    /** 复制文件。目标已存在时**直接失败**，绝不覆盖。 */
+    copy(from: string, to: string): Promise<void>
+    move(from: string, to: string): Promise<void>
+    rename(from: string, to: string): Promise<void>
+    /**
+     * 递归列出一个目录下的文件，供"快速打开"建索引。
+     * 带上限：宁可索引不全，也不能让界面失去响应。
+     */
+    walk(
+      根: string,
+      选项?: { 上限?: number; 深度?: number }
+    ): Promise<{
+      文件: { 路径: string; 名字: string; 修改时间: number; 大小: number }[]
+      已截断: boolean
+    }>
   }
   task: {
     report(payload: TaskProgress): Promise<void>

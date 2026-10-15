@@ -1,10 +1,6 @@
 /**
  * 检查产品里是否残留第三方品牌痕迹。
  *
- * **只查产品，不查 `rea/`。** `rea/` 是分析报告，把品牌从一份分析报告里
- * 抹掉没有意义——那里本来就是在记录"对方是怎么做的"。
- * 要守的是另一条线：**用户拿到的编辑器不该带别人的名字**。
- *
  * 两类要查：
  *
  *   1. **品牌化标识** —— 带 `typora` 字样的字段名、目录名、类名。硬约束，出现即错。
@@ -28,7 +24,7 @@ const 根 = resolve(process.argv[2] ?? process.cwd())
 /** 本脚本自身必须豁免：它的词表是拼出来的，注释里也会解释这些词指什么。 */
 const 工具脚本 = new Set([resolve(根, 'scripts', '检查品牌痕迹.mjs')])
 
-const 跳过目录 = ['node_modules', 'out', 'release', 'rea', '.git']
+const 跳过目录 = ['node_modules', 'out', 'release', '.git']
 const 处理扩展 = ['.ts', '.md', '.css', '.mjs', '.py', '.json', '.html']
 
 const 拼 = (...段) => 段.join('')

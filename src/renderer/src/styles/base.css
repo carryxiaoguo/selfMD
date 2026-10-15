@@ -706,6 +706,138 @@ body.live-preview .cm-md-marker-hidden {
 }
 
 /* ==========================================================================
+   快速打开
+   ========================================================================== */
+
+.quick-open {
+  width: min(560px, 88vw);
+  max-height: 60vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 0;
+}
+
+.quick-open-input {
+  flex: none;
+  width: 100%;
+  padding: 12px 14px;
+  font-size: 14px;
+  color: var(--text-color);
+  background: var(--bg-primary);
+  border: none;
+  border-bottom: 1px solid var(--window-border-color);
+  outline: none;
+}
+
+.quick-open-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 0;
+}
+
+.quick-open-item {
+  padding: 6px 14px;
+  cursor: pointer;
+}
+
+.quick-open-item.is-active {
+  background: var(--active-file-bg-color);
+}
+
+.quick-open-name {
+  font-size: 13px;
+  color: var(--text-color);
+}
+
+.quick-open-path {
+  margin-top: 1px;
+  font-size: 11px;
+  color: var(--blur-text-color);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  /* 目录部分用等宽字体：路径里数字多，等宽更好扫读 */
+  font-family: var(--font-mono);
+}
+
+.quick-open-empty,
+.quick-open-foot {
+  padding: 10px 14px;
+  font-size: 12px;
+  color: var(--blur-text-color);
+}
+
+.quick-open-foot {
+  flex: none;
+  border-top: 1px solid var(--window-border-color);
+}
+
+/* ==========================================================================
+   文档列表（侧边栏"文档"标签）
+   --------------------------------------------------------------------------
+   多文档下最容易忘记存盘，所以"有未保存改动"必须一眼可见——
+   一个圆点就够，但不能没有。
+   ========================================================================== */
+
+.article-list {
+  padding: 4px 0;
+}
+
+.article-list-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px 5px 14px;
+  font-size: 13px;
+  color: var(--text-color);
+  cursor: pointer;
+  border-left: 2px solid transparent;
+}
+
+.article-list-item:hover {
+  background: var(--item-hover-bg-color);
+}
+
+.article-list-item.is-active {
+  background: var(--active-file-bg-color);
+  border-left-color: var(--active-file-text-color);
+  font-weight: 600;
+}
+
+.article-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.article-dirty {
+  color: var(--accent);
+  font-size: 16px;
+  line-height: 1;
+}
+
+.article-close {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  font-size: 14px;
+  line-height: 1;
+  color: var(--blur-text-color);
+  background: none;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.article-close:hover {
+  color: var(--text-color);
+  background: var(--item-hover-bg-color);
+}
+
+/* ==========================================================================
    上下文菜单
    ========================================================================== */
 
@@ -784,6 +916,46 @@ body.live-preview .cm-md-marker-hidden {
   height: 1px;
   margin: 4px 8px;
   background: var(--window-border-color);
+}
+
+/* ==========================================================================
+   渲染时转换的标点
+   --------------------------------------------------------------------------
+   文档里存的仍是 ASCII 直引号与连字符，只在屏幕上显示成排版字符。
+
+   实现要点：**盖一层，而不是改宽度**。
+   原字符留在原地并保持自己的宽度（`color: transparent` 只藏颜色，
+   不藏占位），排版字符用绝对定位的 `::after` 叠在上面。
+   这样 CodeMirror 量到的仍是原字符的宽度，光标位置不受影响；
+   而如果改用 `font-size: 0` 让 ::after 撑开宽度，虽然显示更"准"，
+   却会让测量结果随字形变化，打字时光标会轻微跳动。
+
+   `.cm-line` 需要 `position: relative` 作为定位基准，
+   否则绝对定位会跑到视口上。
+   ========================================================================== */
+
+.cm-line {
+  position: relative;
+}
+
+.cm-typo-punct {
+  color: transparent;
+}
+
+.cm-typo-punct::after {
+  content: attr(data-typo);
+  position: absolute;
+  color: var(--text-color);
+  /* 让排版字符从原字符的左边缘开始画 */
+  left: var(--typo-offset, 0);
+  pointer-events: none;
+}
+
+/* 选中的标点要能看出被选中了——否则用户拖选一段文字时
+   会以为这几个字没被选上。 */
+.cm-typo-punct::selection,
+.cm-typo-punct::after::selection {
+  background: var(--select-text-bg-color);
 }
 
 /* ==========================================================================

@@ -1,8 +1,18 @@
+# 依赖与构建产物
 node_modules/
 out/
 dist/
 release/
+.vite/
+
+# 编辑器与系统杂物
 *.log
 .DS_Store
-.vite/
-/rea/
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# 本地临时文件
+*.tmp
+*.bak

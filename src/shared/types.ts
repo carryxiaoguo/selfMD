@@ -1,8 +1,8 @@
 /**
  * main / preload / renderer 之间共享的领域类型。
  *
- * 命名与结构参照主流 Markdown 编辑器的通行做法
- * （分析记录见 `rea/`），但代码是一份独立实现。
+ * 命名与结构参照主流 Markdown 编辑器的通行做法，
+ * 但代码是一份独立实现。
  */
 
 // ---------------------------------------------------------------------------
@@ -156,6 +156,21 @@ export interface Settings {
   /** 启用的语言，取值见 Chromium 支持的列表（如 `en-US`、`en-GB`）。 */
   spellCheckLanguages: string[]
 
+  // --- 导出 ------------------------------------------------------------------
+  /**
+   * 导出的 HTML 里是否附带侧边目录。
+   *
+   * 默认开：导出的 HTML 常常是给人看的，没有目录的长文很难导航。
+   */
+  exportIncludeOutline: boolean
+  /**
+   * 是否把本地图片内嵌成 base64，做成单文件。
+   *
+   * 默认关：内嵌会让文件大出好几倍，而个人使用时图片通常就在同一个目录里。
+   * 需要发给别人时再打开。
+   */
+  exportEmbedImages: boolean
+
   // --- 外观 ----------------------------------------------------------------
   theme: string
   darkTheme: string
@@ -230,6 +245,9 @@ export const DEFAULT_SETTINGS: Settings = {
 
   spellCheck: false,
   spellCheckLanguages: ['en-US'],
+
+  exportIncludeOutline: true,
+  exportEmbedImages: false,
 
   theme: 'github',
   darkTheme: 'github-dark',

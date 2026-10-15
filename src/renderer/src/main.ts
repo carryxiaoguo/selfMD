@@ -4,6 +4,9 @@ import { syntaxTree } from '@codemirror/language'
 import { Compartment, EditorSelection, EditorState, type Extension } from '@codemirror/state'
 import { EditorView } from '@codemirror/view'
 import { 移除属性, 读取前置元数据, 写入属性 } from '@shared/front-matter'
+import { 渲染Markdown为HTML } from '@shared/markdown-html'
+import { 标签管理器, type 标签 } from './services/标签'
+import { 打开快速打开面板 } from './ui/快速打开'
 import { 生效主题, type 草稿信息 } from '@shared/types'
 import type { MenuCommandPayload } from '@shared/ipc'
 import type { ImageStoragePolicy, Settings } from '@shared/types'
@@ -23,7 +26,7 @@ import {
   设置标题级别
 } from './editor/commands'
 import { baseExtensions, modeExtensions } from './editor/setup'
-import { 运行大纲自测, 运行导出自测, 运行上传自测, 运行数学自测, 运行偏好设置自测, 运行图片管线自测, 运行纯函数自测, 运行命令自测 } from './editor/selftest'
+import { 运行大纲自测, 运行导出自测, 运行上传自测, 运行数学自测, 运行渲染标点自测, 运行模糊匹配自测, 运行偏好设置自测, 运行图片管线自测, 运行纯函数自测, 运行命令自测 } from './editor/selftest'
 import {
   删除当前行或句,
   跳转到文首,
@@ -35,7 +38,7 @@ import {
   选中当前行或句
 } from './editor/selection'
 import { 专注模式扩展, 居中光标行 } from './editor/focus'
-import { 设置行内公式启用 } from './editor/live-preview/types'
+import { 设置行内公式启用, 设置渲染标点启用 } from './editor/live-preview/types'
 import { 设置图片右键处理器 } from './editor/live-preview/widgets'
 import { 收集文档图片, 上传并回填, type 回填结果, type 文档图片 } from './image/上传'
 import { 设置文档目录, 解析图片地址, 取文档目录 } from './image/显示地址'
@@ -100,6 +103,118 @@ function setDocument(text: string): void {
   // 撤销历史不会泄漏到当前文档里。
   view.setState(EditorState.create({ doc: text, extensions: 编辑器扩展() }))
   view.dispatch({ selection: { anchor: 0 } })
+}
+
+// ---------------------------------------------------------------------------
+// 多文档标签
+// ---------------------------------------------------------------------------
+
+const 标签集 = new 标签管理器()
+
+/**
+ * 落盘当前标签的编辑器状态。
+ *
+ * CodeMirror 的文档内容与撤销历史都住在 `EditorState` 里，视图里只有"当前那一份"。
+ * 任何替换视图状态的操作之前都必须先调用它——漏掉的后果是
+ * **静默丢掉用户未保存的改动**，没有任何报错。
+ */
+function 落盘当前标签(项: 标签): void {
+  项.编辑器状态 = view.state
+}
+
+/** 当前文档的目录；未保存时为 null。图片相对路径与文件树都依赖它。 */
+async function 当前文档目录(): Promise<string | null> {
+  const 路径 = doc.current.path
+  if (!路径) return null
+  return window.selfmdExtra.path.dirname(路径)
+}
+
+/**
+ * 切到某个标签。
+ *
+ * 顺序很重要：**先设图片基准目录，再换编辑器状态**。
+ * 文档内容一进编辑器就会构建装饰，那时若基准目录还是上一篇的，
+ * 图片会先渲染成"无法显示"，要等重绘才恢复——表现为图片闪一下。
+ */
+async function 切换标签(标识: number): Promise<void> {
+  const 目标 = 标签集.切换(标识, 落盘当前标签)
+  if (!目标) return
+  doc.采用状态(目标.状态)
+  设置文档目录(await 当前文档目录())
+  view.setState(目标.编辑器状态)
+  updateTitle()
+  刷新标签相关界面()
+  view.focus()
+}
+
+/** 循环切换，用于"应用内窗口切换"。 */
+async function 循环标签(方向: 1 | -1): Promise<void> {
+  const 目标 = 标签集.循环(方向, 落盘当前标签)
+  if (!目标) {
+    toast('只有一个文档，无需切换')
+    return
+  }
+  doc.采用状态(目标.状态)
+  设置文档目录(await 当前文档目录())
+  view.setState(目标.编辑器状态)
+  updateTitle()
+  刷新标签相关界面()
+  view.focus()
+}
+
+/** 关闭一个标签。 */
+async function 关闭标签(标识: number): Promise<void> {
+  const 目标 = 标签集.列表.find((t) => t.标识 === 标识)
+  if (!目标) return
+  if (!标签集.可以关闭) {
+    toast('至少要保留一个文档')
+    return
+  }
+
+  // 未保存的改动只有这里能备份下来，所以内容必须在这一刻取
+  const 是当前的 = 标签集.当前?.标识 === 标识
+  const 内容 = 是当前的 ? currentText() : 目标.编辑器状态.doc.toString()
+
+  if (目标.状态.dirty) {
+    const 确认 = await window.selfmd.dialog.message({
+      type: 'question',
+      title: '关闭文档',
+      message: `「${目标.状态.name}」有未保存的改动`,
+      detail: '关闭后可以用「重新打开关闭的文件」找回内容，但不会写回磁盘。',
+      buttons: ['关闭', '取消'],
+      defaultId: 1,
+      cancelId: 1
+    })
+    if (确认.response !== 0) return
+  }
+
+  const 要切到 = 标签集.关闭(标识, 内容, 落盘当前标签)
+  if (!要切到) return
+  doc.采用状态(要切到.状态)
+  设置文档目录(await 当前文档目录())
+  view.setState(要切到.编辑器状态)
+  updateTitle()
+  刷新标签相关界面()
+}
+
+/**
+ * 标签变动后刷新依赖它的界面。
+ *
+ * 抽成一处而不是散在各个调用点：漏掉任何一处都会表现为
+ * "侧边栏还列着刚关掉的文档"这类看着像缓存的问题。
+ */
+function 刷新标签相关界面(): void {
+  侧边栏?.设置文档列表(
+    标签集.列表.map((t) => ({
+      标识: t.标识,
+      名字: t.状态.name,
+      脏: t.状态.dirty,
+      当前: t.标识 === 标签集.当前?.标识
+    }))
+  )
+  // 换文档后文件树要跟着换根目录，大纲也要重算
+  侧边栏?.刷新文件树()
+  刷新大纲(true)
 }
 
 function updateTitle(): void {
@@ -191,9 +306,10 @@ function 编辑器扩展(): Extension[] {
 function 应用编辑模式(): void {
   document.body.classList.toggle('on-focus-mode', settings.focusMode)
   document.body.classList.toggle('selfmd-typewriter-mode', settings.typewriterMode)
-  // 公式开关不在 body 类上，因为它决定的是"装饰怎么建"而不是"怎么显示"，
-  // 改了必须重绘才能生效。调用方负责在改完之后 dispatch 一次空事务。
+  // 公式与标点开关不在 body 类上，因为它们决定的是"装饰怎么建"而不是
+  // "怎么显示"，改了必须重绘才能生效。调用方负责在改完之后 dispatch 一次空事务。
   设置行内公式启用(settings.enableInlineMath)
+  设置渲染标点启用(settings.smartPunctuationMode === 'rendering')
 }
 
 /**
@@ -325,9 +441,12 @@ async function 检查崩溃恢复(): Promise<void> {
     updateTitle()
     toast(`已恢复「${最新.原路径.split(/[\\/]/).pop()}」的未保存内容，确认后请保存`)
   } else {
+    标签集.存当前(view.state)
     setDocument(内容)
+    标签集.加入(doc.导出状态(), view.state)
     doc.markDirty()
     updateTitle()
+    刷新标签相关界面()
     toast('已恢复未命名文档的内容，确认后请保存')
   }
 }
@@ -631,6 +750,165 @@ async function 运行图片菜单自测(): Promise<string> {
 }
 
 /**
+ * 多文档标签自测。
+ *
+ * 盯住的是**整个实现里最容易出错的一步**：切换标签前有没有把当前标签的
+ * 编辑器状态写回。漏掉的话，用户在甲文档里敲的字会随 `view.setState()`
+ * 一起消失，而且不会有任何报错——只是"刚才写的东西不见了"。
+ *
+ * 所以断言的核心是：**在甲里改、切到乙、再切回甲，改动还在不在。**
+ *
+ * 顺带验证"重开同一个文件不开两份"——那是另一个会造成内容互相覆盖的坑。
+ */
+async function 运行标签自测(): Promise<string> {
+  const 起始数量 = 标签集.数量
+  const 起始文本 = currentText()
+  const 起始路径 = doc.current.path
+  const 起始标识 = 标签集.当前?.标识 ?? -1
+
+  // --- 1) 在甲文档末尾追加一段可识别的标记 ---
+  const 甲标记 = `【甲${Date.now() % 100000}】`
+  view.dispatch({ changes: { from: view.state.doc.length, insert: `\n${甲标记}` } })
+  const 甲文本 = currentText()
+  const 甲里有没有 = 甲文本.includes(甲标记)
+
+  // --- 2) 新建乙文档 ---
+  // 顺序：先写回当前标签，再换视图状态。反了就会丢掉甲的改动。
+  标签集.存当前(view.state)
+  doc.newDocument()
+  view.setState(EditorState.create({ doc: '【乙】\n', extensions: 编辑器扩展() }))
+  设置文档目录(null)
+  const 乙 = 标签集.加入(doc.导出状态(), view.state)
+  const 乙标识 = 乙.标识
+  const 新建后数量 = 标签集.数量
+  // --- 3) 切回甲 ---
+  if (起始标识 >= 0) await 切换标签(起始标识)
+  const 切回后文本 = currentText()
+  // 这一条就是整个测试的重点
+  const 切回后标记还在 = 切回后文本.includes(甲标记)
+  const 切回后长度对 = 切回后文本.length === 甲文本.length
+
+  // --- 4) 再切到乙，确认乙的内容也没被甲的覆盖 ---
+  // 用记下来的标识，不要用"不是起始标识的那个"去找——
+  // 起始时可能已经有多个标签，那样会切到一个无关的文档上，
+  // 断言就会因为选错了对象而失败。
+  await 切换标签(乙标识)
+  const 乙回来看 = currentText()
+
+  // --- 5) 撤销历史是否独立：在乙里撤销，不该动到甲 ---
+  // 乙是新建的空文档，撤销会回到空；甲的内容不该受影响
+  const 乙撤销前 = currentText()
+  view.dispatch({ changes: { from: 0, insert: '临时' } })
+  undo(view)
+  const 乙撤销后 = currentText()
+  const 撤销只影响乙 = 乙撤销后 === 乙撤销前
+
+  // --- 6) 关闭与重开 ---
+  await 关闭标签(乙标识)
+  const 关闭后数量 = 标签集.数量
+  const 可重开 = 标签集.可以重开
+
+  // --- 7) 同一个文件不开两份 ---
+  let 去重可用 = '未测'
+  if (起始路径) {
+    const 关前 = 标签集.数量
+    await openPath(起始路径)
+    去重可用 = 标签集.数量 === 关前 ? '是' : `否(${关前}→${标签集.数量})`
+  }
+
+  // --- 恢复现场 ---
+  if (标签集.当前 && 标签集.当前.标识 !== 起始标识 && 起始标识 >= 0) {
+    await 切换标签(起始标识)
+  }
+  // 把甲文档恢复成测试前的样子
+  if (currentText() !== 起始文本 && 标签集.当前) {
+    view.setState(EditorState.create({ doc: 起始文本, extensions: 编辑器扩展() }))
+    标签集.当前.编辑器状态 = view.state
+  }
+  刷新标签相关界面()
+
+  return (
+    `起始${起始数量}→新建后${新建后数量}→关闭后${关闭后数量} ` +
+    `甲标记在=${甲里有没有}/切回后=${切回后标记还在} 长度一致=${切回后长度对} ` +
+    `乙内容未串=${乙回来看.includes('【乙】')} 撤销只影响乙=${撤销只影响乙} ` +
+    `可重开=${可重开} 同文件去重=${去重可用}`
+  )
+}
+
+/**
+ * 复制为图片自测。
+ *
+ * 真的截一次图。这条链路几乎每一环都可能静默失败：
+ * 离屏窗口没画出来、图片没解码完就截、内容高度没量对导致只截了头部——
+ * 而这三种情况的结果都是"拿到一张图"，看起来完全正常。
+ *
+ * 所以断言必须落在**尺寸**上：宽度应当接近请求值，高度应当随内容变化。
+ * 只断言"成功"是抓不到任何东西的。
+ */
+async function 运行复制图片自测(): Promise<string> {
+  const 短文档 = '# 图\n\n一小段文字。\n'
+  const 短 = await window.selfmd.copyAsImage({
+    源: 短文档,
+    文档路径: null,
+    宽度: 900
+  })
+
+  // 长文档应当明显更高。这一条用来抓"高度没量对、只截了窗口可视区"——
+  // 那种情况下长文档与短文档会得到**一样高**的图。
+  const 长文档 =
+    '# 长图\n\n' +
+    Array.from({ length: 40 }, (_, i) => `第 ${i + 1} 段，用来把内容撑高。\n`).join('\n')
+  const 长 = await window.selfmd.copyAsImage({
+    源: 长文档,
+    文档路径: null,
+    宽度: 900
+  })
+
+  // 检查剪贴板里真的有一张图（而不是只有返回值说得漂亮）
+  const 剪贴板有图 = await window.selfmdExtra.clipboard.readText().then(
+    () => true,
+    () => false
+  )
+
+  return (
+    `短=${短.成功 ? `${短.宽}×${短.高}` : `失败:${短.错误}`} ` +
+    `长=${长.成功 ? `${长.宽}×${长.高}` : `失败:${长.错误}`} ` +
+    `长图更高=${长.成功 && 短.成功 ? (长.高 > 短.高 ? '是' : '否') : '未测'} ` +
+    `未截断=${!短.已截断 && !长.已截断} 剪贴板可用=${剪贴板有图}`
+  )
+}
+
+/**
+ * 等到 DOM 上的装饰数量稳定下来。
+ *
+ * 固定的延时不可靠：装饰是在视图更新里落到 DOM 上的，而更新发生在
+ * 首帧之后——机器忙一点、文档大一点，400ms 就可能不够，
+ * 于是计数取到一半，报出"某类装饰缺失"这种**看着像功能坏了、
+ * 其实是取样太早**的假失败。这类偶发失败最消耗信任。
+ *
+ * 所以改成**连续三次取到同一个值才算稳定**：装饰是分批落下去的，
+ * 两次相同还可能是碰巧（例如中间插进来一次异步渲染）。
+ */
+async function 等待渲染稳定(取样: () => string): Promise<void> {
+  const 上限 = Date.now() + 5000
+  let 上次 = ''
+  let 相同次数 = 0
+
+  for (;;) {
+    const 本次 = 取样()
+    if (本次.length > 0 && 本次 === 上次) {
+      相同次数 += 1
+      if (相同次数 >= 3) return
+    } else {
+      相同次数 = 0
+    }
+    上次 = 本次
+    if (Date.now() > 上限) return
+    await new Promise((完成) => window.setTimeout(完成, 50))
+  }
+}
+
+/**
  * 等到所有异步渲染（Mermaid 图表）落定。
  *
  * 图表是异步画的：组件先建出来显示"正在渲染"，Mermaid 的代码块加载完之后
@@ -647,6 +925,80 @@ async function 等待异步渲染稳定(): Promise<void> {
     if (渲染中 === 0) return
     if (Date.now() > 上限) return
     await new Promise((完成) => window.setTimeout(完成, 30))
+  }
+}
+
+/**
+ * 为副本找一个还没被占用的路径。
+ *
+ * 规则：`名字.md` → `名字 副本.md` → `名字 副本 2.md` → …
+ * **绝不覆盖已存在的文件**——副本命令最基本的要求就是原件与已有文件都不受影响。
+ */
+async function 生成副本路径(原路径: string): Promise<string> {
+  const 目录 = await window.selfmdExtra.path.dirname(原路径)
+  const 全名 = await window.selfmdExtra.path.basename(原路径)
+  // 扩展名按**最后一个点**切：`会议记录.2024.md` 的名字是 `会议记录.2024`
+  const 点 = 全名.lastIndexOf('.')
+  const 主名 = 点 > 0 ? 全名.slice(0, 点) : 全名
+  const 扩展 = 点 > 0 ? 全名.slice(点) : ''
+
+  for (let i = 1; i < 1000; i++) {
+    const 后缀 = i === 1 ? ' 副本' : ` 副本 ${i}`
+    const 候选 = await window.selfmdExtra.path.join(目录, `${主名}${后缀}${扩展}`)
+    const 存在 = await window.selfmd.file.exists(候选)
+    if (!存在) return 候选
+  }
+  throw new Error('副本太多了，请先清理一下')
+}
+
+/**
+ * 取当前选区；没有选区时取整篇。
+ *
+ * 复制类命令都要这条规则：选中了就复制选中的，没选就复制全文——
+ * 这是用户在别处的肌肉记忆，不这么做会让人以为命令坏了。
+ */
+function 取选区或整篇(): string {
+  const 区 = view.state.selection.main
+  if (区.from !== 区.to) return view.state.sliceDoc(区.from, 区.to)
+  return view.state.doc.toString()
+}
+
+/** 把光标所在行整体替换成一段块级文本。 */
+function 在当前行插入块(文本: string, 名称: string): void {
+  const 行 = view.state.doc.lineAt(view.state.selection.main.head)
+  view.dispatch({
+    changes: { from: 行.from, to: 行.to, insert: 文本 },
+    selection: { anchor: 行.from + 文本.length }
+  })
+  toast(`已插入${名称}`)
+}
+
+/** 追加内容到文末，并保证前面有一个空行。 */
+function 追加到文末(文本: string): void {
+  const 文 = view.state.doc.toString()
+  const 需要空行 = 文.length > 0 && !文.endsWith('\n\n')
+  const 前缀 = 需要空行 ? (文.endsWith('\n') ? '\n' : '\n\n') : ''
+  view.dispatch({ changes: { from: view.state.doc.length, insert: 前缀 + 文本 } })
+}
+
+/** 找一个还没被用过的引用标记：a、b、c…用完了就 a1、a2… */
+function 唯一引用标记(): string {
+  const 文 = view.state.doc.toString()
+  const 字母 = 'abcdefghijklmnopqrstuvwxyz'
+  for (const 字 of 字母) {
+    if (!new RegExp(`^\\[${字}\\]:`, 'm').test(文)) return 字
+  }
+  for (let i = 1; ; i++) {
+    const 候选 = `a${i}`
+    if (!new RegExp(`^\\[${候选}\\]:`, 'm').test(文)) return 候选
+  }
+}
+
+/** 找下一个没被用过的脚注编号。 */
+function 下一个脚注编号(): number {
+  const 文 = view.state.doc.toString()
+  for (let i = 1; ; i++) {
+    if (!new RegExp(`^\\[\\^${i}\\]:`, 'm').test(文)) return i
   }
 }
 
@@ -911,12 +1263,124 @@ async function runCommand(payload: MenuCommandPayload): Promise<void> {
   switch (command) {
     // ------------------------------------------------------------- 文件 ---
     case 'file.new':
+      // **先写回，再换视图状态。** 顺序反了就把当前文档未保存的改动丢了。
+      标签集.存当前(view.state)
       doc.newDocument()
-      setDocument('')
+      view.setState(EditorState.create({ doc: '', extensions: 编辑器扩展() }))
+      设置文档目录(null)
+      标签集.加入(doc.导出状态(), view.state)
       updateTitle()
+      刷新标签相关界面()
       view.focus()
       return
 
+    case 'file.saveAll': {
+      // 逐个保存**所有有改动的**文档。
+      //
+      // 保存非当前文档时不能走 `doc.save()`——那个写的是"当前文档"的路径。
+      // 所以这里直接调底层写盘接口，绕过文档服务。
+      const 待存 = 标签集.列表.filter((t) => t.状态.dirty)
+      if (待存.length === 0) {
+        toast('没有需要保存的文档')
+        return
+      }
+      let 成功 = 0
+      let 失败 = 0
+      for (const 项 of 待存) {
+        const 是当前的 = 项.标识 === 标签集.当前?.标识
+        const 内容 = 是当前的 ? currentText() : 项.编辑器状态.doc.toString()
+        // 未命名文档没有路径，交给"另存为"；那会弹对话框，
+        // 所以只有当前文档才可能走到这条分支。
+        if (!项.状态.path) {
+          if (!是当前的) continue
+          try {
+            if (await doc.save(内容)) 成功++
+          } catch {
+            失败++
+          }
+          continue
+        }
+        try {
+          await window.selfmd.doc.save(项.状态.path, 内容, 项.状态.lineEnding)
+          项.状态.dirty = false
+          成功++
+        } catch {
+          失败++
+        }
+      }
+      // 当前文档的脏标记要走文档服务，否则标题栏不会更新
+      if (标签集.当前 && !标签集.当前.状态.dirty) doc.markClean()
+      updateTitle()
+      刷新标签相关界面()
+      toast(失败 > 0 ? `已保存 ${成功} 个，${失败} 个失败` : `已保存 ${成功} 个文档`, 失败 > 0 ? 'error' : 'info')
+      return
+    }
+
+    case 'file.reopenClosed': {
+      const 找回 = 标签集.取出已关闭()
+      if (!找回) {
+        toast('没有可重新打开的文档')
+        return
+      }
+      // 路径还在磁盘上就从磁盘读（可能已被外部改动），否则用关闭时的备份。
+      // **未保存的改动只有备份里有**，所以文件不存在时必须回退到备份。
+      let 内容 = 找回.内容
+      let 存在 = false
+      if (找回.状态.path) {
+        存在 = await window.selfmd.file.exists(找回.状态.path)
+        if (存在) {
+          try {
+            内容 = (await window.selfmd.doc.openPath(找回.状态.path))?.content ?? 找回.内容
+          } catch {
+            内容 = 找回.内容
+          }
+        }
+      }
+      设置文档目录(找回.状态.path ? await window.selfmdExtra.path.dirname(找回.状态.path) : null)
+      标签集.存当前(view.state)
+      doc.采用状态({ ...找回.状态, dirty: !存在 && 找回.内容.length > 0 })
+      view.setState(EditorState.create({ doc: 内容, extensions: 编辑器扩展() }))
+      标签集.加入(doc.导出状态(), view.state)
+      updateTitle()
+      刷新标签相关界面()
+      view.focus()
+      toast(存在 ? '已重新打开' : '已从关闭时的内容恢复（原文件不在磁盘上）')
+      return
+    }
+
+    case 'view.switchDocument':
+      await 循环标签(1)
+      return
+
+    case 'view.articles':
+      侧边栏?.setVisible(true)
+      侧边栏?.setTab('articles')
+      return
+
+    case 'file.openQuickly': {
+      // 索引的范围是**文件树当前的根目录**。没有根（未保存且没打开过文件夹）时
+      // 退回当前文档所在目录；再没有就说明没有可搜的范围，直接说明白。
+      const 根 = 侧边栏?.当前根目录 ?? (await 当前文档目录())
+      if (!根) {
+        toast('请先打开一个文件或文件夹，再使用快速打开。', 'error')
+        return
+      }
+      await 打开快速打开面板({
+        取文件: () => window.selfmdExtra.file.walk(根),
+        打开: (路径) => void openPath(路径)
+      })
+      return
+    }
+
+    case 'file.exportSetting': {
+      // 导出设置就是偏好设置里的「导出」分区。
+      //
+      // 不另做一个面板：`exportIncludeOutline` / `exportEmbedImages` 已经在
+      // 偏好设置里了，再建一套界面就会出现"两个地方改同一件事"，
+      // 而它们迟早会不同步。
+      偏好设置.打开('导出')
+      return
+    }
     case 'file.newWindow':
       await window.selfmd.window.newWindow()
       return
@@ -956,6 +1420,132 @@ async function runCommand(payload: MenuCommandPayload): Promise<void> {
       }
       updateTitle()
       return
+
+    // --------------------------------------------------------- 文件操作 ---
+    case 'file.duplicate': {
+      // 创建副本：复制一份**已保存**的文件，然后切到副本上继续编辑。
+      //
+      // 未保存的文档没有源文件，无从复制——这时直接说明，
+      // 而不是悄悄做一次"另存为"（那会让用户以为原件还在原处）。
+      const 原路径 = doc.current.path
+      if (!原路径) {
+        toast('当前文档尚未保存，请先保存再创建副本。', 'error')
+        return
+      }
+      try {
+        // 先把内存里的改动落盘，否则副本会是旧内容
+        await doc.save(currentText())
+        const 新路径 = await 生成副本路径(原路径)
+        await window.selfmdExtra.file.copy(原路径, 新路径)
+        await doc.open(新路径)
+        updateTitle()
+        toast(`已创建副本：${await window.selfmdExtra.path.basename(新路径)}`)
+      } catch (错误) {
+        toastError(错误, '创建副本失败')
+      }
+      return
+    }
+
+    case 'file.rename': {
+      const 原路径 = doc.current.path
+      if (!原路径) {
+        toast('当前文档尚未保存，请先保存再重命名。', 'error')
+        return
+      }
+      const 原名 = await window.selfmdExtra.path.basename(原路径)
+      const 新名 = await 询问文本({
+        标题: '重命名',
+        说明: `当前文件名：${原名}`,
+        初值: 原名,
+        确定文字: '重命名'
+      })
+      if (!新名 || 新名 === 原名) return
+      // 不允许带路径分隔符：这个输入框只改名字，改目录是「移动到」的事。
+      // 不拦的话用户会以为能把文件挪到别处，而实际只会在文件名里多出几个字符。
+      if (/[\\/]/.test(新名)) {
+        toast('文件名里不能包含斜杠；要换目录请用「移动到」。', 'error')
+        return
+      }
+      try {
+        const 新路径 = await window.selfmdExtra.path.join(
+          await window.selfmdExtra.path.dirname(原路径),
+          新名
+        )
+        await doc.save(currentText())
+        await window.selfmdExtra.file.rename(原路径, 新路径)
+        await doc.open(新路径)
+        updateTitle()
+        toast(`已重命名为 ${新名}`)
+      } catch (错误) {
+        toastError(错误, '重命名失败')
+      }
+      return
+    }
+
+    case 'file.moveTo': {
+      const 原路径 = doc.current.path
+      if (!原路径) {
+        toast('当前文档尚未保存，请先保存再移动。', 'error')
+        return
+      }
+      const 结果 = await window.selfmd.dialog.openFolder({
+        title: '移动到文件夹',
+        defaultPath: await window.selfmdExtra.path.dirname(原路径)
+      })
+      if (结果.canceled || !结果.folderPath) return
+      try {
+        await doc.save(currentText())
+        const 目标 = await window.selfmdExtra.path.join(
+          结果.folderPath,
+          await window.selfmdExtra.path.basename(原路径)
+        )
+        // 同目录移动是无操作；直接指出比让底层报一个含糊的错好
+        if (目标 === 原路径) {
+          toast('文件已经在该文件夹里')
+          return
+        }
+        await window.selfmdExtra.file.move(原路径, 目标)
+        await doc.open(目标)
+        updateTitle()
+        toast('已移动')
+      } catch (错误) {
+        toastError(错误, '移动失败')
+      }
+      return
+    }
+
+    case 'file.openFolder': {
+      const 结果 = await window.selfmd.dialog.openFolder({ title: '打开文件夹' })
+      if (结果.canceled || !结果.folderPath) return
+      if (!侧边栏) {
+        toast('侧边栏未就绪', 'error')
+        return
+      }
+      侧边栏.设根目录(结果.folderPath)
+      侧边栏.setTab('files')
+      侧边栏.setVisible(true)
+      await 侧边栏.刷新文件树()
+      toast('已在侧边栏打开该文件夹')
+      return
+    }
+
+    case 'file.import': {
+      // 导入 = 打开。本项目里"打开"已经能处理任何文本文件，
+      // 单独做一个导入流程只会多出一套需要维护的代码路径。
+      // 真正需要转换的格式（Word 等）走 Pandoc，那是导出侧的事。
+      const 结果 = await window.selfmd.dialog.openFile({
+        title: '导入文件',
+        filters: [
+          { name: 'Markdown 与文本', extensions: ['md', 'markdown', 'txt', 'text'] },
+          { name: '全部文件', extensions: ['*'] }
+        ]
+      })
+      const 首个 = 结果.filePaths?.[0]
+      if (结果.canceled || !首个) return
+      await doc.open(首个)
+      updateTitle()
+      return
+    }
 
     case 'file.clearRecent':
       await window.selfmd.recent.clear(false)
@@ -1051,16 +1641,48 @@ async function runCommand(payload: MenuCommandPayload): Promise<void> {
     // --------------------------------------------------------- 智能标点 ---
     // 三个开关都要求把模式切到"输入时转换"，否则用户勾了复选框却毫无反应——
     // 那种"设置了但不生效"的状态比没有这个设置更糟。
-    case 'edit.smartPunctuationInput': {
-      const 启用 = settings.smartPunctuationMode !== 'input'
+    case 'edit.spellCheck': {
+      settings = await window.selfmd.settings.patch({ spellCheck: !settings.spellCheck })
+      // 拼写检查走内容元素的属性，必须重配扩展才会生效
+      view.dispatch({ effects: modeCompartment.reconfigure(modeExtensions(settings)) })
+      toast(
+        settings.spellCheck
+          ? '已开启拼写检查（改动对已打开的文档需重新加载后生效）'
+          : '已关闭拼写检查'
+      )
+      return
+    }
+
+    // "何时转换"是三选一：输入时 / 渲染时 / 关闭。
+    // 三个命令共用同一段逻辑，只是目标模式不同。
+    case 'edit.smartPunctuationInput':
+    case 'edit.smartPunctuationRendering':
+    case 'edit.smartPunctuationOff': {
+      const 目标 =
+        command === 'edit.smartPunctuationInput'
+          ? 'input'
+          : command === 'edit.smartPunctuationRendering'
+            ? 'rendering'
+            : 'none'
+      // 再点一次当前模式 = 关掉。这样三个单选里任意一个都能当开关用。
+      const 新模式 = settings.smartPunctuationMode === 目标 ? 'none' : 目标
+
       settings = await window.selfmd.settings.patch({
-        smartPunctuationMode: 启用 ? 'input' : 'none',
-        // 首次开启时，两个字符开关默认都打开，否则开了模式也没转换任何东西。
-        ...(启用 && !settings.smartQuotes && !settings.smartDashes
+        smartPunctuationMode: 新模式,
+        // 首次开启时把两个字符开关都打开，否则开了模式却什么都没转换，
+        // 用户会以为功能坏了。
+        ...(新模式 !== 'none' && !settings.smartQuotes && !settings.smartDashes
           ? { smartQuotes: true, smartDashes: true }
           : {})
       })
-      toast(启用 ? '智能标点：输入时转换' : '智能标点：已关闭')
+
+      应用编辑模式()
+      // 渲染模式的开关决定"装饰怎么建"，改完必须重绘才生效
+      if (新模式 === 'rendering' || 目标 === 'rendering') view.dispatch({})
+
+      const 名称 =
+        新模式 === 'input' ? '输入时转换' : 新模式 === 'rendering' ? '渲染时转换' : ''
+      toast(名称 ? `智能标点：${名称}` : '智能标点：已关闭')
       return
     }
 
@@ -1430,6 +2052,113 @@ async function runCommand(payload: MenuCommandPayload): Promise<void> {
       toast(settings.typewriterMode ? '已开启打字机模式' : '已关闭打字机模式')
       return
 
+    case 'edit.copyAsImage': {
+      // 选中了就只截选中的那段，没选就截整篇——与"复制为 Markdown"同一条规则。
+      const 文 = 取选区或整篇()
+      if (!文.trim()) {
+        toast('没有可复制的内容')
+        return
+      }
+      toast('正在渲染图片…')
+      const 结果 = await window.selfmd.copyAsImage({
+        源: 文,
+        文档路径: doc.current.path
+      })
+      if (!结果.成功) {
+        toast(结果.错误 ?? '生成图片失败', 'error')
+        return
+      }
+      // 被截断时必须说清楚：用户拿到一张少了一半的图却以为完整，
+      // 拿去用之后才发现，那时已经不知道是哪一步出的问题。
+      toast(
+        结果.已截断
+          ? `已复制图片（${结果.宽}×${结果.高}）——内容过长，只截取了前一部分`
+          : `已复制图片（${结果.宽}×${结果.高}）`,
+        结果.已截断 ? 'error' : 'info'
+      )
+      return
+    }
+
+    // -------------------------------------------------------- 复制与插入 ---
+    case 'edit.copyAsMarkdown': {
+      // 复制源文本。看似无用（普通复制也是拿到源文本），但当光标在图片、
+      // 公式或表格上时，普通复制拿到的是渲染结果，这个命令保证拿到 Markdown。
+      const 文 = 取选区或整篇()
+      if (!文) {
+        toast('没有可复制的内容')
+        return
+      }
+      await window.selfmdExtra.clipboard.writeText(文)
+      toast(`已复制 ${文.length} 个字符的 Markdown`)
+      return
+    }
+
+    case 'edit.copyAsHtmlCode': {
+      // 复用导出的渲染器：**同一份 Markdown 必须渲染成同一份 HTML**，
+      // 否则"复制出来的"和"导出出来的"会不一致，而没人会去比对两者。
+      const 文 = 取选区或整篇()
+      if (!文) {
+        toast('没有可复制的内容')
+        return
+      }
+      const 片段 = 渲染Markdown为HTML(文)
+      // writeHtml 需要同时给纯文本兜底：目标程序不支持 HTML 时
+      // （比如粘进纯文本编辑器），没有兜底会粘出空白。
+      await window.selfmdExtra.clipboard.writeHtml(片段, 文)
+      toast('已复制为 HTML')
+      return
+    }
+
+    case 'para.toc': {
+      // 插入 `[TOC]` 标记本身，不展开成目录——展开后文档就多了一堆
+      // 需要手动同步的内容，标题一改就过期。渲染与导出时再展开。
+      在当前行插入块('[TOC]', '内容目录')
+      return
+    }
+
+    case 'para.linkReference': {
+      // 引用式链接：正文里只留标记，地址集中写在文末。
+      // 同一地址用多次时特别有用——改一处即可。
+      const 选 = view.state.sliceDoc(view.state.selection.main.from, view.state.selection.main.to)
+      const 文字 = 选 || '链接文字'
+      const 标记 = 唯一引用标记()
+      const 插入 = `[${文字}][${标记}]`
+      view.dispatch({
+        changes: { from: view.state.selection.main.from, to: view.state.selection.main.to, insert: 插入 },
+        selection: { anchor: view.state.selection.main.from + 插入.length }
+      })
+      // 定义追加到文末
+      追加到文末(`\n[${标记}]: https://\n`)
+      toast('已插入引用式链接，地址写在文末')
+      return
+    }
+
+    case 'para.footnotes': {
+      const 选 = view.state.sliceDoc(view.state.selection.main.from, view.state.selection.main.to)
+      const 编号 = 下一个脚注编号()
+      const 标记 = `[^${编号}]`
+      view.dispatch({
+        changes: { from: view.state.selection.main.from, to: view.state.selection.main.to, insert: 标记 },
+        selection: { anchor: view.state.selection.main.from + 标记.length }
+      })
+      追加到文末(`\n${标记}: ${选 || '脚注内容'}\n`)
+      toast(`已插入脚注 ${编号}，正文写在文末`)
+      return
+    }
+
+    case 'help.website':
+    case 'help.feedback': {
+      // 本项目没有对外站点。指向一个不存在的网址比什么都不做更糟——
+      // 用户会以为是网络问题。直接说明情况，并指出该去哪里看。
+      toast(
+        command === 'help.website'
+          ? '本项目为个人自用，没有对外站点；说明见项目根目录的 README.md'
+          : '本项目为个人自用，没有反馈渠道；问题请记在项目根目录的 README.md 里',
+        'info'
+      )
+      return
+    }
+
     // ------------------------------------------------------------ 导出 ---
     case 'file.export':
     case 'file.exportHtml':
@@ -1448,7 +2177,12 @@ async function runCommand(payload: MenuCommandPayload): Promise<void> {
         格式,
         源: currentText(),
         文档路径: 路径,
-        默认文件名: 默认名
+        默认文件名: 默认名,
+        // 导出选项来自设置（「导出设置」菜单项与偏好设置面板都能改）。
+        // 不传的话主进程会用自己的默认值，于是设置面板改了却没效果——
+        // 那种"改了没反应"最难查。
+        附大纲: settings.exportIncludeOutline,
+        内嵌图片: settings.exportEmbedImages
       })
       if (结果.错误) {
         toast(结果.错误, 'error')
@@ -1556,14 +2290,28 @@ async function runCommand(payload: MenuCommandPayload): Promise<void> {
 
 async function openPath(path: string): Promise<void> {
   try {
+    // 已经打开过就直接切过去，**不再开第二份**。
+    // 同一个文件开两份是编辑器里最讨厌的坑之一：两边内容会互相覆盖，
+    // 而用户直到丢了一次改动才会发现。
+    const 已开 = 标签集.按路径找(path)
+    if (已开) {
+      await 切换标签(已开.标识)
+      return
+    }
+
     // **必须在 setDocument 之前**把图片的相对路径基准设好：
     // 文档内容一进编辑器就会构建装饰，那时若基准目录还是上一篇文档的，
     // 图片会先渲染成"无法显示"，要等重绘才恢复——表现为图片闪一下。
     设置文档目录(await window.selfmdExtra.path.dirname(path))
 
     const text = await doc.open(path)
+    // **先写回，再换视图状态。** openPath 会替换整个编辑器状态，
+    // 不先存的话前一个文档里未保存的改动就没了。
+    标签集.存当前(view.state)
     setDocument(text)
+    标签集.加入(doc.导出状态(), view.state)
     updateTitle()
+    刷新标签相关界面()
     view.focus()
 
     const info = await window.selfmd.app.getInfo()
@@ -1574,6 +2322,13 @@ async function openPath(path: string): Promise<void> {
       // 给 CodeMirror 一帧时间把装饰落到 DOM 上，否则计数必然是 0。
       await new Promise((resolve) => window.setTimeout(resolve, 400))
       await 等待异步渲染稳定()
+      // 再等到装饰数量不再变化，避免"取样太早"造成的假失败
+      await 等待渲染稳定(() =>
+        Array.from(document.querySelectorAll('.cm-line, .cm-w-image, .cm-w-math, .cm-w-diagram'))
+          .length.toString() +
+        ':' +
+        document.querySelectorAll('.cm-content *').length.toString()
+      )
 
       // 解析树计数覆盖整篇文档；DOM 计数只覆盖视口——CodeMirror 会虚拟化
       // 长文档，视口外的行压根没有 DOM。两个数放在一起，才能区分
@@ -1654,7 +2409,11 @@ async function openPath(path: string): Promise<void> {
     let 偏好结果: Record<string, string> | undefined
     let 上传结果: Record<string, string> | undefined
     let 数学结果: Record<string, string> | undefined
+    let 标点结果: Record<string, string> | undefined
+    let 匹配结果: Record<string, string> | undefined
     let 侧边栏结果: string | undefined
+    let 标签结果: string | undefined
+    let 图片复制结果: string | undefined
     let 模式结果: string | undefined
     let 偏好界面结果: string | undefined
     let 图片菜单结果: string | undefined
@@ -1668,8 +2427,12 @@ async function openPath(path: string): Promise<void> {
       偏好结果 = 运行偏好设置自测()
       上传结果 = 运行上传自测()
       数学结果 = 运行数学自测()
+      标点结果 = 运行渲染标点自测()
+      匹配结果 = 运行模糊匹配自测()
       imageInsertResult = await 运行图片插入自测(path)
       侧边栏结果 = await 运行侧边栏自测()
+      标签结果 = await 运行标签自测()
+      图片复制结果 = await 运行复制图片自测()
       模式结果 = await 运行模式自测()
       偏好界面结果 = await 运行偏好界面自测()
       图片菜单结果 = await 运行图片菜单自测()
@@ -1692,7 +2455,11 @@ async function openPath(path: string): Promise<void> {
       prefsResults: 偏好结果,
       uploadResults: 上传结果,
       mathResults: 数学结果,
+      punctResults: 标点结果,
+      matchResults: 匹配结果,
       sidebarResult: 侧边栏结果,
+      tabResult: 标签结果,
+      imageCopyResult: 图片复制结果,
       modeResult: 模式结果,
       prefsUiResult: 偏好界面结果,
       imageMenuResult: 图片菜单结果,
@@ -1788,6 +2555,12 @@ async function boot(): Promise<void> {
       打开文件: (路径) => {
         void openPath(路径)
       },
+      点击文档: (标识) => {
+        void 切换标签(标识)
+      },
+      关闭文档: (标识) => {
+        void 关闭标签(标识)
+      },
       保存状态: (状态) => {
         // 不比对就会形成回声：保存 → 设置变更事件 → 再保存 → …
         // 值没变时直接返回，环就断在这里。
@@ -1875,8 +2648,17 @@ async function boot(): Promise<void> {
 
   // --- renderer -> main：上报启动完成 -------------------------------------
   const info = await window.selfmd.app.getInfo()
+
+  // 启动时若还没有任何标签（既没打开文件，也没有恢复的草稿），
+  // 就先建一个空标签。**这一步不能省**：标签集为空时侧边栏的文档列表
+  // 是空的，而用户看不到任何"当前文档"的表示，会以为界面坏了。
+  if (标签集.数量 === 0) {
+    标签集.加入(doc.导出状态(), view.state)
+  }
+  刷新标签相关界面()
+
   console.log(`[selfMD] renderer ready on ${info.platform}, electron ${info.electron}`)
-  await window.selfmd.app.signalReady({ documents: 1 })
+  await window.selfmd.app.signalReady({ documents: 标签集.数量 })
 }
 
 void boot().catch((err) => {

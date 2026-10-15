@@ -1,8 +1,9 @@
 import type { EditorState } from '@codemirror/state'
 import { 扫描行内公式 } from '@shared/数学'
-import { 块级行样式, 标题行装饰, 隐藏, 插入, 替换为 } from './decorations'
+import { 扫描渲染标点 } from '../smart-punctuation'
+import { 块级行样式, 标题行装饰, 隐藏, 插入, 替换为, 渲染标点装饰 } from './decorations'
 import type { 构建上下文, 语法节点 } from './types'
-import { 加行装饰, 行内公式已启用 } from './types'
+import { 加行装饰, 行内公式已启用, 渲染标点已启用 } from './types'
 import { 列表圆点, 水平线, 数学公式, 表格分隔, 任务框, 语言标签, 计算层级 } from './widgets'
 
 /**
@@ -50,6 +51,22 @@ function 检测前置元数据(状态: EditorState): 手工块 | null {
 // ---------------------------------------------------------------------------
 // 手工扫描：数学块
 // ---------------------------------------------------------------------------
+
+/**
+ * 收集段落里行内代码的区间。
+ *
+ * 渲染时转换必须跳过这些区间：`代码里的 " 引号 " 与 -- 是内容本身`，
+ * 替换成弯引号会让人以为文档里存的就是排版字符。
+ */
+function 收集行内代码区间(节点: 语法节点): { from: number; to: number }[] {
+  const 结果: { from: number; to: number }[] = []
+  let 子 = 节点.firstChild
+  while (子) {
+    if (子.name === 'InlineCode') 结果.push({ from: 子.from, to: 子.to })
+    子 = 子.nextSibling
+  }
+  return 结果
+}
 
 /** `$$` 独占一行开始，到下一个含 `$$` 的行结束；`$$x$$` 单行闭合也算。 */
 export function 检测数学块(状态: EditorState): 手工块[] {
@@ -153,6 +170,25 @@ export function 处理块级(
             to: 区间.to + 1, // 含结尾的 `$`
             deco: 替换为(new 数学公式(区间.公式, false)),
             rank: 2
+          })
+        }
+      }
+
+      // 渲染时转换：把直引号、连字符、省略号在屏幕上显示成排版字符。
+      //
+      // 只在**非活动行**生效——正在编辑的那一行必须显示真正的字符，
+      // 否则用户敲下 `"` 却看到 `“`，会以为文档里存的就是弯引号。
+      // 这与行内标记"活动行露出源码"是同一条规则。
+      if (渲染标点已启用() && !在活动行) {
+        const 代码区间 = 收集行内代码区间(节点)
+        for (const 段 of 扫描渲染标点(原文, 段落起)) {
+          // 行内代码里的引号与连字符是内容，不能替换
+          if (代码区间.some((区) => 段.from >= 区.from && 段.to <= 区.to)) continue
+          上下文.条目.push({
+            from: 段.from,
+            to: 段.to,
+            deco: 渲染标点装饰(段.显示),
+            rank: 0
           })
         }
       }

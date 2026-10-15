@@ -45,6 +45,31 @@ export function 插入(widget: WidgetType, side: number): Decoration {
   return Decoration.widget({ widget, side })
 }
 
+/**
+ * "渲染时转换"用的标点装饰。
+ *
+ * **不替换字符，只加类与属性。** 替换会让那一个字符变得不可编辑——
+ * 光标进不去、也删不掉；而引号恰恰是用户最常回头去改的东西。
+ * 加上类之后由 CSS 把原字符藏起来、用 `::after` 显示排版字符，
+ * 文档模型与编辑行为都不受影响。
+ *
+ * 装饰按显示字符缓存：一段文字里重复的标点很多，
+ * 每次新建 Decoration 会让 CodeMirror 的装饰比较失去意义。
+ */
+const 标点装饰缓存 = new Map<string, Decoration>()
+
+export function 渲染标点装饰(显示: string): Decoration {
+  let 装饰 = 标点装饰缓存.get(显示)
+  if (!装饰) {
+    装饰 = Decoration.mark({
+      class: 'cm-typo-punct',
+      attributes: { 'data-typo': 显示 }
+    })
+    标点装饰缓存.set(显示, 装饰)
+  }
+  return 装饰
+}
+
 // ---------------------------------------------------------------------------
 // 行内
 // ---------------------------------------------------------------------------

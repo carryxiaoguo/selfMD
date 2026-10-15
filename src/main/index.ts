@@ -1,5 +1,6 @@
 import { app, BrowserWindow, nativeImage } from 'electron'
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { EV } from '@shared/ipc'
 import { 图标路径 } from './util/资源路径'
@@ -35,10 +36,44 @@ import { createWindow, 应用拼写词典 } from './window'
 
 registerPrivilegedSchemes()
 
+/**
+ * 冒烟测试用**独立的用户数据目录**。
+ *
+ * 必须在 `requestSingleInstanceLock()` 之前设置——单实例锁是按 userData
+ * 分的，换目录才谈得上"互不干扰"。
+ *
+ * 两个理由：
+ *
+ *   1. **不能去抢用户正在用的那个锁。** 装好的应用开着时，冒烟会撞上它的
+ *      单实例锁而无法启动。那个锁是真实用户占着的，正确做法是各走各的，
+ *      而不是把人家杀掉。冒烟因此会以非零码退出并说明原因。
+ *   2. **冒烟会写草稿、最近文件、窗口状态。** 写进真实目录就是污染用户数据；
+ *      而残留状态又会让下一次冒烟的结果不可复现——上一轮留下的草稿会让
+ *      "崩溃恢复"用例看到不属于它的东西。
+ */
+if (process.argv.includes('--smoke-test')) {
+  app.setPath('userData', join(tmpdir(), `selfmd-冒烟-${process.pid}`))
+}
+
 // 第二个实例应当把已有窗口带到前台，而不是重新启动一遍。
 const gotLock = app.requestSingleInstanceLock()
 if (!gotLock) {
-  app.quit()
+  // 冒烟测试下拿不到锁必须**以非零码退出**。
+  //
+  // 否则进程会安安静静地以 0 结束，而上层只看到"退出码 0"就以为通过了——
+  // 实际上一条断言都没跑。这种假通过比报错危险得多：它会让人以为
+  // 改动是安全的，直到某天真的坏了才发现。
+  //
+  // 拿不到锁几乎总是因为有一个残留实例（装好的那份、或上一次测试留下的）。
+  if (process.argv.includes('--smoke-test')) {
+    console.error(
+      '[selfMD] 冒烟测试无法启动：已有另一个 selfMD 实例在运行，' +
+        '它占着单实例锁。请先结束所有 selfMD / electron 进程再重试。'
+    )
+    app.exit(1)
+  } else {
+    app.quit()
+  }
 } else {
   app.on('second-instance', (_event, argv) => {
     const win = BrowserWindow.getAllWindows()[0]

@@ -490,9 +490,31 @@ async function 运行主题自测(): Promise<string> {
   const 不存在 = await 取('这个文件不存在.css')
   const 穿越 = await 取('../package.json')
 
+  // --- 内置主题是否真的装上了 -------------------------------------------
+  //
+  // 主题"装了没有"这件事会静默出错：文件没写进 `<userData>/themes`、
+  // 元数据里的 `@name` 解析失败、深色标记判错——三种情况在界面上
+  // 都只表现为"下拉框里少一项"或"名字变成文件名"，不会报任何错。
+  // 所以真的列一次，把 id、显示名、深色标记都数出来。
+  const 主题们 = await window.selfmd.theme.list()
+  const 内置 = 主题们.filter((t) => t.builtin)
+  const 描述 = 内置
+    .map((t) => `${t.id}=${t.name}${t.isDark ? '(暗)' : ''}`)
+    .sort()
+    .join(' ')
+
+  // 三款内置主题都要能通过协议读到正文（不是 404 也不是空文件）
+  const 可读 = await Promise.all(
+    内置.map(async (t) => {
+      const 状态 = await 取(`${t.id}.css`)
+      return 状态 === '200'
+    })
+  )
+
   return (
     `主题本体=${主题本体} 子目录资源=${子目录资源} ` +
-    `缺失文件=${不存在} 目录穿越=${穿越}`
+    `缺失文件=${不存在} 目录穿越=${穿越} ` +
+    `内置=${内置.length} 明细=${描述} 全部可读=${可读.every(Boolean)}`
   )
 }
 

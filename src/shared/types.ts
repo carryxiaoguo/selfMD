@@ -249,8 +249,10 @@ export const DEFAULT_SETTINGS: Settings = {
   exportIncludeOutline: true,
   exportEmbedImages: false,
 
-  theme: 'github',
-  darkTheme: 'github-dark',
+  // 默认用「月之亮面」而不是「黄皮纸」：默认值应当中性，
+  // 黄皮纸的衬线正文与暖色纸底是很强的风格主张，更适合按需选。
+  theme: 'moon-light',
+  darkTheme: 'moon-dark',
   useSeparateDarkTheme: false,
   isDarkMode: false,
   sidebarVisible: true,

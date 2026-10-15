@@ -14,8 +14,6 @@ import { BUILTIN_THEMES } from './builtin-themes'
  *   /** @dark true *​/       -> 深色配色
  */
 
-const SEED_MARKER = '.seeded'
-
 /** 拒绝任何可能逃出主题目录的 id。 */
 export function isSafeThemeId(id: string): boolean {
   return /^[A-Za-z0-9][A-Za-z0-9._-]{0,120}$/.test(id) && !id.includes('..')
@@ -77,23 +75,31 @@ function parseMeta(css: string): { name: string | null; isDark: boolean } {
   }
 }
 
-/** 首次启动、目录为空时写入内置主题。 */
+/**
+ * 补齐缺失的内置主题。
+ *
+ * **每次启动都跑，而不是只在首次启动时写一次。**
+ * 早先用了一个标记文件做"写过就跳过"，结果是：后来新增内置主题时，
+ * 已有用户的目录里永远不会有它们——而界面上只表现为"下拉框里少一项"，
+ * 不报任何错，也就没人会发现。
+ *
+ * 已经存在的文件**不覆盖**：用户很可能改过内置主题的配色，
+ * 覆盖等于悄悄丢掉他的改动。代价是内置主题日后的修改不会自动送达
+ * 到老用户那里——这个取舍是有意的，改主题前请先确认值不值得。
+ */
 export function seedBuiltinThemes(): void {
   const dir = getAppPaths().themes
   try {
     mkdirSync(dir, { recursive: true })
-    const marker = join(dir, SEED_MARKER)
-    if (existsSync(marker)) return
 
+    let 新写 = 0
     for (const theme of BUILTIN_THEMES) {
       const target = join(dir, `${theme.id}.css`)
-      if (!existsSync(target)) writeFileSync(target, theme.css, 'utf8')
+      if (existsSync(target)) continue
+      writeFileSync(target, theme.css, 'utf8')
+      新写 += 1
     }
-    writeFileSync(
-      marker,
-      'Built-in themes were written here on first launch.\nDelete this file to re-seed them.\n',
-      'utf8'
-    )
+    if (新写 > 0) console.log(`[themes] 已补齐 ${新写} 款内置主题`)
   } catch (err) {
     console.error('[themes] seeding failed:', err)
   }
@@ -176,11 +182,16 @@ export function deleteTheme(id: string): void {
 }
 
 /**
- * 把两个主题槽位（浅色 + 深色）合并成单个样式表，这正是 生成的
- * `themes/current-theme.css` 所扮演的角色。
+ * 把两个主题槽位（浅色 + 深色）合并成单个样式表。
+ *
+ * 合并顺序就是优先级：浅色在前、深色在后，所以开深色模式时
+ * 深色那几行会覆盖掉同名变量，而两份都没设的变量继续用基础样式的默认值。
+ *
+ * 兜底用 `parchment` / `moon-dark`：主题文件被删掉或读不出来时，
+ * 界面得有一套能看的配色。这两款是内置主题，只要应用还在就一定能读到。
  */
 export function buildActiveThemeCss(lightId: string, darkId: string, isDark: boolean): string {
-  const light = readTheme(lightId) || readTheme('github')
-  const dark = isDark ? readTheme(darkId) || readTheme('github-dark') : ''
+  const light = readTheme(lightId) || readTheme('parchment')
+  const dark = isDark ? readTheme(darkId) || readTheme('moon-dark') : ''
   return dark ? `${light}\n\n/* === dark override === */\n${dark}` : light
 }

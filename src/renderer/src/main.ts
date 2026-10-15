@@ -849,6 +849,71 @@ async function 运行图片菜单自测(): Promise<string> {
 }
 
 /**
+ * 交互反馈自测。
+ *
+ * 这类改动最容易**静默失效**：选择器写错、变量名拼错、被后面的规则覆盖——
+ * 三种情况下界面都照常能用，只是"又是生硬的"。而"生硬"没有报错，
+ * 只有用的人能感觉到。
+ *
+ * 所以断言落在**计算样式**上：过渡时长是不是非零、令牌有没有解析出来、
+ * 按压位移有没有真的挂上。读计算值而不是读样式表，
+ * 因为"写了规则"和"规则生效"是两回事。
+ */
+async function 运行交互自测(): Promise<string> {
+  // 偏好设置面板里有按钮、标签、输入框，是现成的取样点
+  偏好设置.打开()
+  await new Promise((完成) => setTimeout(完成, 60))
+
+  const 根样式 = getComputedStyle(document.documentElement)
+  const 令牌 = ['--ease', '--ease-press', '--dur-quick', '--dur-base']
+    .map((名) => `${名.replace('--', '')}=${根样式.getPropertyValue(名).trim() || '空'}`)
+    .join(' ')
+
+  /** 取某个元素的计算过渡时长（秒 → 毫秒）。 */
+  const 过渡时长 = (选择器: string): string => {
+    const el = document.querySelector(选择器)
+    if (!el) return '找不到'
+    const 值 = getComputedStyle(el).transitionDuration
+    if (!值) return '无'
+    const 毫秒 = 值
+      .split(',')
+      .map((段) => Number.parseFloat(段) * (段.includes('ms') ? 1 : 1000))
+    return `${Math.max(...毫秒)}ms`
+  }
+
+  const 取样 = [
+    `按钮=${过渡时长('.selfmd-btn')}`,
+    `标签=${过渡时长('.prefs-tab')}`,
+    `输入=${过渡时长('.prefs-search')}`
+  ].join(' ')
+
+  // 过渡属性里必须包含 background-color 与 transform：
+  // 只过渡颜色的话，按压仍然是没有反馈的硬跳。
+  let 属性齐 = '未测'
+  const 按钮 = document.querySelector('.selfmd-btn')
+  if (按钮) {
+    const 属性 = getComputedStyle(按钮).transitionProperty
+    属性齐 = 属性.includes('background-color') && 属性.includes('transform') ? '是' : `否(${属性})`
+  }
+
+  // 焦点环：`:focus-visible` 只在键盘导航时命中，所以这里用键盘模拟验证。
+  // 直接读 :focus 会读到鼠标点击的情况，那本来就不该有环。
+  let 有焦点环 = '未测'
+  const 可聚焦 = document.querySelector('.prefs-tab') as HTMLElement | null
+  if (可聚焦) {
+    可聚焦.focus()
+    const 阴影 = getComputedStyle(可聚焦).boxShadow
+    有焦点环 = 阴影 && 阴影 !== 'none' ? '是' : '否'
+    可聚焦.blur()
+  }
+
+  偏好设置.关闭()
+  await new Promise((完成) => setTimeout(完成, 60))
+
+  return `${令牌} ${取样} 属性齐=${属性齐} 焦点环=${有焦点环} 面板已关=${!偏好设置.是否打开}`
+}
+
+/**
  * 多文档标签自测。
  *
  * 盯住的是**整个实现里最容易出错的一步**：切换标签前有没有把当前标签的
@@ -2518,6 +2583,7 @@ async function openPath(path: string): Promise<void> {
     let 上传结果: Record<string, string> | undefined
     let 数学结果: Record<string, string> | undefined
     let 标点结果: Record<string, string> | undefined
+    let 交互结果: string | undefined
     let 匹配结果: Record<string, string> | undefined
     let 侧边栏结果: string | undefined
     let 标签结果: string | undefined
@@ -2536,6 +2602,7 @@ async function openPath(path: string): Promise<void> {
       上传结果 = 运行上传自测()
       数学结果 = 运行数学自测()
       标点结果 = 运行渲染标点自测()
+      交互结果 = await 运行交互自测()
       匹配结果 = 运行模糊匹配自测()
       imageInsertResult = await 运行图片插入自测(path)
       侧边栏结果 = await 运行侧边栏自测()
@@ -2567,6 +2634,7 @@ async function openPath(path: string): Promise<void> {
       matchResults: 匹配结果,
       sidebarResult: 侧边栏结果,
       tabResult: 标签结果,
+      interactionResult: 交互结果,
       imageCopyResult: 图片复制结果,
       modeResult: 模式结果,
       prefsUiResult: 偏好界面结果,

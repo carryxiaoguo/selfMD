@@ -499,6 +499,7 @@ export function registerAppIpc(): void {
         punctResults?: Record<string, string>
         tabResult?: string
         imageCopyResult?: string
+        interactionResult?: string
         matchResults?: Record<string, string>
         mode?: string
       }
@@ -577,6 +578,9 @@ export function registerAppIpc(): void {
         for (const [名, 输出] of Object.entries(info.mathResults)) {
           console.log(`    ${名}  =>  ${输出}`)
         }
+      }
+      if (info.interactionResult) {
+        console.log(`[selfMD] 交互反馈自测：${info.interactionResult}`)
       }
       if (info.tabResult) console.log(`[selfMD] 多文档标签自测：${info.tabResult}`)
       if (info.imageCopyResult) console.log(`[selfMD] 复制为图片自测：${info.imageCopyResult}`)

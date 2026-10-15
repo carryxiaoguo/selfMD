@@ -119,6 +119,23 @@
   --code-punct: #52607a;
   --code-tag: #e45649;
   --code-meta: #986801;
+
+  /* --- 动效令牌 --------------------------------------------------------
+     全部交互反馈共用这几个值，而不是每处各写一个 0.2s ease。
+     散着写的结果是同一个界面里十几种节奏，看着就"廉价"。
+
+     缓动曲线的选择有讲究：
+       --ease        快出慢收（decelerate）。元素进入视野、颜色变化用这条，
+                     因为它模拟的是"被推动后自然减速"，最接近物理直觉。
+       --ease-press  按下用。起手更快、收尾更硬，让"按下去"显得干脆，
+                     而不是软绵绵地陷进去。
+
+     时长都在 200ms 以内：超过这个数，界面就开始显得迟钝——
+     用户是在打字，不是在欣赏动画。 */
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+  --ease-press: cubic-bezier(0.3, 0, 0.2, 1);
+  --dur-quick: 110ms;
+  --dur-base: 160ms;
 }
 
 *,
@@ -1569,4 +1586,215 @@ body.no-replace .cm-panel.cm-search button[name='replaceAll'] {
 .cm-searchMatch-selected {
   background: var(--primary-color);
   color: var(--primary-btn-text-color);
+}
+
+/* ==========================================================================
+   交互反馈
+   --------------------------------------------------------------------------
+   这一节只做一件事：让每一次点击、悬停、聚焦都有**物理感**。
+
+   原先的问题不是"不好看"，而是**没有过渡**——整份样式表里只有一处
+   transition，所有状态变化都是瞬间跳变的。人眼对"突变"的感知是
+   "廉价/生硬"，对"120ms 内平滑过渡"的感知是"现代"。
+
+   三条原则：
+
+     1. **只过渡颜色与位移，不过渡尺寸。** 过渡 width/height 会触发布局重排，
+        在长文档里能明显感觉到卡顿；颜色与 transform 走合成层，代价几乎为零。
+     2. **按压必须有反馈。** `:active` 上缩 3%，这是"我确实点到了"的唯一即时证据。
+        没有它，点击就只是"等结果"。
+     3. **焦点环只给键盘。** 用 `:focus-visible` 而不是 `:focus`——
+        鼠标点一下也冒出一圈蓝框，是最招人烦的"现代化"。
+   ========================================================================== */
+
+button,
+[role='button'],
+.selfmd-btn,
+.sidebar-tab,
+.prefs-tab,
+.outline-item,
+.file-list-item,
+.article-list-item,
+.article-close,
+.selfmd-menu-item,
+.sidebar-resizer,
+.stat.clickable,
+.cm-panel.cm-search button {
+  /* 一处声明覆盖所有可点元素：漏掉任何一个，那个控件就会显得"格格不入" */
+  transition:
+    background-color var(--dur-quick) var(--ease),
+    color var(--dur-quick) var(--ease),
+    border-color var(--dur-quick) var(--ease),
+    box-shadow var(--dur-base) var(--ease),
+    transform var(--dur-quick) var(--ease-press);
+}
+
+/* --- 按压反馈 -------------------------------------------------------------
+   缩 3% 而不是 5%：太大就成了"果冻"，编辑器里要的是干脆。
+   位移类反馈走 transform，不触发重排。 */
+button:not(:disabled):active,
+.selfmd-btn:not(:disabled):active,
+.article-close:active,
+.cm-panel.cm-search button:not(:disabled):active {
+  transform: scale(0.96);
+}
+
+/* 整行类条目按下时缩进一点点，比缩放更贴合"列表项"的形态 */
+.selfmd-menu-item:not(.disabled):active,
+.outline-item:active,
+.file-list-item:active,
+.article-list-item:active {
+  transform: scale(0.99);
+}
+
+.sidebar-tab:active,
+.prefs-tab:active {
+  transform: scale(0.98);
+}
+
+/* --- 键盘焦点 -------------------------------------------------------------
+   `:focus-visible` 只在键盘导航时命中，鼠标点击不会触发。
+   焦点环用 box-shadow 画而不是 outline：outline 在圆角元素上是方框，
+   而且不能跟随 border-radius。 */
+button:focus-visible,
+.selfmd-btn:focus-visible,
+.sidebar-tab:focus-visible,
+.prefs-tab:focus-visible,
+.outline-item:focus-visible,
+.file-list-item:focus-visible,
+.article-list-item:focus-visible,
+.article-close:focus-visible,
+.selfmd-menu-item:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+/* --- 按钮的层次 -------------------------------------------------------------
+   主按钮悬停时轻微抬起：投影比变色更能表达"这个可以按"。
+   位移只动 translateY，不动 margin——后者会推挤相邻元素。 */
+.selfmd-btn {
+  transition:
+    background-color var(--dur-quick) var(--ease),
+    border-color var(--dur-quick) var(--ease),
+    box-shadow var(--dur-base) var(--ease),
+    transform var(--dur-quick) var(--ease-press);
+}
+
+.selfmd-btn:hover {
+  box-shadow: 0 1px 2px rgb(0 0 0 / 6%);
+}
+
+.selfmd-btn-primary:hover {
+  box-shadow: 0 2px 8px -2px var(--accent);
+}
+
+/* --- 输入框 -----------------------------------------------------------------
+   聚焦时同时变边框色与加环：只变色太弱，只加环太跳。 */
+.selfmd-modal-input,
+.prefs-search,
+.prefs-control input,
+.prefs-control select,
+.quick-open-input {
+  transition:
+    border-color var(--dur-quick) var(--ease),
+    box-shadow var(--dur-base) var(--ease),
+    background-color var(--dur-quick) var(--ease);
+}
+
+/* --- 悬停的层次感 -----------------------------------------------------------
+   条目悬停只给底色，不给位移：列表里整行移动会让眼睛跟着晃。 */
+.outline-item,
+.file-list-item,
+.article-list-item,
+.selfmd-menu-item {
+  border-radius: 4px;
+  /* 让底色的出现与消失都有一点呼吸，而不是硬切 */
+  transition:
+    background-color var(--dur-quick) var(--ease),
+    color var(--dur-quick) var(--ease),
+    transform var(--dur-quick) var(--ease-press);
+}
+
+/* --- 侧边栏标签的下划线 ------------------------------------------------------
+   用 transform 画下划线而不是改 border-width：后者会改变元素高度，
+   整排标签会跟着抖一下。 */
+.sidebar-tab {
+  position: relative;
+}
+
+.sidebar-tab::after {
+  content: '';
+  position: absolute;
+  left: 12%;
+  right: 12%;
+  bottom: 0;
+  height: 2px;
+  background: var(--primary-color);
+  border-radius: 2px 2px 0 0;
+  /* 从中间向两侧展开，比整条淡入更有方向感 */
+  transform: scaleX(0);
+  transition: transform var(--dur-base) var(--ease);
+}
+
+.sidebar-tab.active::after {
+  transform: scaleX(1);
+}
+
+/* 激活态改用伪元素画线，原生的 border-bottom 让位 */
+.sidebar-tab.active {
+  border-bottom-color: transparent;
+}
+
+/* --- 尊重"减少动态效果" ------------------------------------------------------
+   系统里开了这个开关的用户，多半是会晕动或有前庭敏感。
+   过渡全部关掉，但**状态本身不能少**——颜色该变还是要变。 */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+
+  button:not(:disabled):active,
+  .selfmd-btn:not(:disabled):active,
+  .selfmd-menu-item:not(.disabled):active,
+  .outline-item:active,
+  .file-list-item:active,
+  .article-list-item:active,
+  .sidebar-tab:active,
+  .prefs-tab:active {
+    transform: none;
+  }
+}
+
+/* --- 滚动条 -----------------------------------------------------------------
+   默认滚动条在深色主题上是一道刺眼的亮灰。只改颜色与宽度，
+   不做圆角胶囊那类花活——编辑器里滚动条越不显眼越好。 */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--window-border-color);
+  border: 3px solid transparent;
+  background-clip: content-box;
+  border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--blur-text-color);
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
 }

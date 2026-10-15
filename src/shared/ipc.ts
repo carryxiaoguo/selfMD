@@ -390,6 +390,8 @@ export interface SelfMdApi {
       punctResults?: Record<string, string>
       /** 仅冒烟测试模式：多文档标签自测结果。 */
       tabResult?: string
+      /** 仅冒烟测试模式：交互反馈自测结果。 */
+      interactionResult?: string
       /** 仅冒烟测试模式：复制为图片自测结果。 */
       imageCopyResult?: string
       /** 仅冒烟测试模式：模糊匹配自测结果。 */

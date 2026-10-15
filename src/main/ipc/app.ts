@@ -395,6 +395,10 @@ export function registerAppIpc(): void {
     const win = windowOf(e)
     if (!win) return false
     win.setAlwaysOnTop(on)
+    // 「窗口置顶」是菜单里的 checkbox，改完必须重建菜单，勾选才会跟上实际状态。
+    // 全屏那边有 enter/leave-full-screen 事件可挂，置顶没有对应事件，
+    // 只能在这里显式重建。
+    rebuildMenu()
     return win.isAlwaysOnTop()
   })
 

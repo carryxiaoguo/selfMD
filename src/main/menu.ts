@@ -489,10 +489,15 @@ function viewMenu(): MenuItemConstructorOptions {
       { type: 'separator' },
       toItem(pick('View', 'view.alwaysOnTop'), {
         type: 'checkbox',
+        // 勾选状态读**窗口的实际状态**，不读设置也不缓存。
+        // 这两个开关改变的是窗口而不是文档，缓存一份迟早会与实际不同步，
+        // 而菜单显示错了用户只会以为"点了没反应"。
+        checked: BrowserWindow.getFocusedWindow()?.isAlwaysOnTop() ?? false,
         click: (menuItem) => send('view.alwaysOnTop', menuItem.checked)
       }),
       toItem(pick('View', 'view.fullScreen'), {
         type: 'checkbox',
+        checked: BrowserWindow.getFocusedWindow()?.isFullScreen() ?? false,
         click: (menuItem) => send('view.fullScreen', menuItem.checked)
       }),
       {

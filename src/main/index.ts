@@ -388,8 +388,38 @@ function smokeOpenPath(): string | null {
   return arg ? arg.slice('--smoke-open='.length) : null
 }
 
-async function runSmokeTest(): Promise<void> {
-  const target = smokeOpenPath()
+/**
+ * 全屏自测：真的进一次全屏，再真的按一次 Esc。
+ *
+ * 为什么要测：全屏时 Windows 会把标题栏连同最小化/最大化/关闭一起隐藏，
+ * **没有任何可点的退出入口**。如果 Esc 不管用，用户就真的卡住了——
+ * 而且这件事在开发时极难发现，因为开发者知道 F11 能切回来。
+ *
+ * `sendInputEvent` 走的是**真实输入管线**，因此会经过
+ * `before-input-event`，与用户按键完全同一条路；直接调 `setFullScreen(false)`
+ * 就测不到任何东西了。
+ */
+async function 运行全屏自测(): Promise<string> {
+  const 窗口 = BrowserWindow.getAllWindows()[0]
+  if (!窗口) return '没有窗口，未测'
+
+  const 原本 = 窗口.isFullScreen()
+  try {
+    窗口.setFullScreen(true)
+    await new Promise((完成) => setTimeout(完成, 500))
+    const 进入 = 窗口.isFullScreen()
+
+    窗口.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'Escape' })
+    await new Promise((完成) => setTimeout(完成, 500))
+    const 按Esc后仍全屏 = 窗口.isFullScreen()
+
+    return `进入全屏=${进入} 按Esc后仍全屏=${按Esc后仍全屏}`
+  } finally {
+    if (!窗口.isDestroyed()) 窗口.setFullScreen(原本)
+  }
+}
+
+async function runSmokeTest(): Promise<void> {  const target = smokeOpenPath()
   const 等文档 = target !== null || SMOKE_IMAGE
 
   // 图标是否真的能解码，而不是"文件存在"就算数：路径写错、PNG 损坏、
@@ -435,6 +465,8 @@ async function runSmokeTest(): Promise<void> {
     await whenDocumentOpened()
     console.log('[selfMD] 冒烟：文档已加载')
   }
+
+  console.log(`[selfMD] 全屏自测：${await 运行全屏自测()}`)
 
   clearTimeout(timer)
   清理主题素材()

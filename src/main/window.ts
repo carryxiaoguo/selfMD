@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import { EV } from '@shared/ipc'
 import type { Settings } from '@shared/types'
 import { 图标路径 } from './util/资源路径'
+import { rebuildMenu } from './menu'
 import { getSettings } from './services/settings'
 
 /**
@@ -118,6 +119,35 @@ export function createWindow(options: WindowOptions = {}): BrowserWindow {
   })
 
   if (options.path) pendingPaths.set(win.id, options.path)
+
+  // --- 全屏的两件必须做的事 ---------------------------------------------
+  //
+  // 全屏时 Windows 会把整个标题栏连同最小化/最大化/关闭一起隐藏。
+  // 这是系统行为、不是缺陷，但由此带来两个必须自己补上的出口：
+
+  // 1. **Esc 退出全屏。**
+  //    `win.setFullScreen(true)` 是程序化全屏，Electron 不会自动响应 Esc；
+  //    用户之前能退出多半是碰巧（按了 F11，或系统层的偶发处理）。
+  //    全屏下没有任何可点的按钮，不给一条确定的退路就会真的卡住。
+  //    用 `before-input-event` 而不是在渲染层监听键盘：渲染层的监听要看焦点，
+  //    而全屏时用户可能刚点过侧边栏，焦点不在编辑器上。
+  win.webContents.on('before-input-event', (事件, 输入) => {
+    if (输入.type !== 'keyDown') return
+    if (输入.key === 'Escape' && win.isFullScreen()) {
+      win.setFullScreen(false)
+      事件.preventDefault()
+    }
+  })
+
+  // 2. **菜单勾选要跟着实际状态走。**
+  //    `全屏` 是个 checkbox，但之前没给 `checked`，也没在状态变化时重建菜单，
+  //    于是全屏时菜单里那一项仍显示未勾选——用户会以为功能没生效。
+  const 同步菜单 = (): void => {
+    if (!win.isDestroyed()) rebuildMenu()
+  }
+  win.on('enter-full-screen', 同步菜单)
+  win.on('leave-full-screen', 同步菜单)
+
 
   // 把渲染进程的日志输出到 main 进程的 stdout。否则从终端启动应用时，
   // 渲染进程启动阶段的失败是完全看不见的。

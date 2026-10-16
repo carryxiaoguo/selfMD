@@ -127,30 +127,53 @@ export const 块级行样式 = {
 } as const
 
 /**
- * 代码块的行装饰，按**该块自己的配色**取。
+ * 代码块的行装饰，按**该块自己的外观**取。
  *
- * `--code-*` 是一组 CSS 变量，作用域落在行元素上之后，
- * 块内的 token（`cm-tok-keyword` 等）会自然继承到这套值——
+ * --code-* 是一组 CSS 变量，作用域落在行元素上之后，
+ * 块内的 token（cm-tok-keyword 等）会自然继承到这套值——
  * 不需要为每种配色各写一份 token 规则。
  *
- * 装饰实例按 `配色|位置` 缓存：同一篇文档里同样配色的代码块很多，
- * 每次新建 Decoration 会让 CodeMirror 的装饰比较失去意义。
+ * @param 配色 该块自己的配色标识（follow 表示跟随主题）
+ * @param 位置 首行 / 中间行 / 末行，决定圆角
+ * @param 行号 正文行的序号（从 1 开始）；首尾围栏行传 null
+ * @param 字体栈 该块的字体系列；空串表示跟随主题
+ *
+ * ## 行号为什么走属性而不是 CSS 计数器
+ *
+ * 计数器想过，但**在虚拟化的编辑器里不可靠**：CodeMirror 会把视口外的行
+ * 从 DOM 里拿掉，计数器在一屏之内会重新开始。而构建装饰时就已经知道
+ * 每一行是块内第几行，直接写进属性最简单也最准。
+ *
+ * 行号用 content: attr(data-行号) 画在 ::before 上，所以它**不是 DOM 文本**——
+ * 复制代码时不会把行号带出去。行号是给眼睛看的，一旦混进剪贴板，
+ * 粘到别处就全是垃圾。
  */
 const 代码块行缓存 = new Map<string, Decoration>()
 
 export function 代码块行装饰(
   配色: string,
-  位置: '首' | '中' | '末'
+  位置: '首' | '中' | '末',
+  行号: number | null,
+  字体栈: string
 ): Decoration {
-  const 键 = `${配色}|${位置}`
+  const 类名 = ['cm-lp-code', 'md-fences']
+  if (位置 === '首') 类名.push('cm-lp-code-first')
+  if (位置 === '末') 类名.push('cm-lp-code-last')
+  if (配色 !== 'follow') 类名.push(`cm-code-${配色}`)
+
+  const 属性: Record<string, string> = {}
+  if (行号 !== null) 属性['data-行号'] = String(行号)
+  // 字体栈从 TS 来而不是在 CSS 里再写一份：写两份迟早会不一致，
+  // 而且内置字体表本来就是 TS 里的数据。CSS 只负责兜底。
+  if (字体栈) 属性.style = `--code-font: ${字体栈}`
+
+  // 带行号的装饰每行都不同，缓存没有意义；围栏行（无行号）才缓存
+  if (行号 !== null) return Decoration.line({ class: 类名.join(' '), attributes: 属性 })
+
+  const 键 = `${配色}|${字体栈}|${位置}`
   let 装饰 = 代码块行缓存.get(键)
   if (!装饰) {
-    const 类名 = ['cm-lp-code', 'md-fences']
-    if (位置 === '首') 类名.push('cm-lp-code-first')
-    if (位置 === '末') 类名.push('cm-lp-code-last')
-    // `follow` 是默认值，不带类：类名越少，主题作者越好覆盖
-    if (配色 !== 'follow') 类名.push(`cm-code-${配色}`)
-    装饰 = Decoration.line({ class: 类名.join(' ') })
+    装饰 = Decoration.line({ class: 类名.join(' '), attributes: 属性 })
     代码块行缓存.set(键, 装饰)
   }
   return 装饰

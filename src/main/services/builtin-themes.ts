@@ -86,6 +86,8 @@ export const BUILTIN_THEMES: BuiltinTheme[] = [
   --md-char-color: #b3a17c;
   --meta-content-color: #7a6a4a;
   --rawblock-edit-panel-bd: #efe4c9;
+  --code-bg: #e8dcbd;
+  --code-edge: #d3bf92;
   --item-hover-bg-color: #e8dbbd;
   --item-hover-text-color: #2b2419;
   --active-file-bg-color: #e3d4b2;
@@ -199,6 +201,8 @@ export const BUILTIN_THEMES: BuiltinTheme[] = [
   --md-char-color: #9aa5c4;
   --meta-content-color: #5b6b96;
   --rawblock-edit-panel-bd: #eef2fa;
+  --code-bg: #eaeff9;
+  --code-edge: #ccd8ef;
   --item-hover-bg-color: #e3e9f7;
   --item-hover-text-color: #1a2038;
   --active-file-bg-color: #dde5f8;
@@ -269,6 +273,8 @@ export const BUILTIN_THEMES: BuiltinTheme[] = [
   --md-char-color: #4d5878;
   --meta-content-color: #7f8bb0;
   --rawblock-edit-panel-bd: #111730;
+  --code-bg: #060912;
+  --code-edge: #26304a;
   --item-hover-bg-color: #1a2140;
   --item-hover-text-color: #e4e9f7;
   --active-file-bg-color: #1e2749;

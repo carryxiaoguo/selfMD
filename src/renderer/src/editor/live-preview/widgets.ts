@@ -3,6 +3,7 @@ import { foldCode } from '@codemirror/language'
 import { languages } from '@codemirror/language-data'
 import { WidgetType, type EditorView } from '@codemirror/view'
 import {
+  内置字体,
   构建围栏信息,
   信息串区间,
   样式显示名,
@@ -104,6 +105,7 @@ export class 代码块头部 extends WidgetType {
       other.信息.语言 === this.信息.语言 &&
       other.信息.名称 === this.信息.名称 &&
       other.信息.样式 === this.信息.样式 &&
+      other.信息.字体 === this.信息.字体 &&
       other.位置.首行起 === this.位置.首行起
     )
   }
@@ -164,7 +166,15 @@ export class 代码块头部 extends WidgetType {
       this.改信息(view, { 语言: 语言.value })
     })
 
-    // --- 样式 -----------------------------------------------------------
+    // --- 字体 -----------------------------------------------------------
+    const 字体 = this.选单('cm-w-codehead-font', '代码字体')
+    for (const 项 of 内置字体) 字体.append(new Option(项.名, 项.值))
+    字体.value = this.信息.字体
+    字体.addEventListener('change', () => {
+      this.改信息(view, { 字体: 字体.value })
+    })
+
+    // --- 配色 -----------------------------------------------------------
     const 样式 = this.选单('cm-w-codehead-style', '代码块配色')
     for (const 名 of 样式顺序) 样式.append(new Option(样式显示名[名], 名))
     样式.value = this.信息.样式
@@ -185,7 +195,7 @@ export class 代码块头部 extends WidgetType {
       )
     })
 
-    盒.append(折叠, 名称, 语言, 样式, 复制)
+    盒.append(折叠, 名称, 语言, 字体, 样式, 复制)
     return 盒
   }
 

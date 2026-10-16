@@ -84,6 +84,8 @@
   --code-bg: var(--rawblock-edit-panel-bd);
   --code-border: var(--window-border-color);
   --code-text: var(--text-color);
+  /* 代码块左侧色带与上下边框的颜色。主题可以覆盖；不覆盖时用界面边框色兜底。 */
+  --code-edge: var(--border);
 
   --syntax: var(--md-char-color);
   --syntax-active: var(--control-text-color);
@@ -364,26 +366,66 @@ body.live-preview .cm-md-marker-hidden {
   color: var(--text-secondary);
 }
 
-/* --- 代码围栏：整块背景，首尾行带圆角 ---------------------------------- */
+/* --- 代码围栏：整块背景，首尾行带圆角 ----------------------------------
+   代码块刻意做得**与文档主题明显不同**：它不是正文的一部分，是一块
+   "外来物"。所以除了底色，还给左侧一条色带勾出边界——只靠底色的话，
+   在黄皮纸这类本身就偏暖的主题上，代码块和纸张会糊成一片。 */
 
 .cm-lp-code {
   background: var(--code-bg);
-  font-family: var(--font-mono);
+  /* 字体栈由装饰层写在行上（`--code-font`），取自内置字体表。
+     写两份迟早会不一致，CSS 这里只负责兜底。 */
+  font-family: var(--code-font, var(--font-mono));
   font-size: 0.92em;
   color: var(--code-text);
+  /* 左侧色带：比四周描边轻，但足以把代码块从正文里"切"出来 */
+  border-left: 3px solid var(--code-edge, var(--border));
+  /* 行号与代码之间留出左内边距，数字才有地方站 */
+  padding-left: 0.55em !important;
 }
 
 .cm-lp-code-first {
   border-top-left-radius: var(--radius);
   border-top-right-radius: var(--radius);
+  border-top: 1px solid var(--code-edge, var(--border));
   padding-top: 0.35em !important;
 }
 
 .cm-lp-code-last {
   border-bottom-left-radius: var(--radius);
   border-bottom-right-radius: var(--radius);
+  border-bottom: 1px solid var(--code-edge, var(--border));
   padding-bottom: 0.35em !important;
   margin-bottom: 0.6em;
+}
+
+/* --- 行号 -----------------------------------------------------------------
+   画在 `::before` 上，所以它**不是 DOM 文本**，复制代码不会把行号带出去。
+   这一点是刻意的：行号是给眼睛看的，混进剪贴板粘到别处就全是垃圾。
+
+   行号来自行装饰上的 `data-行号`，不是 CSS 计数器——CodeMirror 会虚拟化
+   视口外的行，计数器在一屏之内会重新开始。 */
+
+.cm-lp-code[data-行号]::before {
+  content: attr(data-行号);
+  display: inline-block;
+  /* 固定宽度 + 右对齐，个位数与两位数才不会错开 */
+  width: 2em;
+  margin-right: 0.9em;
+  text-align: right;
+  color: var(--code-comment);
+  /* 序号比正文再淡一档：它是路标，不是内容 */
+  opacity: 0.6;
+  /* 等宽数字，避免 1 和 8 宽度不同导致整列参差 */
+  font-variant-numeric: tabular-nums;
+  /* 不能被选中：拖动选择代码时不该把数字划进去 */
+  user-select: none;
+}
+
+/* 光标所在行高亮一下行号，方便对照位置 */
+.cm-lp-code[data-行号].cm-activeLine::before {
+  opacity: 1;
+  color: var(--code-function);
 }
 
 /* --- 代码块头部栏 --------------------------------------------------------
@@ -498,6 +540,7 @@ body.live-preview .cm-md-marker-hidden {
 .cm-code-light {
   --code-bg: #ffffff;
   --code-text: #24292f;
+  --code-edge: #d0d7de;
   --code-keyword: #8250df;
   --code-string: #0a3069;
   --code-comment: #8b949e;
@@ -515,6 +558,7 @@ body.live-preview .cm-md-marker-hidden {
 .cm-code-dark {
   --code-bg: #16181d;
   --code-text: #c7cfe4;
+  --code-edge: #2c313c;
   --code-keyword: #c792ea;
   --code-string: #98d982;
   --code-comment: #6b7590;

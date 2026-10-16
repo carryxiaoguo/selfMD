@@ -22,7 +22,7 @@ import {
   代码块头部,
   计算层级
 } from './widgets'
-import { 解析围栏首行 } from '@shared/代码块信息'
+import { 内置字体, 解析围栏首行 } from '@shared/代码块信息'
 
 /**
  * 块级装饰。
@@ -295,16 +295,24 @@ export function 处理块级(
     case 'FencedCode': {
       const 首行 = 状态.doc.lineAt(节点.from)
       const 末行 = 状态.doc.lineAt(Math.max(节点.from, 节点.to - 1))
-      // 配色取自该块自己的信息串（`style=dark` 之类），不是全局设置——
-      // 同一篇文档里不同代码块用不同配色是合理需求
+      // 配色与字体都取自该块自己的信息串（`style=dark font=consolas` 之类），
+      // 不是全局设置——同一篇文档里不同代码块用不同外观是合理需求
       const 本块信息 = 解析围栏首行(状态.sliceDoc(首行.from, 首行.to))
+      const 字体栈 = 内置字体.find((项) => 项.值 === 本块信息.字体)?.族 ?? ''
+      // 行号只编正文行：首尾围栏不是代码，给它们编号会让人以为
+      // "第 1 行"是反引号那一行
+      let 正文序号 = 0
       for (let n = 首行.number; n <= 末行.number; n++) {
+        const 是正文 = n !== 首行.number && n !== 末行.number
+        if (是正文) 正文序号++
         加行装饰(
           上下文,
           状态.doc.line(n).from,
           代码块行装饰(
             本块信息.样式,
-            n === 首行.number ? '首' : n === 末行.number ? '末' : '中'
+            n === 首行.number ? '首' : n === 末行.number ? '末' : '中',
+            是正文 ? 正文序号 : null,
+            字体栈
           )
         )
       }

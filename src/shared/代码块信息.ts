@@ -38,10 +38,67 @@ export const 样式显示名: Record<代码块样式, string> = {
 /** 下拉里的顺序：默认项排第一。 */
 export const 样式顺序: 代码块样式[] = ['follow', 'light', 'dark']
 
+// ---------------------------------------------------------------------------
+// 字体
+// ---------------------------------------------------------------------------
+
+/**
+ * 内置的代码字体。
+ *
+ * 每一项是一个**字体族列表**而不是单个字体名：这些字体不一定都装在同一台
+ * 机器上（`Cascadia Mono` 是 Win11 才自带的），列表让浏览器按顺序回退，
+ * 装了什么就用什么，都不会退化成默认衬线体。
+ *
+ * 最后一位统一是 `monospace`，保证再差也有等宽兜底——代码用比例字体排版
+ * 会让缩进完全失去意义。
+ */
+export interface 字体项 {
+  值: string
+  名: string
+  族: string
+}
+
+export const 内置字体: 字体项[] = [
+  { 值: 'follow', 名: '跟随主题', 族: '' },
+  { 值: 'consolas', 名: 'Consolas', 族: 'Consolas, "Courier New", monospace' },
+  {
+    值: 'cascadia',
+    名: 'Cascadia Mono',
+    族: '"Cascadia Mono", "Cascadia Code", Consolas, monospace'
+  },
+  {
+    值: 'jetbrains',
+    名: 'JetBrains Mono',
+    族: '"JetBrains Mono", "Sarasa Mono SC", Consolas, monospace'
+  },
+  { 值: 'fira', 名: 'Fira Code', 族: '"Fira Code", Consolas, monospace' },
+  {
+    值: 'sourcecode',
+    名: 'Source Code Pro',
+    族: '"Source Code Pro", Consolas, monospace'
+  },
+  {
+    值: 'sarasa',
+    名: '更纱黑体',
+    族: '"Sarasa Mono SC", "Sarasa Term SC", "Sarasa Fixed SC", Consolas, monospace'
+  },
+  { 值: 'simsun', 名: '宋体', 族: 'SimSun, "Songti SC", "MS Song", monospace' },
+  {
+    值: 'yahei',
+    名: '微软雅黑',
+    族: '"Microsoft YaHei UI", "Microsoft YaHei", monospace'
+  },
+  { 值: 'courier', 名: 'Courier New', 族: '"Courier New", monospace' }
+]
+
+const 字体值表 = new Set(内置字体.map((项) => 项.值))
+
 export interface 围栏信息 {
   语言: string
   名称: string
   样式: 代码块样式
+  /** 内置字体的标识；`follow` 表示跟随主题。 */
+  字体: string
 }
 
 /** 去掉首尾空白并合并内部连续空白——信息串里多余的空格没有意义。 */
@@ -66,6 +123,7 @@ export function 解析围栏信息(原始: string): 围栏信息 {
 
   const 名称片段: string[] = []
   let 样式: 代码块样式 = 'follow'
+  let 字体 = 'follow'
 
   for (const 片 of 片段) {
     const 等号 = 片.indexOf('=')
@@ -78,11 +136,16 @@ export function 解析围栏信息(原始: string): 围栏信息 {
         // 否则名称里会莫名其妙多出一截 `style=xxx`
         continue
       }
+      if (键 === 'font') {
+        if (字体值表.has(值)) 字体 = 值
+        // 同上：认不出的字体标识不该混进名称里
+        continue
+      }
     }
     名称片段.push(片)
   }
 
-  return { 语言, 名称: 名称片段.join(' '), 样式 }
+  return { 语言, 名称: 名称片段.join(' '), 样式, 字体 }
 }
 
 /**
@@ -96,6 +159,7 @@ export function 构建围栏信息(信息: 围栏信息): string {
   if (信息.语言) 片段.push(信息.语言)
   if (信息.名称) 片段.push(信息.名称)
   if (信息.样式 !== 'follow') 片段.push(`style=${信息.样式}`)
+  if (信息.字体 && 信息.字体 !== 'follow') 片段.push(`font=${信息.字体}`)
   return 片段.join(' ')
 }
 
@@ -130,6 +194,6 @@ export function 信息串区间(首行文本: string): { 起: number; 终: numbe
  */
 export function 解析围栏首行(首行文本: string): 围栏信息 {
   const 区间 = 信息串区间(首行文本)
-  if (!区间) return { 语言: '', 名称: '', 样式: 'follow' }
+  if (!区间) return { 语言: '', 名称: '', 样式: 'follow', 字体: 'follow' }
   return 解析围栏信息(首行文本.slice(区间.起, 区间.终))
 }

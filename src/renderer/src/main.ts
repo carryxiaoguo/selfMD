@@ -1102,11 +1102,37 @@ async function 运行代码块头部自测(): Promise<string> {
   }
   结果.push(`改名称=${/示例/.test(首行()) ? '对' : `错(${首行()})`}`)
 
+  // --- 字体与行号 ------------------------------------------------------
+  const 字体前 = document.querySelector('.cm-w-codehead-font') as HTMLSelectElement | null
+  结果.push(`字体下拉=${字体前 ? 字体前.options.length : 0}`)
+  await 改下拉('.cm-w-codehead-font', 'consolas')
+  // 字体栈要落到行上（`--code-font`），只在文档里写 `font=` 是不够的
+  const 行元素 = document.querySelector('.cm-lp-code[data-行号]') as HTMLElement | null
+  const 行字体 = 行元素 ? getComputedStyle(行元素).getPropertyValue('--code-font').trim() : ''
+  结果.push(`改字体=${/font=consolas/.test(首行()) && /Consolas/.test(行字体) ? '对' : `错(${首行()})`}`)
+
+  // 行号：正文行才编号，首尾围栏不编
+  const 编号行 = document.querySelectorAll('.cm-lp-code[data-行号]')
+  const 首号 = 编号行[0]?.getAttribute('data-行号')
+  结果.push(`行号=${编号行.length}行/首个=${首号}`)
+
+  // 代码块必须与页面底色**明显不同**：这是"语言块和原本主题不一样"的判据。
+  // 不比较具体色值（那会随主题变），比较亮度差——差得太小就等于没区分。
+  const 页面底 = getComputedStyle(document.body).backgroundColor
+  const 代码底 = 行元素 ? getComputedStyle(行元素).backgroundColor : ''
+  const 亮度 = (色: string): number => {
+    const 数 = /rgba?\((\d+),\s*(\d+),\s*(\d+)/.exec(色)
+    if (!数) return -1
+    return (Number(数[1]) * 299 + Number(数[2]) * 587 + Number(数[3]) * 114) / 1000
+  }
+  const 差 = Math.abs(亮度(页面底) - 亮度(代码底))
+  结果.push(`底色差=${差.toFixed(0)}${差 >= 6 && 亮度(代码底) >= 0 ? '(够)' : '(太接近)'}`)
+
   // 三项都写完之后，信息串应当仍然可被解析回同样的三项——
   // 构建与解析是一对，只测一边等于没测
   const 信息 = 解析围栏信息(首行().replace(/^```/, ''))
   结果.push(
-    `往返=${信息.语言 === 'python' && 信息.名称 === '示例' && 信息.样式 === 'dark' ? '对' : `错(${JSON.stringify(信息)})`}`
+    `往返=${信息.语言 === 'python' && 信息.名称 === '示例' && 信息.样式 === 'dark' && 信息.字体 === 'consolas' ? '对' : `错(${JSON.stringify(信息)})`}`
   )
   结果.push(`首行=${JSON.stringify(首行())}`)
 
@@ -2960,7 +2986,10 @@ async function openPath(path: string): Promise<void> {
         代码着色总数: '.cm-lp-code [class*="cm-tok-"]',
         // 代码块头部栏。原来这里数的是行尾的 `cm-w-lang` 小标签，
         // 现在首行整行换成头部栏，那个标签只在光标停在围栏行时才出现。
-        代码块头部: '.cm-w-codehead'
+        代码块头部: '.cm-w-codehead',
+        // 行号。数的是带 `data-行号` 属性的行——属性在、数字才画得出来，
+        // 只数行数的话"行装饰在但属性没挂"这种情况会漏过去。
+        代码行号: '.cm-lp-code[data-行号]'
       }
       // --- DOM 计数：滚动取样取最大值 -------------------------------------
       //

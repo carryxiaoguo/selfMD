@@ -597,7 +597,34 @@ body.live-preview .cm-md-marker-hidden {
   --code-meta: #e5c07b;
 }
 
-/* --- 前置元数据 --------------------------------------------------------- */
+/* --- 提示框（`> [!NOTE]`）------------------------------------------------
+   用户的要求就一句："字体会变弱一点即可"。
+
+   所以它和普通引用的区别**不在形状，在分量**：左边框更细更淡、文字降到
+   muted、不加醒目底色。提示是旁注，不该和正文抢注意力——做成一个鲜艳的
+   卡片反而违背了"提示"这两个字。 */
+
+.cm-lp-callout {
+  /* 覆盖引言的左边框：细一半、淡一档 */
+  border-left: 2px solid var(--border) !important;
+  background: var(--bg-secondary);
+  color: var(--text-muted);
+}
+
+/* 标签本身比正文再弱一档，但保持可读——它是这块的"抬头" */
+.cm-w-callout {
+  display: inline-block;
+  margin-right: 0.5em;
+  padding: 0 0.45em;
+  color: var(--text-muted);
+  background: var(--bg-tertiary);
+  border-radius: 3px;
+  font-size: 0.78em;
+  /* 小字号加一点字距，中文才不会挤成一团 */
+  letter-spacing: 0.05em;
+  /* 竖排居中对齐正文 */
+  vertical-align: 0.1em;
+}
 
 .cm-lp-frontmatter {
   background: var(--bg-secondary);

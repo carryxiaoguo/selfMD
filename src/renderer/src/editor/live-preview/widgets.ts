@@ -264,6 +264,31 @@ function 提示(按钮: HTMLButtonElement, 文字: string): void {
   }, 1200)
 }
 
+/**
+ * 提示框首行的标签。
+ *
+ * 把 `> [!NOTE]` 换成一个小小的「提示」。**只换这一行**，正文一个字都不动——
+ * 提示框的内容仍然是可编辑的普通文本，用户想改随时能改。
+ */
+export class 提示标签 extends WidgetType {
+  override eq(other: 提示标签): boolean {
+    return other instanceof 提示标签
+  }
+
+  override toDOM(): HTMLElement {
+    const el = document.createElement('span')
+    el.className = 'cm-w-callout'
+    el.textContent = '提示'
+    // 标签是装饰性的，读屏时念出来只会干扰正文
+    el.setAttribute('aria-hidden', 'true')
+    return el
+  }
+
+  override ignoreEvent(): boolean {
+    return false
+  }
+}
+
 // ---------------------------------------------------------------------------
 // 列表符号
 // ---------------------------------------------------------------------------

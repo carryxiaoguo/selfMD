@@ -100,6 +100,13 @@ export function 标题行装饰(级: number): Decoration {
 
 export const 块级行样式 = {
   引言: Decoration.line({ class: 'cm-lp-quote' }),
+  /**
+   * 提示框（`> [!NOTE]`）。
+   *
+   * 与引言共用左边框的血统，但**整块字色更浅**——用户要的就是这个：
+   * 提示是旁注，不该和正文抢注意力。
+   */
+  提示框: Decoration.line({ class: 'cm-lp-quote cm-lp-callout' }),
   // `md-fences` 与 `md-task-list-item` 是**通用的类名**
   // （用 scripts/CSS选择器.py 扫内置主题，分别出现 24 与 30 次）。
   // 挂上它们，针对这两个类写的现成主题规则就能直接生效；

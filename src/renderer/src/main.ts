@@ -1128,6 +1128,19 @@ async function 运行代码块头部自测(): Promise<string> {
   const 差 = Math.abs(亮度(页面底) - 亮度(代码底))
   结果.push(`底色差=${差.toFixed(0)}${差 >= 6 && 亮度(代码底) >= 0 ? '(够)' : '(太接近)'}`)
 
+  // 头部栏必须与代码行**严丝合缝**：中间多出一条空行，整块就散成两截。
+  // 量的是两者的实际边界距离，而不是"看起来对不对"。
+  {
+    const 头 = document.querySelector('.cm-w-codehead') as HTMLElement | null
+    const 首代码 = document.querySelector('.cm-lp-code[data-行号]') as HTMLElement | null
+    if (头 && 首代码) {
+      const 缝 = Math.round(首代码.getBoundingClientRect().top - 头.getBoundingClientRect().bottom)
+      结果.push(`头与代码间距=${缝}px`)
+    } else {
+      结果.push('头与代码间距=元素缺失')
+    }
+  }
+
   // 三项都写完之后，信息串应当仍然可被解析回同样的三项——
   // 构建与解析是一对，只测一边等于没测
   const 信息 = 解析围栏信息(首行().replace(/^```/, ''))

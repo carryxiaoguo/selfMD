@@ -450,8 +450,12 @@ body.live-preview .cm-md-marker-hidden {
   /* 顶部圆角与首行行装饰的圆角会叠成两层，这里把行装饰那层让开 */
   box-sizing: border-box;
   font-family: var(--font-body);
+  /* 字号与行高在这里设回来：它所在的行被设成了 font-size: 0，
+     为的是消掉行盒的 strut。不设回来这一行就什么都看不见了。 */
   font-size: 12px;
   line-height: 1.6;
+  /* 头部栏与下面的代码行严丝合缝，不留间隙 */
+  margin: 0;
 }
 
 /* 头部栏里的控件统一用 muted 色：它是外壳，不参与正文的层次 */
@@ -523,10 +527,19 @@ body.live-preview .cm-md-marker-hidden {
   color: var(--primary-color) !important;
 }
 
-/* 头部栏是替换装饰，它所在的"行"本身不该再显示代码块的等宽字体与底色 */
+/* 头部栏所在的"行"。
+   这一行的文字全被替换成了头部栏，所以它自己**不能**再占一份文字行高——
+   留着的话头部栏和代码之间会多出一条空行，块就散成两截了。
+   `font-size: 0` 干掉行盒的 strut（行内那个"隐形字符"的高度），
+   头部栏在自己的规则里把字号设回来。 */
 .cm-lp-code-first:has(.cm-w-codehead) {
   background: transparent;
   padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  line-height: 0;
+  font-size: 0;
+  /* 头部栏自带下边框，行本身不要再画一条，否则叠成双线 */
+  border-bottom: none;
 }
 
 /* --- 代码块自带的配色 ------------------------------------------------------

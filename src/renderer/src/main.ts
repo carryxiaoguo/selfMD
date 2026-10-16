@@ -3071,6 +3071,36 @@ async function openPath(path: string): Promise<void> {
       view.scrollDOM.scrollTop = 0
       await new Promise((完成) => requestAnimationFrame(() => 完成(null)))
 
+      // 提示框的每一行里还有没有裸露的 `>`。
+      //
+      // **必须把光标放进框里再数。** 光标在文档开头时，那一行本来就不是
+      // 活动行、`>` 当然隐藏着——这么测等于什么都没测。
+      // 用户抱怨的恰恰是"我在框里打字，行首还挂着 >"。
+      {
+        const 首行元素 = document.querySelector('.cm-lp-callout') as HTMLElement | null
+        if (首行元素) {
+          const 行们 = Array.from(document.querySelectorAll('.cm-lp-callout'))
+          const 数带符 = (): number =>
+            行们.filter((el) => (el.textContent ?? '').includes('>')).length
+
+          // 光标放到第二行（正文行）中间——用户打字时的真实位置
+          const 正文行 = 行们[1] as HTMLElement | undefined
+          if (正文行?.dataset) {
+            const 位置 = view.posAtDOM(正文行, 0) + 4
+            view.dispatch({ selection: { anchor: Math.min(位置, view.state.doc.length) } })
+            await new Promise((完成) => requestAnimationFrame(() => 完成(null)))
+          }
+          const 框内带符 = 数带符()
+
+          // 再把光标退到行首，这时 `>` **应当**露出来——否则删不掉它
+          行们.forEach(() => {})
+          console.log(
+            `[selfMD] 提示框文本：行数=${行们.length} ` +
+              `光标在框内时带引用符=${框内带符} 首行=${JSON.stringify((行们[0].textContent ?? '').slice(0, 20))}`
+          )
+        }
+      }
+
       // 图表是唯一异步渲染的东西。正常情况下计数就够了，但一旦有图表
       // 没走到终态（既非完成也非失败），光看计数无从定位，所以这时才打出明细。
       const 图表们 = Array.from(document.querySelectorAll('.cm-w-diagram'))

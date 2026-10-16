@@ -3092,11 +3092,22 @@ async function openPath(path: string): Promise<void> {
           }
           const 框内带符 = 数带符()
 
-          // 再把光标退到行首，这时 `>` **应当**露出来——否则删不掉它
+          // 字色必须**量**：引用正文外面还套着一层 `.cm-md-quote` 行内标记，
+          // 它自带颜色，只给行元素设 color 是压不过它的。
+          // 光看 CSS 会以为设上了，屏幕上是"没变浅"。
+          const 正文元素 = 行们[1] as HTMLElement | undefined
+          const 行字色 = 正文元素 ? getComputedStyle(正文元素).color : ''
+          const 标记 = 正文元素?.querySelector('.cm-md-quote') as HTMLElement | null
+          const 标记字色 = 标记 ? getComputedStyle(标记).color : '（无行内标记）'
+          const 正文行元素 = document.querySelector('.cm-line:not(.cm-lp-quote)') as HTMLElement | null
+          const 普通字色 = 正文行元素 ? getComputedStyle(正文行元素).color : ''
+
           行们.forEach(() => {})
           console.log(
             `[selfMD] 提示框文本：行数=${行们.length} ` +
-              `光标在框内时带引用符=${框内带符} 首行=${JSON.stringify((行们[0].textContent ?? '').slice(0, 20))}`
+              `光标在框内时带引用符=${框内带符} ` +
+              `框内字色=${行字色}/${标记字色} 正文行字色=${普通字色} ` +
+              `首行=${JSON.stringify((行们[0].textContent ?? '').slice(0, 20))}`
           )
         }
       }

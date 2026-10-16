@@ -608,6 +608,18 @@ body.live-preview .cm-md-marker-hidden {
   /* 覆盖引言的左边框：细一半、淡一档 */
   border-left: 2px solid var(--border) !important;
   background: var(--bg-secondary);
+}
+
+/* 字色要**连着行内标记一起**改。
+   引用正文外面还套着一层 `.cm-md-quote`（行内标记装饰），它自带颜色——
+   只给行元素设 color 是压不过它的，屏幕上就是"设了没生效"。
+   行内代码同理。 */
+.cm-lp-callout,
+.cm-lp-callout .cm-md-quote,
+.cm-lp-callout .cm-md-link,
+.cm-lp-callout .cm-md-strong,
+.cm-lp-callout .cm-md-emphasis,
+.cm-lp-callout .cm-tok-quote {
   color: var(--text-muted);
 }
 

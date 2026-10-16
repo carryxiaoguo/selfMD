@@ -96,7 +96,7 @@
   --font-mono: var(--monospace);
   --font-size: 16px;
   --line-height: 1.65;
-  --content-max-width: 860px;
+  --content-max-width: 900px;
 
   --radius: 6px;
   --shadow: 0 1px 3px rgba(31, 35, 40, 0.12);
@@ -214,16 +214,28 @@ body {
   padding: 0;
 }
 
-.cm-content {
-  padding: 3rem 0 40vh;
+/* 注意这里用 `.cm-editor .cm-content` 两级选择器，不是单个 `.cm-content`。
+   CodeMirror 会在运行时把自己的基础样式注入 `<head>`，位置排在
+   `base.css` **之后**——同样是一个类选择器时，后加载的它赢。
+   原来写的 `.cm-line { padding: 0 3rem }` 就是这么被吃掉的：
+   一行都没生效，所以正文和代码块两侧一直没有留白。
+   多一级就压过去了，不必用 `!important`。 */
+.cm-editor .cm-content {
+  /* 左右留白放在**容器**上而不是每一行上。
+     放在行上的话，行的背景会连内边距一起涂满——代码块、引用块的色块
+     就顶到了编辑器边缘。放在容器上，行的宽度只剩内容区，色块自然两侧留白。 */
+  padding: 3rem 3rem 40vh;
+  box-sizing: border-box;
   caret-color: var(--accent);
   max-width: var(--content-max-width);
   margin: 0 auto;
   width: 100%;
 }
 
-.cm-line {
-  padding: 0 3rem;
+.cm-editor .cm-line {
+  /* 归零：CodeMirror 默认给行加了左右内边距，留着的话它会和
+     容器的留白叠在一起，代码块的色块也会被推出内容区 */
+  padding: 0;
 }
 
 .cm-cursor,

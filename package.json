@@ -8,6 +8,7 @@
   "main": "./out/main/index.js",
   "scripts": {
     "dev": "node scripts/dev.mjs",
+    "预览": "node scripts/预览.mjs",
     "start": "electron-vite preview",
     "build": "npm run typecheck && electron-vite build",
     "smoke": "electron-vite build && node scripts/smoke.mjs",

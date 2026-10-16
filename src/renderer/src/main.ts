@@ -1141,6 +1141,27 @@ async function 运行代码块头部自测(): Promise<string> {
     }
   }
 
+  // 代码块的色块两侧要留白，不能顶到编辑器边缘——顶满了整页看着就挤。
+  // 量的是色块左沿与编辑区左沿的距离，而不是"看着还行"。
+  {
+    const 代码块 = document.querySelector('.cm-lp-code') as HTMLElement | null
+    const 编辑区 = document.querySelector('.cm-editor') as HTMLElement | null
+    const 内容区 = document.querySelector('.cm-content') as HTMLElement | null
+    if (代码块 && 编辑区 && 内容区) {
+      const 左留白 = Math.round(
+        代码块.getBoundingClientRect().left - 编辑区.getBoundingClientRect().left
+      )
+      const 内容样式 = getComputedStyle(内容区)
+      const 行样式 = getComputedStyle(代码块)
+      结果.push(
+        `左留白=${左留白}px 内容区左右内边距=${内容样式.paddingLeft}/${内容样式.paddingRight} ` +
+          `行左右内边距=${行样式.paddingLeft}/${行样式.paddingRight}`
+      )
+    } else {
+      结果.push('左留白=元素缺失')
+    }
+  }
+
   // 三项都写完之后，信息串应当仍然可被解析回同样的三项——
   // 构建与解析是一对，只测一边等于没测
   const 信息 = 解析围栏信息(首行().replace(/^```/, ''))
@@ -1211,18 +1232,35 @@ async function 运行代码块自测(): Promise<string> {
   let 围栏可见 = '未测'
   let 跳出后位置 = '未测'
   let 跳出后打字不进块 = '未测'
+  let 落到围栏行 = '未测'
 
   if (围栏) {
     const 块 = 围栏 as { from: number; to: number }
-    // 光标落在**最后一行代码**上——正是用户会以为自己"已经在外面"的位置
-    const 最后代码位置 = view.state.doc.lineAt(块.to).from - 1
-    view.dispatch({ selection: { anchor: Math.max(块.from, 最后代码位置) } })
-    await new Promise((完成) => setTimeout(完成, 80))
+    const 取末行文本 = (): string => {
+      const 代码行 = Array.from(document.querySelectorAll('.cm-lp-code'))
+      return 代码行.length > 0 ? (代码行[代码行.length - 1].textContent ?? '') : ''
+    }
 
-    // 闭合围栏那一行的 DOM 里还看得见 ``` 吗
-    const 代码行 = Array.from(document.querySelectorAll('.cm-lp-code'))
-    const 末行文本 = 代码行.length > 0 ? (代码行[代码行.length - 1].textContent ?? '') : ''
-    围栏可见 = 末行文本.includes('```') ? '是' : '否'
+    // --- 光标在最后一行代码上：闭合围栏应当**隐藏** ---------------------
+    //
+    // 这里断言的是"块里干净"：块内平时不该出现一行 ```，
+    // 否则看着像块没闭合。边界靠代码块的下边框表达，不靠那行字符。
+    view.dispatch({ selection: { anchor: Math.max(块.from, 块.to - 4) } })
+    await new Promise((完成) => setTimeout(完成, 80))
+    围栏可见 = 取末行文本().includes('```') ? '在块内仍显示' : '块内已隐藏'
+
+    // --- 光标**落到闭合围栏那一行**时，源码必须露出来 -------------------
+    //
+    // 这是"以为出去了、其实还在块里"的最后一道防线：真站到那一行上，
+    // 就得看得见自己站在哪。隐藏着的字符上打字，是找不到原因的怪现象。
+    const 闭合行 = view.state.doc.lineAt(块.to)
+    view.dispatch({ selection: { anchor: 闭合行.from } })
+    await new Promise((完成) => setTimeout(完成, 80))
+    落到围栏行 = 取末行文本().includes('```') ? '已露出' : '仍隐藏'
+
+    // 回到最后一行代码上，继续后面的 Escape 测试
+    view.dispatch({ selection: { anchor: Math.max(块.from, 块.to - 4) } })
+    await new Promise((完成) => setTimeout(完成, 60))
 
     // Escape 跳出
     const 成功 = 跳出代码块(view)
@@ -1242,7 +1280,7 @@ async function 运行代码块自测(): Promise<string> {
   view.setState(备份)
   await new Promise((完成) => setTimeout(完成, 60))
 
-  return `闭合围栏可见=${围栏可见} 跳出后位置=${跳出后位置} 跳出后打字不进块=${跳出后打字不进块}`
+  return `块内围栏=${围栏可见} 落在围栏行=${落到围栏行} 跳出后位置=${跳出后位置} 跳出后打字不进块=${跳出后打字不进块}`
 }
 
 /**

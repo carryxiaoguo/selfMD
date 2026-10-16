@@ -1,5 +1,15 @@
 import { EditorSelection, type EditorState } from '@codemirror/state'
+import { foldCode } from '@codemirror/language'
+import { languages } from '@codemirror/language-data'
 import { WidgetType, type EditorView } from '@codemirror/view'
+import {
+  构建围栏信息,
+  信息串区间,
+  样式显示名,
+  样式顺序,
+  解析围栏首行,
+  type 围栏信息
+} from '@shared/代码块信息'
 
 /**
  * 内联 widget 集合。
@@ -34,6 +44,214 @@ export class 语言标签 extends WidgetType {
   override ignoreEvent(): boolean {
     return false
   }
+}
+
+// ---------------------------------------------------------------------------
+// 代码块头部栏
+// ---------------------------------------------------------------------------
+
+/**
+ * 语言下拉的选项表。
+ *
+ * 值取语言描述的第一个别名（`py`、`js`、`rs`），因为围栏里写的通常是别名；
+ * 显示名用完整名称（`Python`），因为下拉里要看的是"这是个什么语言"。
+ *
+ * `languages` 有上百项，原生 `<select>` 能靠首字母跳转应付长列表，
+ * 所以不做裁剪——裁掉的那几个恰好是用户想用的，比列表长更让人恼火。
+ */
+const 语言选项: { 值: string; 名: string }[] = (() => {
+  const 表: { 值: string; 名: string }[] = []
+  for (const 项 of languages) {
+    const 值 = 项.alias[0] ?? 项.name.toLowerCase()
+    表.push({ 值, 名: 项.name })
+  }
+  // 按显示名排序；中文用户找语言主要靠认名字，字母序比包内顺序好找
+  return 表.sort((甲, 乙) => 甲.名.localeCompare(乙.名))
+})()
+
+/** 围栏在文档中的位置。头部栏的所有动作都要靠它换算回文档坐标。 */
+export interface 代码块位置 {
+  围栏起: number
+  围栏终: number
+  首行起: number
+}
+
+/**
+ * 代码块头部栏。
+ *
+ * 替换围栏首行（```` ```python ````）。用户不必去改反引号后面的文本，
+ * 而是从下拉里选语言、在输入框里填名称——**但落回文档的仍然是纯文本**，
+ * 只是那串文本由控件生成而不是手敲。
+ *
+ * ## 为什么 `ignoreEvent` 返回 true
+ *
+ * CodeMirror 的事件处理逻辑是"遍历到 widget 时，若 `ignoreEvent` 为真则
+ * **不处理**该事件，交给 widget"。这里必须返回 `true`：否则点下拉框会被
+ * 编辑器当成"移动光标"，控件根本打不开。
+ *
+ * （与它相反的是任务复选框——那边返回 `false`，靠 `preventDefault` 自行处理。）
+ */
+export class 代码块头部 extends WidgetType {
+  constructor(
+    readonly 信息: 围栏信息,
+    readonly 位置: 代码块位置
+  ) {
+    super()
+  }
+
+  override eq(other: 代码块头部): boolean {
+    return (
+      other.信息.语言 === this.信息.语言 &&
+      other.信息.名称 === this.信息.名称 &&
+      other.信息.样式 === this.信息.样式 &&
+      other.位置.首行起 === this.位置.首行起
+    )
+  }
+
+  override toDOM(view: EditorView): HTMLElement {
+    const 盒 = document.createElement('div')
+    盒.className = 'cm-w-codehead'
+    // 头部栏是控件而不是文本，屏幕阅读器不该把它读成正文
+    盒.setAttribute('role', 'group')
+    盒.setAttribute('aria-label', '代码块设置')
+
+    // --- 折叠 -----------------------------------------------------------
+    const 折叠 = document.createElement('button')
+    折叠.type = 'button'
+    折叠.className = 'cm-w-codehead-btn cm-w-codehead-fold'
+    折叠.textContent = '▾'
+    折叠.title = '折叠代码块'
+    折叠.setAttribute('aria-label', '折叠代码块')
+    折叠.addEventListener('click', (事件) => {
+      事件.preventDefault()
+      // 先把光标放到围栏首行，折叠才会作用在这个块上——
+      // 否则折的是光标当前所在的那个块，用户会觉得"点错了"。
+      view.dispatch({ selection: { anchor: this.位置.首行起 } })
+      foldCode(view)
+    })
+
+    // --- 名称 -----------------------------------------------------------
+    const 名称 = document.createElement('input')
+    名称.type = 'text'
+    名称.className = 'cm-w-codehead-name'
+    名称.placeholder = '请输入代码块名称'
+    名称.value = this.信息.名称
+    名称.setAttribute('aria-label', '代码块名称')
+    // 用 `change` 而不是每次按键都写回：逐字同步会让撤销栈里塞满
+    // 半截名称，Ctrl+Z 得按十几次才能退回去。
+    名称.addEventListener('change', () => {
+      this.改信息(view, { 名称: 名称.value.trim() })
+    })
+    名称.addEventListener('keydown', (事件) => {
+      if (事件.key === 'Enter') {
+        事件.preventDefault()
+        名称.blur()
+      }
+    })
+
+    // --- 语言 -----------------------------------------------------------
+    const 语言 = this.选单('cm-w-codehead-lang', '代码块语言')
+    for (const 项 of 语言选项) 语言.append(new Option(项.名, 项.值))
+    // 当前语言不在表里（用户手写了冷门别名）时补一项，
+    // 否则下拉会显示成第一项，用户以为语言被改掉了
+    if (this.信息.语言 && !语言选项.some((项) => 项.值 === this.信息.语言)) {
+      语言.prepend(new Option(this.信息.语言, this.信息.语言, true, true))
+    }
+    // 空值表示"没有语言"，退化成纯文本块
+    语言.prepend(new Option('纯文本', '', this.信息.语言 === '', this.信息.语言 === ''))
+    语言.value = this.信息.语言
+    语言.addEventListener('change', () => {
+      this.改信息(view, { 语言: 语言.value })
+    })
+
+    // --- 样式 -----------------------------------------------------------
+    const 样式 = this.选单('cm-w-codehead-style', '代码块配色')
+    for (const 名 of 样式顺序) 样式.append(new Option(样式显示名[名], 名))
+    样式.value = this.信息.样式
+    样式.addEventListener('change', () => {
+      this.改信息(view, { 样式: 样式.value as 围栏信息['样式'] })
+    })
+
+    // --- 复制 -----------------------------------------------------------
+    const 复制 = document.createElement('button')
+    复制.type = 'button'
+    复制.className = 'cm-w-codehead-btn cm-w-codehead-copy'
+    复制.textContent = '复制'
+    复制.title = '复制代码'
+    复制.addEventListener('click', () => {
+      void navigator.clipboard.writeText(this.取代码(view)).then(
+        () => 提示(复制, '已复制'),
+        () => 提示(复制, '复制失败')
+      )
+    })
+
+    盒.append(折叠, 名称, 语言, 样式, 复制)
+    return 盒
+  }
+
+  /** 造一个下拉；三个下拉的公共部分收在这里，免得样式类名写漏。 */
+  private 选单(类名: string, 无障碍名: string): HTMLSelectElement {
+    const el = document.createElement('select')
+    el.className = `cm-w-codehead-select ${类名}`
+    el.setAttribute('aria-label', 无障碍名)
+    return el
+  }
+
+  /**
+   * 取代码块正文（不含首尾围栏）。
+   *
+   * 从**文档**里现取，而不是缓存进 widget：用户按下复制的那一刻，
+   * 内容多半已经和 widget 构造时不一样了。
+   */
+  private 取代码(view: EditorView): string {
+    const 状态 = view.state
+    const 起 = Math.min(this.位置.围栏起, 状态.doc.length)
+    const 终 = Math.min(this.位置.围栏终, 状态.doc.length)
+    const 原文 = 状态.sliceDoc(起, 终)
+    // 去掉首行的围栏、末行的围栏，只留中间正文
+    return 原文
+      .split('\n')
+      .slice(1, -1)
+      .join('\n')
+  }
+
+  /** 把改动写回围栏首行的信息串。 */
+  private 改信息(view: EditorView, 部分: Partial<围栏信息>): void {
+    const 状态 = view.state
+    const 行 = 状态.doc.lineAt(Math.min(this.位置.首行起, 状态.doc.length))
+    const 行文本 = 状态.sliceDoc(行.from, 行.to)
+    const 区间 = 信息串区间(行文本)
+    if (!区间) return
+
+    // **必须用 `解析围栏首行`，不能对整行调 `解析围栏信息`。**
+    // 后者会把反引号当成语言的一部分，构建时再写回去——每改一次多三个
+    // 反引号，攒到十几个才看得出来。
+    const 新信息 = { ...解析围栏首行(行文本), ...部分 }
+    const 新文 = 构建围栏信息(新信息)
+    if (新文 === 行文本.slice(区间.起, 区间.终)) return
+
+    view.dispatch({
+      // 只替换反引号之后的部分：反引号是围栏的语法标记，动它等于换语法
+      changes: { from: 行.from + 区间.起, to: 行.from + 区间.终, insert: 新文 },
+      userEvent: 'input.codeBlockInfo'
+    })
+  }
+
+  /** 控件必须自己收事件，否则点下拉会被编辑器当成移动光标。 */
+  override ignoreEvent(): boolean {
+    return true
+  }
+}
+
+/** 按钮上短暂换一下文字，给点击一个可见的反馈。 */
+function 提示(按钮: HTMLButtonElement, 文字: string): void {
+  const 原文 = 按钮.textContent
+  按钮.textContent = 文字
+  按钮.classList.add('cm-w-codehead-done')
+  window.setTimeout(() => {
+    按钮.textContent = 原文
+    按钮.classList.remove('cm-w-codehead-done')
+  }, 1200)
 }
 
 // ---------------------------------------------------------------------------

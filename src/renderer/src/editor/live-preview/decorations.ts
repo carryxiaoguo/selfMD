@@ -125,3 +125,33 @@ export const 块级行样式 = {
   // 夹在句子中间的图片不加这个类，仍按行内处理。
   图片行: Decoration.line({ class: 'cm-lp-image-line' })
 } as const
+
+/**
+ * 代码块的行装饰，按**该块自己的配色**取。
+ *
+ * `--code-*` 是一组 CSS 变量，作用域落在行元素上之后，
+ * 块内的 token（`cm-tok-keyword` 等）会自然继承到这套值——
+ * 不需要为每种配色各写一份 token 规则。
+ *
+ * 装饰实例按 `配色|位置` 缓存：同一篇文档里同样配色的代码块很多，
+ * 每次新建 Decoration 会让 CodeMirror 的装饰比较失去意义。
+ */
+const 代码块行缓存 = new Map<string, Decoration>()
+
+export function 代码块行装饰(
+  配色: string,
+  位置: '首' | '中' | '末'
+): Decoration {
+  const 键 = `${配色}|${位置}`
+  let 装饰 = 代码块行缓存.get(键)
+  if (!装饰) {
+    const 类名 = ['cm-lp-code', 'md-fences']
+    if (位置 === '首') 类名.push('cm-lp-code-first')
+    if (位置 === '末') 类名.push('cm-lp-code-last')
+    // `follow` 是默认值，不带类：类名越少，主题作者越好覆盖
+    if (配色 !== 'follow') 类名.push(`cm-code-${配色}`)
+    装饰 = Decoration.line({ class: 类名.join(' ') })
+    代码块行缓存.set(键, 装饰)
+  }
+  return 装饰
+}

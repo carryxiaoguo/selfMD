@@ -8,6 +8,7 @@ import { 渲染Markdown为HTML } from '@shared/markdown-html'
 import { 标签管理器, type 标签 } from './services/标签'
 import { 打开快速打开面板 } from './ui/快速打开'
 import { 侧边栏可见, 侧边栏被锁定, 生效主题, type 草稿信息 } from '@shared/types'
+import { 解析围栏信息 } from '@shared/代码块信息'
 import type { MenuCommandPayload } from '@shared/ipc'
 import type { ImageStoragePolicy, Settings } from '@shared/types'
 import {
@@ -27,6 +28,7 @@ import {
   设置标题级别
 } from './editor/commands'
 import { baseExtensions, modeExtensions } from './editor/setup'
+import { 继续代码围栏 } from './editor/commands'
 import { 运行大纲自测, 运行导出自测, 运行上传自测, 运行数学自测, 运行渲染标点自测, 运行模糊匹配自测, 运行偏好设置自测, 运行图片管线自测, 运行纯函数自测, 运行命令自测 } from './editor/selftest'
 import {
   删除当前行或句,
@@ -1042,6 +1044,97 @@ async function 运行右键菜单自测(): Promise<string> {
     `顶层项=${顶层项} 置灰=${置灰数} 有子菜单=${有子菜单} ` +
     `子菜单项=${子菜单项数} 挂在Body=${挂在Body} 拦截默认菜单=${被拦截} 关闭后残留=${残留}`
   )
+}
+
+/**
+ * 代码块头部栏自测。
+ *
+ * 头部栏是"渲染出来了但点了没用"的高危区：控件在 widget 里，
+ * 事件要么被编辑器抢走、要么写回文档时算错了位置——两种情况都不会报错，
+ * 界面上只表现为"下拉能打开但选了没反应"。
+ *
+ * 所以这里**真的去点**：改下拉、填输入框、发一次 `change`，
+ * 然后检查**文档内容**变没变。查 DOM 是不够的——DOM 由文档驱动，
+ * 两者都错的时候看起来是一致的。
+ */
+async function 运行代码块头部自测(): Promise<string> {
+  const 原文 = ['段落。', '', '```js', 'const 甲 = 1', '```', ''].join('\n')
+  const 备份 = view.state
+  view.setState(EditorState.create({ doc: 原文, extensions: 编辑器扩展() }))
+  设置文档目录(null)
+  // 光标放到正文段落上：这样围栏首行才会换成头部栏
+  view.dispatch({ selection: { anchor: 0 } })
+  await new Promise((完成) => setTimeout(完成, 80))
+
+  const 结果: string[] = []
+
+  /** 改一个下拉并等装饰重建。 */
+  const 改下拉 = async (选择器: string, 值: string): Promise<void> => {
+    const el = document.querySelector(选择器) as HTMLSelectElement | null
+    if (!el) return
+    el.value = 值
+    el.dispatchEvent(new Event('change', { bubbles: true }))
+    await new Promise((完成) => setTimeout(完成, 80))
+  }
+
+  const 首行 = (): string => view.state.doc.line(3).text
+
+  // --- 改语言 ---------------------------------------------------------
+  const 头部数 = document.querySelectorAll('.cm-w-codehead').length
+  结果.push(`头部栏=${头部数}`)
+
+  await 改下拉('.cm-w-codehead-lang', 'python')
+  结果.push(`改语言=${/^```python$/.test(首行()) ? '对' : `错(${首行()})`}`)
+
+  // --- 改样式 ---------------------------------------------------------
+  await 改下拉('.cm-w-codehead-style', 'dark')
+  // 样式写进信息串，同时行上要挂出对应的配色类——只写文档不挂类，
+  // 下拉选了等于没选，而文档里却留下了记录，是最难查的那种不一致。
+  const 有配色类 = document.querySelectorAll('.cm-code-dark').length > 0
+  结果.push(`改样式=${/style=dark/.test(首行()) && 有配色类 ? '对' : `错(${首行()})`}`)
+
+  // --- 改名称 ---------------------------------------------------------
+  const 名称框 = document.querySelector('.cm-w-codehead-name') as HTMLInputElement | null
+  if (名称框) {
+    名称框.value = '示例'
+    名称框.dispatchEvent(new Event('change', { bubbles: true }))
+    await new Promise((完成) => setTimeout(完成, 80))
+  }
+  结果.push(`改名称=${/示例/.test(首行()) ? '对' : `错(${首行()})`}`)
+
+  // 三项都写完之后，信息串应当仍然可被解析回同样的三项——
+  // 构建与解析是一对，只测一边等于没测
+  const 信息 = 解析围栏信息(首行().replace(/^```/, ''))
+  结果.push(
+    `往返=${信息.语言 === 'python' && 信息.名称 === '示例' && 信息.样式 === 'dark' ? '对' : `错(${JSON.stringify(信息)})`}`
+  )
+  结果.push(`首行=${JSON.stringify(首行())}`)
+
+  // --- 输入流：```py 回车 ---------------------------------------------
+  //
+  // 这条覆盖用户提的第二个诉求：直接敲围栏标记 + 回车就要出代码块。
+  // 真的调一次绑定在 Enter 上的那个命令，而不是自己模拟换行。
+  view.setState(
+    EditorState.create({ doc: '```py', extensions: 编辑器扩展() })
+  )
+  view.dispatch({ selection: { anchor: view.state.doc.length } })
+  await new Promise((完成) => setTimeout(完成, 60))
+  // 真的调一次绑定在 Enter 上的那个命令，而不是自己模拟换行。
+  // CodeMirror 自带的 `insertNewlineContinueMarkup` 在围栏内直接放弃，
+  // 所以这里调的是本项目自己的 `继续代码围栏`。
+  const 换行结果 = 继续代码围栏(view)
+  await new Promise((完成) => setTimeout(完成, 120))
+  const 文本 = view.state.doc.toString()
+  const 闭合了 = (文本.match(/```/g) ?? []).length >= 2
+  // 光标落进正文之后，首行就该换成头部栏
+  const 出现头部 = document.querySelectorAll('.cm-w-codehead').length > 0
+  结果.push(
+    `回车出块=${换行结果 && 闭合了 ? '对' : `错(${JSON.stringify(文本)})`} 出现头部栏=${出现头部 ? '对' : '错'}`
+  )
+
+  view.setState(备份)
+  await new Promise((完成) => setTimeout(完成, 60))
+  return 结果.join(' ')
 }
 
 /**
@@ -2864,12 +2957,35 @@ async function openPath(path: string): Promise<void> {
         代码函数: '.cm-tok-function',
         代码数字: '.cm-tok-number',
         代码类型: '.cm-tok-type',
-        代码着色总数: '.cm-lp-code [class*="cm-tok-"]'
+        代码着色总数: '.cm-lp-code [class*="cm-tok-"]',
+        // 代码块头部栏。原来这里数的是行尾的 `cm-w-lang` 小标签，
+        // 现在首行整行换成头部栏，那个标签只在光标停在围栏行时才出现。
+        代码块头部: '.cm-w-codehead'
       }
+      // --- DOM 计数：滚动取样取最大值 -------------------------------------
+      //
+      // 装饰只对视口内的行生效（CodeMirror 会虚拟化长文档），所以单看一屏
+      // 的计数是**布局敏感的**：代码块头部栏让行变高了一点，下方的内容
+      // 就被挤出视口，计数从 2 变成 0——看起来像"表格不渲染了"，
+      // 其实只是滚到屏幕外了。
+      //
+      // 取样三次（顶、中、底）逐项取最大值，就把断言从"必须正好一屏放得下"
+      // 里解放出来。取最大值而不是求和：同一行在多个视口里都会出现，
+      // 求和会把重复计进去。
       domCounts = {}
-      for (const [名, 选择器] of Object.entries(待统计)) {
-        domCounts[名] = document.querySelectorAll(选择器).length
+      const 取样位置 = [0, 0.5, 1]
+      for (const 比例 of 取样位置) {
+        const 可达高 = Math.max(0, view.scrollDOM.scrollHeight - view.scrollDOM.clientHeight)
+        view.scrollDOM.scrollTop = 可达高 * 比例
+        // 滚动之后 CodeMirror 需要一帧重建视口内的装饰
+        await new Promise((完成) => requestAnimationFrame(() => 完成(null)))
+        for (const [名, 选择器] of Object.entries(待统计)) {
+          const 数 = document.querySelectorAll(选择器).length
+          domCounts[名] = Math.max(domCounts[名] ?? 0, 数)
+        }
       }
+      view.scrollDOM.scrollTop = 0
+      await new Promise((完成) => requestAnimationFrame(() => 完成(null)))
 
       // 图表是唯一异步渲染的东西。正常情况下计数就够了，但一旦有图表
       // 没走到终态（既非完成也非失败），光看计数无从定位，所以这时才打出明细。
@@ -2905,6 +3021,7 @@ async function openPath(path: string): Promise<void> {
     let 交互结果: string | undefined
     let 代码块结果: string | undefined
     let 右键结果: string | undefined
+    let 头部结果: string | undefined
     let 匹配结果: Record<string, string> | undefined
     let 侧边栏结果: string | undefined
     let 标签结果: string | undefined
@@ -2924,6 +3041,7 @@ async function openPath(path: string): Promise<void> {
       数学结果 = 运行数学自测()
       标点结果 = 运行渲染标点自测()
       右键结果 = await 运行右键菜单自测()
+      头部结果 = await 运行代码块头部自测()
       代码块结果 = await 运行代码块自测()
       交互结果 = await 运行交互自测()
       匹配结果 = 运行模糊匹配自测()
@@ -2959,6 +3077,7 @@ async function openPath(path: string): Promise<void> {
       tabResult: 标签结果,
       codeBlockResult: 代码块结果,
       contextMenuResult: 右键结果,
+      codeBlockHeaderResult: 头部结果,
       interactionResult: 交互结果,
       imageCopyResult: 图片复制结果,
       modeResult: 模式结果,

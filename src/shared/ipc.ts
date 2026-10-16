@@ -396,6 +396,8 @@ export interface SelfMdApi {
       tabResult?: string
       /** 仅冒烟测试模式：编辑器右键菜单自测结果。 */
       contextMenuResult?: string
+      /** 仅冒烟测试模式：代码块头部栏自测结果。 */
+      codeBlockHeaderResult?: string
       /** 仅冒烟测试模式：代码块交互自测结果。 */
       codeBlockResult?: string
       /** 仅冒烟测试模式：交互反馈自测结果。 */

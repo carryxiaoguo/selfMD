@@ -1,10 +1,28 @@
 import type { EditorState } from '@codemirror/state'
 import { 扫描行内公式 } from '@shared/数学'
 import { 扫描渲染标点 } from '../smart-punctuation'
-import { 块级行样式, 标题行装饰, 隐藏, 插入, 替换为, 渲染标点装饰 } from './decorations'
+import {
+  块级行样式,
+  代码块行装饰,
+  标题行装饰,
+  隐藏,
+  插入,
+  替换为,
+  渲染标点装饰
+} from './decorations'
 import type { 构建上下文, 语法节点 } from './types'
 import { 加行装饰, 行内公式已启用, 渲染标点已启用 } from './types'
-import { 列表圆点, 水平线, 数学公式, 表格分隔, 任务框, 语言标签, 计算层级 } from './widgets'
+import {
+  列表圆点,
+  水平线,
+  数学公式,
+  表格分隔,
+  任务框,
+  语言标签,
+  代码块头部,
+  计算层级
+} from './widgets'
+import { 解析围栏首行 } from '@shared/代码块信息'
 
 /**
  * 块级装饰。
@@ -277,15 +295,47 @@ export function 处理块级(
     case 'FencedCode': {
       const 首行 = 状态.doc.lineAt(节点.from)
       const 末行 = 状态.doc.lineAt(Math.max(节点.from, 节点.to - 1))
+      // 配色取自该块自己的信息串（`style=dark` 之类），不是全局设置——
+      // 同一篇文档里不同代码块用不同配色是合理需求
+      const 本块信息 = 解析围栏首行(状态.sliceDoc(首行.from, 首行.to))
       for (let n = 首行.number; n <= 末行.number; n++) {
-        const 样式 =
-          n === 首行.number
-            ? 块级行样式.代码块首行
-            : n === 末行.number
-              ? 块级行样式.代码块末行
-              : 块级行样式.代码块中间行
-        加行装饰(上下文, 状态.doc.line(n).from, 样式)
+        加行装饰(
+          上下文,
+          状态.doc.line(n).from,
+          代码块行装饰(
+            本块信息.样式,
+            n === 首行.number ? '首' : n === 末行.number ? '末' : '中'
+          )
+        )
       }
+
+      // --- 首行换成代码块头部栏 -------------------------------------------
+      //
+      // 条件是"光标不在首行上"。光标停在首行时保留真正的源码，
+      // 用户才能直接改 ``` 后面的语言；一移开就换成可点的头部栏。
+      //
+      // 用**整行替换**而不是在行尾插一个 widget：头部栏要占据整行宽度
+      // （名称输入框、两个下拉、按钮），行尾插入的 widget 只能挤在
+      // 折叠后的标记旁边，撑不开。
+      if (!上下文.活动行.has(首行.number)) {
+        const 信息 = 本块信息
+        上下文.条目.push({
+          from: 首行.from,
+          to: 首行.to,
+          deco: 替换为(
+            new 代码块头部(信息, {
+              围栏起: 节点.from,
+              围栏终: 节点.to,
+              首行起: 首行.from
+            })
+          ),
+          rank: 3
+        })
+        // 记下来，让下面处理 ``` 与语言标识时跳过——同一段文本不能被两条
+        // 替换装饰覆盖，CodeMirror 会因区间重叠拒绝整份装饰。
+        上下文.已换头部栏.add(首行.from)
+      }
+
       return false
     }
 
@@ -297,28 +347,39 @@ export function 处理块级(
       // 于是"块内末尾"和"块外"在屏幕上**一模一样**。用户以为已经跳出去了，
       // 其实光标还在块里，一打字就插进了代码。
       //
-      // 这与 Typora 的行为一致：只要光标在代码块内，两个围栏就一直可见，
+      // 这与主流编辑器的行为一致：只要光标在代码块内，两个围栏就一直可见，
       // 边界始终看得见。
       const 父 = 节点.parent
-      if (父?.name === 'FencedCode' && !光标在此块内(父)) {
+      if (父?.name !== 'FencedCode') return true
+      // 首行整行已经是头部栏了，这里的 ``` 不能再推一条重叠的替换装饰
+      if (上下文.已换头部栏.has(状态.doc.lineAt(节点.from).from)) return true
+      if (!光标在此块内(父)) {
         上下文.条目.push({ from: 节点.from, to: 节点.to, deco: 隐藏, rank: 1 })
       }
       return true
     }
 
     case 'CodeInfo': {
-      // 语言标识折叠掉，改由行尾的标签 widget 呈现。可见性规则同上。
+      // 语言标识由头部栏里的下拉呈现，这里折叠掉。
       const 父 = 节点.parent
-      if (父?.name === 'FencedCode' && !光标在此块内(父)) {
+      if (父?.name !== 'FencedCode') return true
+      if (上下文.已换头部栏.has(状态.doc.lineAt(节点.from).from)) return true
+      if (!光标在此块内(父)) {
         上下文.条目.push({ from: 节点.from, to: 节点.to, deco: 隐藏, rank: 1 })
       }
       return true
     }
 
     case 'CodeText': {
-      // CodeText 的父节点是 FencedCode，用它拿到首行位置来挂语言标签。
+      // 语言标签挂在围栏首行的行尾。
+      //
+      // **首行一旦换成头部栏就必须跳过**：头部栏是整行替换，而这条装饰
+      // 恰好落在被替换区间的末端，两条装饰重叠会让 CodeMirror 拒绝整份装饰。
+      // 语言此时已经在下拉里显示，不再需要行尾的标签。
       const 父 = 节点.parent
       if (!父) return true
+      if (上下文.已换头部栏.has(状态.doc.lineAt(父.from).from)) return true
+
       const 语言节点 = 找子节点(父, 'CodeInfo')
       const 语言 = 语言节点 ? 状态.sliceDoc(语言节点.from, 语言节点.to).trim() : ''
       const 行尾 = 状态.doc.lineAt(父.from).to

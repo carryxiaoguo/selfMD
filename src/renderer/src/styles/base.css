@@ -386,6 +386,148 @@ body.live-preview .cm-md-marker-hidden {
   margin-bottom: 0.6em;
 }
 
+/* --- 代码块头部栏 --------------------------------------------------------
+   替换围栏首行（```` ```python ````）。它同时承担"显示这个块是什么语言"
+   和"改语言 / 改名 / 换配色"两件事，所以控件要一直在，而不是悬停才出现——
+   悬停才出现的话，触控板和键盘用户根本找不到入口。
+
+   视觉上刻意做得比代码正文"轻"：淡背景、无重边框、字号小一号。
+   它是块的外壳，不该和代码抢注意力。 */
+
+.cm-w-codehead {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  /* 撑满整行：头部栏的宽度就是代码块的宽度，两者对齐才像同一个卡片 */
+  width: 100%;
+  padding: 4px 8px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border);
+  border-top-left-radius: var(--radius);
+  border-top-right-radius: var(--radius);
+  /* 顶部圆角与首行行装饰的圆角会叠成两层，这里把行装饰那层让开 */
+  box-sizing: border-box;
+  font-family: var(--font-body);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+/* 头部栏里的控件统一用 muted 色：它是外壳，不参与正文的层次 */
+.cm-w-codehead-btn,
+.cm-w-codehead-select {
+  flex: 0 0 auto;
+  padding: 2px 6px;
+  color: var(--text-secondary);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  font-family: inherit;
+  font-size: inherit;
+  cursor: pointer;
+  transition:
+    background-color var(--dur-quick) var(--ease),
+    color var(--dur-quick) var(--ease),
+    border-color var(--dur-quick) var(--ease);
+}
+
+.cm-w-codehead-btn:hover,
+.cm-w-codehead-select:hover {
+  color: var(--text-primary);
+  background: var(--bg-tertiary);
+  border-color: var(--border);
+}
+
+.cm-w-codehead-btn:active {
+  transform: scale(0.96);
+}
+
+.cm-w-codehead-fold {
+  /* 折叠箭头本身没有语义宽度，给它一个固定的正方块，
+     这样三个块的头部栏左侧能对齐 */
+  width: 20px;
+  padding: 2px 0;
+  text-align: center;
+}
+
+/* 名称输入占满剩余宽度：它是这一行里唯一"内容可变长"的控件 */
+.cm-w-codehead-name {
+  flex: 1 1 auto;
+  min-width: 60px;
+  padding: 2px 6px;
+  color: var(--text-primary);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  font-family: inherit;
+  font-size: inherit;
+}
+
+.cm-w-codehead-name::placeholder {
+  color: var(--text-muted);
+}
+
+.cm-w-codehead-name:hover {
+  border-color: var(--border);
+}
+
+.cm-w-codehead-name:focus {
+  outline: none;
+  background: var(--bg-primary);
+  border-color: var(--primary-color);
+}
+
+/* 复制成功 / 失败时短暂高亮，给点击一个可见的反馈 */
+.cm-w-codehead-done {
+  color: var(--primary-color) !important;
+}
+
+/* 头部栏是替换装饰，它所在的"行"本身不该再显示代码块的等宽字体与底色 */
+.cm-lp-code-first:has(.cm-w-codehead) {
+  background: transparent;
+  padding-top: 0 !important;
+}
+
+/* --- 代码块自带的配色 ------------------------------------------------------
+   由信息串里的 `style=…` 决定，作用域落在该块的行元素上。
+   因为全部走 `--code-*` 变量，块内的 token 规则一份都不用重写。
+
+   只给"两套都好看"的少量取值，不做任意调色——配色多了会变成
+   "每个块都不一样"的噪音，而代码块恰恰应该让读者忽略它的外壳。 */
+
+/* 明亮：白底，token 用压深的色，与浅色主题一致 */
+.cm-code-light {
+  --code-bg: #ffffff;
+  --code-text: #24292f;
+  --code-keyword: #8250df;
+  --code-string: #0a3069;
+  --code-comment: #8b949e;
+  --code-number: #953800;
+  --code-type: #9a6700;
+  --code-function: #0550ae;
+  --code-property: #cf222e;
+  --code-variable: #24292f;
+  --code-punct: #57606a;
+  --code-tag: #cf222e;
+  --code-meta: #9a6700;
+}
+
+/* 暗色：近黑底，token 提亮但避开纯饱和色——高饱和文字在暗底上会"发光"，久看刺痛 */
+.cm-code-dark {
+  --code-bg: #16181d;
+  --code-text: #c7cfe4;
+  --code-keyword: #c792ea;
+  --code-string: #98d982;
+  --code-comment: #6b7590;
+  --code-number: #f0a45d;
+  --code-type: #e5c07b;
+  --code-function: #7aa2f7;
+  --code-property: #ef8f8f;
+  --code-variable: #c7cfe4;
+  --code-punct: #8b97b8;
+  --code-tag: #ef8f8f;
+  --code-meta: #e5c07b;
+}
+
 /* --- 前置元数据 --------------------------------------------------------- */
 
 .cm-lp-frontmatter {

@@ -409,6 +409,72 @@ export function 清除格式(view: EditorView): boolean {
 }
 
 /**
+ * 在围栏首行按回车：补出闭合围栏，光标落进正文。
+ *
+ * ## 为什么要自己写
+ *
+ * CodeMirror 的 `insertNewlineContinueMarkup` **在围栏内部直接放弃**。
+ * 它内部的 `getContext` 一遇到 `FencedCode` 就 `return` 空上下文，
+ * 而空上下文等于"这里没什么可延续的"，于是回车只插入一个普通换行——
+ * 用户敲完 ```` ```python ```` 按回车，得到的是一行空行，
+ * 得自己再敲一遍三个反引号才能把块闭上。
+ *
+ * ## 判断条件
+ *
+ * 三个都要满足：
+ *   1. 光标在行尾（在行中间按回车是在改信息串，不该触发）
+ *   2. 这一行是某个 FencedCode 的**首行**
+ *   3. 这个块还没有闭合围栏
+ *
+ * 第三条是关键：漏了它，任何一次在代码块里按回车都会多塞一个围栏。
+ *
+ * @returns 条件不满足时返回 false，把回车让给别的处理器
+ */
+export function 继续代码围栏(view: EditorView): boolean {
+  const 状态 = view.state
+  const 选区 = 状态.selection.main
+  if (!选区.empty) return false
+
+  const 行 = 状态.doc.lineAt(选区.head)
+  const 行文本 = 状态.sliceDoc(行.from, 行.to)
+  // 光标不在行尾：用户是在改已有内容，不是在开新块
+  if (选区.head !== 行.to) return false
+  // 这一行得像围栏首行（反引号或波浪线，后面可以跟语言）
+  if (!/^\s*(`{3,}|~{3,})/.test(行文本)) return false
+
+  // 找包含这一行的 FencedCode
+  let 围栏: 语法节点 | null = null
+  let 节点: 语法节点 | null = syntaxTree(状态).resolveInner(行.from, 1) as unknown as 语法节点
+  while (节点) {
+    if (节点.name === 'FencedCode') {
+      围栏 = 节点
+      break
+    }
+    节点 = 节点.parent
+  }
+  if (!围栏) return false
+  // 必须是**首行**：在块中间按回车不该又补一个围栏
+  if (状态.doc.lineAt(围栏.from).from !== 行.from) return false
+
+  // 已经有闭合围栏就不补。块内每按一次回车都补一个围栏，
+  // 比不补更烦人——那是在替用户"纠正"他并没有犯的错。
+  const 余下 = 状态.sliceDoc(行.to, Math.min(围栏.to, 状态.doc.length))
+  if (/\n\s*(`{3,}|~{3,})\s*$/.test(余下)) return false
+
+  const 缩进 = /^\s*/.exec(行文本)?.[0] ?? ''
+  const 围栏符 = 行文本.trim().startsWith('~') ? '~~~' : '```'
+
+  view.dispatch({
+    changes: { from: 行.to, insert: `\n\n${缩进}${围栏符}` },
+    // 光标落在中间那个空行上——用户接下来要写的是代码，不是围栏
+    selection: { anchor: 行.to + 1 },
+    scrollIntoView: true,
+    userEvent: 'input'
+  })
+  return true
+}
+
+/**
  * 从代码围栏里跳出去。
  *
  * 光标落在围栏内时，把它移到**闭合围栏之后**；文档末尾没有那一行就补一行。

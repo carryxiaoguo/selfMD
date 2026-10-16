@@ -58,6 +58,7 @@ function 构建装饰(view: EditorView): DecorationSet {
   const 上下文: 构建上下文 = {
     活动行: 计算活动行(状态),
     行装饰已用: new Set<number>(),
+    已换头部栏: new Set<number>(),
     条目: [] as 装饰条目[]
   }
 

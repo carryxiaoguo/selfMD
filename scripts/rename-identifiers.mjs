@@ -102,7 +102,7 @@ function 收集计数键() {
     if (
       ts.isVariableDeclaration(节点) &&
       ts.isIdentifier(节点.name) &&
-      节点.name.text === '待统计' &&
+      (节点.name.text === '待统计' || 节点.name.text === 'domCountKeys') &&
       节点.initializer &&
       ts.isObjectLiteralExpression(节点.initializer)
     ) {
@@ -119,7 +119,7 @@ function 收集计数键() {
   return 键
 }
 
-const 自动排除 = 收集计数键()
+const 自动排除 = process.argv.includes('--改计数键') ? [] : 收集计数键()
 let 自动数 = 0
 for (const 名 of 自动排除) {
   if (对照[名]) {

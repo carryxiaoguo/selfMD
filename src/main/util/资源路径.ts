@@ -12,7 +12,7 @@ import { join } from 'node:path'
  *
  * 返回 `undefined` 而不是抛异常：图标缺失不该让应用起不来。
  */
-export function 图标路径(name = 'icon.png'): string | undefined {
+export function iconPath(name = 'icon.png'): string | undefined {
   const candidate = app.isPackaged
     ? [join(process.resourcesPath, 'icon', name)]
     : [join(__dirname, '..', '..', 'resources', 'icon', name)]
@@ -21,6 +21,6 @@ export function 图标路径(name = 'icon.png'): string | undefined {
 
 /** 图标集目录，供"关于"面板或调试使用。 */
 export function 图标目录(): string | undefined {
-  const file = 图标路径()
+  const file = iconPath()
   return file ? join(file, '..') : undefined
 }

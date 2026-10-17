@@ -4,13 +4,13 @@ import type { EditorView } from '@codemirror/view'
 import { 渲染Markdown为HTML } from '@shared/markdown-html'
 import { 偏好设置结构, 全部设置项, 校验设置表 } from '@shared/settings-schema'
 import { 识别块级公式, 扫描行内公式 } from '@shared/数学'
-import { DEFAULT_SETTINGS, type 上传器类型 } from '@shared/types'
+import { DEFAULT_SETTINGS, type uploaderType } from '@shared/types'
 import { 生成上传命令, 解析上传结果 } from '@shared/upload-parse'
 import { 提取标题, 定位当前标题 } from '../ui/outline'
 import {
-  切换列表,
+  toggleList,
   切换引用,
-  包裹行内,
+  wrapInline,
   插入表格,
   插入链接,
   clearFormat,
@@ -18,9 +18,9 @@ import {
   设置标题级别
 } from './commands'
 import { 换引号, 换破折号, 扫描渲染标点 } from './smart-punctuation'
-import { 模糊评分, 模糊筛选, 路径末段 } from '@shared/模糊匹配'
+import { 模糊评分, 模糊筛选, pathTail } from '@shared/模糊匹配'
 import { 句子区间, 词区间 } from './selection'
-import { 读取前置元数据, 写入属性, 移除属性 } from '@shared/front-matter'
+import { readFrontMatter, 写入属性, 移除属性 } from '@shared/front-matter'
 import {
   唯一文件名,
   应当搬运,
@@ -70,13 +70,13 @@ const 用例表: 用例[] = [
     name: '段落加粗',
     input: '甲',
     selection: [0, 1],
-    run: (v) => void 包裹行内(v, '**')
+    run: (v) => void wrapInline(v, '**')
   },
   {
     name: '已加粗再执行=取消',
     input: '**甲**',
     selection: [2, 3],
-    run: (v) => void 包裹行内(v, '**')
+    run: (v) => void wrapInline(v, '**')
   },
   {
     name: '加引用',
@@ -91,23 +91,23 @@ const 用例表: 用例[] = [
   {
     name: '转无序列表',
     input: '甲',
-    run: (v) => void 切换列表(v, '无序')
+    run: (v) => void toggleList(v, '无序')
   },
   {
     name: '有序列表自动编号（两行）',
     input: '甲\n乙',
     selection: [0, 3],
-    run: (v) => void 切换列表(v, '有序')
+    run: (v) => void toggleList(v, '有序')
   },
   {
     name: '转任务列表',
     input: '甲',
-    run: (v) => void 切换列表(v, '任务')
+    run: (v) => void toggleList(v, '任务')
   },
   {
     name: '无序转任务（应替换而非叠加）',
     input: '- 甲',
-    run: (v) => void 切换列表(v, '任务')
+    run: (v) => void toggleList(v, '任务')
   },
   {
     name: '缩进',
@@ -193,8 +193,8 @@ export function 运行纯函数自测(): Record<string, string> {
     ['词中单引号（撇号）', "'", 'don'],
     ['中文后单引号（撇号）', "'", '他']
   ]
-  for (const [name, ch, 前文] of 引号用例) {
-    result[`引号·${name}`] = 换引号(ch, 前文)
+  for (const [name, ch, preamble] of 引号用例) {
+    result[`引号·${name}`] = 换引号(ch, preamble)
   }
 
   // --- 破折号 -----------------------------------------------------------
@@ -208,9 +208,9 @@ export function 运行纯函数自测(): Record<string, string> {
     ['文档里既有的连续连字符（不改动）', '文字--'],
     ['缩进后的连字符（仍属行首）', '    -']
   ]
-  for (const [name, 前文] of 破折号用例) {
-    const 方案 = 换破折号(前文)
-    result[`破折号·${name}`] = 方案 ? `回退${方案.回退}→${方案.插入}` : '不转换'
+  for (const [name, preamble] of 破折号用例) {
+    const plan = 换破折号(preamble)
+    result[`破折号·${name}`] = plan ? `回退${plan.fallback}→${plan.insert}` : '不转换'
   }
 
   // --- 句子边界 ---------------------------------------------------------
@@ -262,44 +262,44 @@ export function 运行图片管线自测(): Record<string, string> {
   const result: Record<string, string> = {}
 
   // --- 目标目录解析 -----------------------------------------------------
-  const 基准: 目标解析输入 = {
+  const baseline: 目标解析输入 = {
     docDir: 'C:/笔记',
-    文档名: '甲.md',
+    docName: '甲.md',
     是文本包: false,
-    文档级设置: null,
-    全局策略: '',
+    docSettings: null,
+    globalPolicy: '',
     自定义目录: './${filename}',
     允许自动上传: false
   }
   const 目标用例: [string, Partial<目标解析输入>][] = [
     ['默认策略（不做特殊处理）', {}],
-    ['当前文件夹', { 全局策略: 'folder' }],
-    ['assets 子目录', { 全局策略: 'assets' }],
-    ['每文件独立 assets', { 全局策略: 'per-file-assets' }],
-    ['自定义相对目录', { 全局策略: 'custom' }],
-    ['自定义绝对目录', { 全局策略: 'custom', 自定义目录: 'D:/图床' }],
-    ['自定义绝对目录带占位符', { 全局策略: 'custom', 自定义目录: 'D:/图/${filename}' }],
-    ['自定义目录留空', { 全局策略: 'custom', 自定义目录: '' }],
-    ['全局上传', { 全局策略: 'upload' }],
-    ['文档级覆盖全局', { 文档级设置: 'imgs', 全局策略: 'assets' }],
-    ['文档级要求上传且已允许', { 文档级设置: 'upload', 允许自动上传: true }],
-    ['文档级要求上传但未允许', { 文档级设置: 'upload', 允许自动上传: false }],
-    ['文档级用 ipic 标记', { 文档级设置: 'ipic', 允许自动上传: true }],
-    ['文档级绝对路径', { 文档级设置: 'D:/图' }],
-    ['文档级含文件名占位符', { 文档级设置: '${filename}.assets' }],
-    ['文本包走包内 assets', { 是文本包: true, 全局策略: 'assets' }],
-    ['未保存文档 + 需要目录的策略', { docDir: null, 文档名: null, 全局策略: 'folder' }],
-    ['未保存文档 + 不动策略', { docDir: null, 文档名: null, 全局策略: '' }],
-    ['未保存文档 + 绝对自定义目录', { docDir: null, 文档名: null, 全局策略: 'custom', 自定义目录: 'D:/图' }]
+    ['当前文件夹', { globalPolicy: 'folder' }],
+    ['assets 子目录', { globalPolicy: 'assets' }],
+    ['每文件独立 assets', { globalPolicy: 'per-file-assets' }],
+    ['自定义相对目录', { globalPolicy: 'custom' }],
+    ['自定义绝对目录', { globalPolicy: 'custom', 自定义目录: 'D:/图床' }],
+    ['自定义绝对目录带占位符', { globalPolicy: 'custom', 自定义目录: 'D:/图/${filename}' }],
+    ['自定义目录留空', { globalPolicy: 'custom', 自定义目录: '' }],
+    ['全局上传', { globalPolicy: 'upload' }],
+    ['文档级覆盖全局', { docSettings: 'imgs', globalPolicy: 'assets' }],
+    ['文档级要求上传且已允许', { docSettings: 'upload', 允许自动上传: true }],
+    ['文档级要求上传但未允许', { docSettings: 'upload', 允许自动上传: false }],
+    ['文档级用 ipic 标记', { docSettings: 'ipic', 允许自动上传: true }],
+    ['文档级绝对路径', { docSettings: 'D:/图' }],
+    ['文档级含文件名占位符', { docSettings: '${filename}.assets' }],
+    ['文本包走包内 assets', { 是文本包: true, globalPolicy: 'assets' }],
+    ['未保存文档 + 需要目录的策略', { docDir: null, docName: null, globalPolicy: 'folder' }],
+    ['未保存文档 + 不动策略', { docDir: null, docName: null, globalPolicy: '' }],
+    ['未保存文档 + 绝对自定义目录', { docDir: null, docName: null, globalPolicy: 'custom', 自定义目录: 'D:/图' }]
   ]
   for (const [name, 覆盖] of 目标用例) {
-    result[`目标·${name}`] = 显示目标(解析目标目录({ ...基准, ...覆盖 }))
+    result[`目标·${name}`] = 显示目标(解析目标目录({ ...baseline, ...覆盖 }))
   }
 
   // --- 是否搬运 ---------------------------------------------------------
   const 搬运基准: 搬运判定输入 = {
     source: 'C:/下载/照片.png',
-    目标目录: 'C:/笔记/imgs',
+    targetDir: 'C:/笔记/imgs',
     搬运本地: true,
     搬运在线: false
   }
@@ -311,7 +311,7 @@ export function 运行图片管线自测(): Record<string, string> {
     ['data 内联图片', { source: 'data:image/png;base64,AAAA' }],
     ['在线图片 + 关闭在线搬运', { source: 'https://example.com/a.png' }],
     ['在线图片 + 开启在线搬运', { source: 'https://example.com/a.png', 搬运在线: true }],
-    ['源与目标都为空', { source: '', 目标目录: '' }]
+    ['源与目标都为空', { source: '', targetDir: '' }]
   ]
   for (const [name, 覆盖] of 搬运用例) {
     result[`搬运·${name}`] = 应当搬运({ ...搬运基准, ...覆盖 }) ? '搬运' : '不搬'
@@ -327,9 +327,9 @@ export function 运行图片管线自测(): Record<string, string> {
   const 无元数据 = '# 标题\n\n正文'
   const 有元数据 = '---\ntitle: 甲\nimage-folder: imgs\n---\n\n正文'
 
-  result['元数据·无元数据'] = 读取前置元数据(无元数据).exists ? '存在' : '不存在'
+  result['元数据·无元数据'] = readFrontMatter(无元数据).exists ? '存在' : '不存在'
 
-  const 读有 = 读取前置元数据(有元数据)
+  const 读有 = readFrontMatter(有元数据)
   result['元数据·读取图片目录'] = 读有.attr['image-folder'] ?? '(缺失)'
   result['元数据·读取标题'] = 读有.attr['title'] ?? '(缺失)'
 
@@ -339,14 +339,14 @@ export function 运行图片管线自测(): Record<string, string> {
     .join('⏎')
 
   result['元数据·更新已有键'] =
-    读取前置元数据(写入属性(有元数据, 'image-folder', '图')).attr[
+    readFrontMatter(写入属性(有元数据, 'image-folder', '图')).attr[
       'image-folder'
     ] ?? '(缺失)'
 
   result['元数据·新增键'] =
-    读取前置元数据(写入属性(有元数据, 'author', '我')).attr['author'] ?? '(缺失)'
+    readFrontMatter(写入属性(有元数据, 'author', '我')).attr['author'] ?? '(缺失)'
 
-  result['元数据·移除一个键后块仍存在'] = 读取前置元数据(
+  result['元数据·移除一个键后块仍存在'] = readFrontMatter(
     移除属性(有元数据, 'image-folder')
   ).exists
     ? '存在'
@@ -360,14 +360,14 @@ export function 运行图片管线自测(): Record<string, string> {
 
   // --- 引用地址生成 -----------------------------------------------------
   const 引用用例: [string, string, string | null, 引用选项][] = [
-    ['同目录相对路径', 'C:/笔记/图/甲.png', 'C:/笔记', { 用相对路径: true, 加点前缀: false, 转义地址: false }],
-    ['加 ./ 前缀', 'C:/笔记/图/甲.png', 'C:/笔记', { 用相对路径: true, 加点前缀: true, 转义地址: false }],
-    ['上级目录相对路径', 'C:/笔记/图/甲.png', 'C:/笔记/子', { 用相对路径: true, 加点前缀: false, 转义地址: false }],
-    ['关闭相对路径', 'C:/笔记/图/甲.png', 'C:/笔记', { 用相对路径: false, 加点前缀: false, 转义地址: false }],
-    ['跨盘符回退绝对路径', 'D:/图/甲.png', 'C:/笔记', { 用相对路径: true, 加点前缀: false, 转义地址: false }],
-    ['空格被转义', 'C:/笔记/图/有 空格.png', 'C:/笔记', { 用相对路径: true, 加点前缀: false, 转义地址: true }],
-    ['中文保持可读', 'C:/笔记/图/样本.png', 'C:/笔记', { 用相对路径: true, 加点前缀: false, 转义地址: true }],
-    ['井号被转义', 'C:/笔记/图/甲#1.png', 'C:/笔记', { 用相对路径: true, 加点前缀: false, 转义地址: true }]
+    ['同目录相对路径', 'C:/笔记/图/甲.png', 'C:/笔记', { useRelativePath: true, addDotPrefix: false, escapeUrl: false }],
+    ['加 ./ 前缀', 'C:/笔记/图/甲.png', 'C:/笔记', { useRelativePath: true, addDotPrefix: true, escapeUrl: false }],
+    ['上级目录相对路径', 'C:/笔记/图/甲.png', 'C:/笔记/子', { useRelativePath: true, addDotPrefix: false, escapeUrl: false }],
+    ['关闭相对路径', 'C:/笔记/图/甲.png', 'C:/笔记', { useRelativePath: false, addDotPrefix: false, escapeUrl: false }],
+    ['跨盘符回退绝对路径', 'D:/图/甲.png', 'C:/笔记', { useRelativePath: true, addDotPrefix: false, escapeUrl: false }],
+    ['空格被转义', 'C:/笔记/图/有 空格.png', 'C:/笔记', { useRelativePath: true, addDotPrefix: false, escapeUrl: true }],
+    ['中文保持可读', 'C:/笔记/图/样本.png', 'C:/笔记', { useRelativePath: true, addDotPrefix: false, escapeUrl: true }],
+    ['井号被转义', 'C:/笔记/图/甲#1.png', 'C:/笔记', { useRelativePath: true, addDotPrefix: false, escapeUrl: true }]
   ]
   for (const [name, image, 文档目录值, options] of 引用用例) {
     result[`引用·${name}`] = 生成引用地址(image, 文档目录值, options)
@@ -470,43 +470,43 @@ export function 运行导出自测(): Record<string, string> {
  */
 export function 运行偏好设置自测(): Record<string, string> {
   const result: Record<string, string> = {}
-  const 项们 = 全部设置项()
+  const items = 全部设置项()
 
-  result['偏好设置·项目数'] = String(项们.length)
+  result['偏好设置·项目数'] = String(items.length)
   result['偏好设置·分区数'] = String(偏好设置结构.length)
 
   const 坏键 = 校验设置表()
   result['偏好设置·键名全部有效'] = 坏键.length === 0 ? '有效' : `无效：${坏键.join('、')}`
 
   // 重复键会让两项互相覆盖，界面上表现为"改了一个另一个也变"
-  const 键们 = 项们.map((item) => String(item.key))
+  const 键们 = items.map((item) => String(item.key))
   const 重复 = 键们.filter((key, subscript) => 键们.indexOf(key) !== subscript)
   result['偏好设置·无重复项'] = 重复.length === 0 ? '无重复' : `重复：${[...new Set(重复)].join('、')}`
 
   // 下拉项必须有选项，否则渲染出一个空下拉框
-  const 空下拉 = 项们.filter((item) => item.kind === '下拉' && (item.options?.length ?? 0) === 0)
+  const 空下拉 = items.filter((item) => item.kind === '下拉' && (item.options?.length ?? 0) === 0)
   result['偏好设置·下拉均有选项'] =
     空下拉.length === 0 ? '均有' : `空下拉：${空下拉.map((item) => String(item.key)).join('、')}`
 
   // 数值项的上下界必须自洽，否则夹紧逻辑会把值卡在边界上出不来
-  const 界错 = 项们.filter(
+  const 界错 = items.filter(
     (item) =>
       item.kind === '数字' &&
-      item.最小 !== undefined &&
-      item.最大 !== undefined &&
-      item.最小 >= item.最大
+      item.minValue !== undefined &&
+      item.maxValue !== undefined &&
+      item.minValue >= item.maxValue
   )
   result['偏好设置·数值区间自洽'] =
     界错.length === 0 ? '自洽' : `区间错误：${界错.map((item) => String(item.key)).join('、')}`
 
   // 每项都要有中文标签
-  const 无中文 = 项们.filter((item) => !/[\u4e00-\u9fff]/.test(item.label))
+  const 无中文 = items.filter((item) => !/[\u4e00-\u9fff]/.test(item.label))
   result['偏好设置·标签均含中文'] =
     无中文.length === 0 ? '均含' : `缺中文：${无中文.map((item) => String(item.key)).join('、')}`
 
   // 下拉项的当前默认值必须是合法选项之一，否则打开面板就是"选了个不存在的项"
   const 默认越界: string[] = []
-  for (const item of 项们) {
+  for (const item of items) {
     if (item.kind !== '下拉' || !item.options) continue
     const 默认值 = String(DEFAULT_SETTINGS[item.key] ?? '')
     if (!item.options.some((options) => options.value === 默认值)) {
@@ -531,52 +531,52 @@ export function 运行偏好设置自测(): Record<string, string> {
  */
 export function 运行上传自测(): Record<string, string> {
   const result: Record<string, string> = {}
-  const 解 = (output: string, 上传器: 上传器类型 = 'picgo-cli', 期望 = 1): string => {
-    const r = 解析上传结果(output, 上传器, 期望)
+  const solved = (output: string, uploader: uploaderType = 'picgo-cli', 期望 = 1): string => {
+    const r = 解析上传结果(output, uploader, 期望)
     return r.error ? `错误(${r.url.length})` : r.url.join(',')
   }
 
   // --- 基本形态 -------------------------------------------------------
-  result['上传·单行纯地址'] = 解('https://i.example.com/a.png\n')
-  result['上传·多行地址'] = 解('https://i.example.com/a.png\nhttps://i.example.com/b.png\n', 'picgo-cli', 2)
+  result['上传·单行纯地址'] = solved('https://i.example.com/a.png\n')
+  result['上传·多行地址'] = solved('https://i.example.com/a.png\nhttps://i.example.com/b.png\n', 'picgo-cli', 2)
   // 裸域名要补上协议，否则 Markdown 渲染器会把它当成相对路径
-  result['上传·裸域名补协议'] = 解('i.example.com/2024/a.png\n')
-  result['上传·ftp 协议保留'] = 解('ftp://files.example.com/a.png\n')
+  result['上传·裸域名补协议'] = solved('i.example.com/2024/a.png\n')
+  result['上传·ftp 协议保留'] = solved('ftp://files.example.com/a.png\n')
 
   // --- 停止条件（最关键的一条） ---------------------------------------
   // 日志头里有旧网址。从后往前扫、遇到非 URL 行即停，才不会被它污染。
-  result['上传·日志头里的旧网址不被误收'] = 解(
+  result['上传·日志头里的旧网址不被误收'] = solved(
     '[INFO] 上次上传：https://old.example.com/旧图.png\n' +
       '[INFO] 开始上传…\n' +
       'https://i.example.com/新图.png\n'
   )
   // 反过来，如果地址后面还有内容（地址在中间），不该把它当结果
-  result['上传·地址后还有日志则停止'] = 解(
+  result['上传·地址后还有日志则停止'] = solved(
     'https://i.example.com/a.png\n[INFO] done\n',
     'picgo-cli',
     0
   )
 
   // --- PicGo 应用模式走 JSON ------------------------------------------
-  result['上传·JSON 成功'] = 解(
+  result['上传·JSON 成功'] = solved(
     JSON.stringify({ success: true, result: ['https://i.example.com/a.png'] }),
     'picgo-app'
   )
-  result['上传·JSON 失败'] = 解(
+  result['上传·JSON 失败'] = solved(
     JSON.stringify({ success: false, msg: '未配置图床' }),
     'picgo-app',
     0
   )
   // JSON 坏了要能退回命令行解析，而不是整个失败
-  result['上传·坏 JSON 退回文本解析'] = 解(
+  result['上传·坏 JSON 退回文本解析'] = solved(
     'some log\nhttps://i.example.com/a.png\n',
     'picgo-app'
   )
 
   // --- 数量校验 -------------------------------------------------------
   // 数量对不上必须报错：宁可失败，也不能让用户拿着错位的地址去回填
-  result['上传·数量不符报错'] = 解('https://i.example.com/a.png\n', 'picgo-cli', 2)
-  result['上传·空输出报错'] = 解('', 'picgo-cli', 1)
+  result['上传·数量不符报错'] = solved('https://i.example.com/a.png\n', 'picgo-cli', 2)
+  result['上传·空输出报错'] = solved('', 'picgo-cli', 1)
 
   // --- 命令行生成 -----------------------------------------------------
   const config = {
@@ -621,31 +621,31 @@ export function 运行上传自测(): Record<string, string> {
  */
 export function 运行数学自测(): Record<string, string> {
   const result: Record<string, string> = {}
-  const 扫 = (docText: string): string =>
+  const sweep = (docText: string): string =>
     扫描行内公式(docText, 0)
       .map((range) => `[${range.formula}]`)
       .join('')
 
-  result['数学·基本行内'] = 扫('质能方程 $E = mc^2$ 是这样的')
+  result['数学·基本行内'] = sweep('质能方程 $E = mc^2$ 是这样的')
   // 公式体内允许空格（`E = mc^2` 就有），限制只作用在 `$` 紧邻的位置
-  result['数学·公式内允许空格'] = 扫('$a + b$')
+  result['数学·公式内允许空格'] = sweep('$a + b$')
   // 两个公式在一行里
-  result['数学·一行两个'] = 扫('$a$ 与 $b$')
+  result['数学·一行两个'] = sweep('$a$ 与 $b$')
 
   // --- 误判防护 -------------------------------------------------------
   // 货币：开头的 `$` 后面紧跟数字（无空白），结尾的 `$` 前面是数字。
   // 这正是规则挡不住的情况——但真正的价格写法 `$5 到 $10` 里，
   // 开头的 `$` 后面紧跟的不是空白而是数字，会命中；所以真正的保护是
   // "成对"要求：只有一个 `$` 时不成立。
-  result['数学·单个美元符号不成公式'] = 扫('这本书 $5 元') || '（无）'
+  result['数学·单个美元符号不成公式'] = sweep('这本书 $5 元') || '（无）'
   // 转义的 `\$` 不是公式
-  result['数学·转义美元符号'] = 扫('价格是 \\$5 到 \\$10 元') || '（无）'
+  result['数学·转义美元符号'] = sweep('价格是 \\$5 到 \\$10 元') || '（无）'
   // `$$` 是块级，不该被行内扫描吃掉
-  result['数学·$$ 不当作行内'] = 扫('$$x^2$$') || '（无）'
+  result['数学·$$ 不当作行内'] = sweep('$$x^2$$') || '（无）'
   // 空内容
-  result['数学·空内容不成公式'] = 扫('$$') || '（无）'
+  result['数学·空内容不成公式'] = sweep('$$') || '（无）'
   // 结尾 `$` 前是空白 → 不闭合
-  result['数学·结尾前有空白不闭合'] = 扫('$a $') || '（无）'
+  result['数学·结尾前有空白不闭合'] = sweep('$a $') || '（无）'
 
   // --- 块级识别 -------------------------------------------------------
   result['数学·块级单行'] = 识别块级公式('$$E = mc^2$$') ?? '（无）'
@@ -670,32 +670,32 @@ export function 运行数学自测(): Record<string, string> {
  */
 export function 运行渲染标点自测(): Record<string, string> {
   const result: Record<string, string> = {}
-  const 扫 = (docText: string): string =>
+  const sweep = (docText: string): string =>
     扫描渲染标点(docText, 0)
-      .map((segment) => `${segment.originalText}→${segment.显示}`)
+      .map((segment) => `${segment.originalText}→${segment.show}`)
       .join(' ')
 
   // --- 破折号：三连优先 ---
-  result['标点·三连是破折号'] = 扫('甲---乙')
-  result['标点·两连是连接号'] = 扫('甲--乙')
+  result['标点·三连是破折号'] = sweep('甲---乙')
+  result['标点·两连是连接号'] = sweep('甲--乙')
   // 四个连字符：先吃掉三连，剩一个原样保留
-  result['标点·四连拆成破折号加连字符'] = 扫('甲----乙')
+  result['标点·四连拆成破折号加连字符'] = sweep('甲----乙')
 
   // --- 省略号 ---
-  result['标点·三点是省略号'] = 扫('等等...')
-  result['标点·两点不动'] = 扫('等等..') || '（无）'
+  result['标点·三点是省略号'] = sweep('等等...')
+  result['标点·两点不动'] = sweep('等等..') || '（无）'
 
   // --- 引号：方向由前文决定 ---
-  result['标点·段首是左引号'] = 扫('"甲"')
-  result['标点·词后是右引号'] = 扫('甲"乙"')
+  result['标点·段首是左引号'] = sweep('"甲"')
+  result['标点·词后是右引号'] = sweep('甲"乙"')
   // 单引号跟在字母后是撇号（don't），不是引号
-  result['标点·撇号'] = 扫("don't")
+  result['标点·撇号'] = sweep("don't")
 
   // --- 不该动的东西 ---
-  result['标点·单个连字符不动'] = 扫('甲-乙') || '（无）'
-  result['标点·普通文字不动'] = 扫('甲乙丙') || '（无）'
+  result['标点·单个连字符不动'] = sweep('甲-乙') || '（无）'
+  result['标点·普通文字不动'] = sweep('甲乙丙') || '（无）'
   // 已经是排版字符的，不该再被"转换"一次
-  result['标点·已是弯引号则不动'] = 扫('“甲”') || '（无）'
+  result['标点·已是弯引号则不动'] = sweep('“甲”') || '（无）'
 
   // --- 偏移量要对 ---
   const segment = 扫描渲染标点('甲"乙', 100)
@@ -722,17 +722,17 @@ export function 运行模糊匹配自测(): Record<string, string> {
     'E:/项目/note.md',
     'E:/项目/a_b_c.md'
   ]
-  const 筛 = (查询: string): string =>
+  const 筛 = (query: string): string =>
     模糊筛选(
-      查询,
+      query,
       名单.map((p) => ({ entry: p, docText: p })),
-      路径末段
+      pathTail
     )
-      .map((p) => 路径末段(p))
+      .map((p) => pathTail(p))
       .join(' ')
 
   // --- 基本匹配 ---
-  result['匹配·空查询返回全部'] = 路径末段(筛('').split(' ')[0] ?? '') || '（空）'
+  result['匹配·空查询返回全部'] = pathTail(筛('').split(' ')[0] ?? '') || '（空）'
   result['匹配·命中文件名'] = 筛('readme')
   // 子序列：`nbt` 命中"笔记"的拼音首字母不成立，改用英文字母的子序列
   result['匹配·子序列命中'] = 筛('nmd')
@@ -757,9 +757,9 @@ export function 运行模糊匹配自测(): Record<string, string> {
   result['评分·靠前分更高'] = 靠前 > 靠后 ? '是' : `否(${靠前} vs ${靠后})`
 
   // --- 路径末段 ---
-  result['路径末段·反斜杠'] = 路径末段('E:\\项目\\文档\\甲.md')
-  result['路径末段·正斜杠'] = 路径末段('E:/项目/文档/甲.md')
-  result['路径末段·没有分隔符'] = 路径末段('甲.md')
+  result['路径末段·反斜杠'] = pathTail('E:\\项目\\文档\\甲.md')
+  result['路径末段·正斜杠'] = pathTail('E:/项目/文档/甲.md')
+  result['路径末段·没有分隔符'] = pathTail('甲.md')
 
   return result
 }
@@ -799,7 +799,7 @@ export function 运行大纲自测(): Record<string, string> {
   const result: Record<string, string> = {}
 
   result['大纲·标题数量'] = String(headings.length)
-  result['大纲·级别序列'] = headings.map((t) => t.级别).join(',')
+  result['大纲·级别序列'] = headings.map((t) => t.level).join(',')
   result['大纲·文本序列'] = headings.map((t) => t.docText).join(' | ')
   // 收尾井号必须剥掉，否则大纲里会出现「二级 ##」
   result['大纲·收尾井号已剥离'] = headings.some((t) => t.docText.includes('#')) ? '残留' : '已剥离'

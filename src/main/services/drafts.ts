@@ -66,7 +66,7 @@ function 取原文件字符数(rawPath: string | null): number | null {
 }
 
 /** 列出全部草稿，按写入时间从新到旧。 */
-export function 列出草稿(): DraftInfo[] {
+export function listDrafts(): DraftInfo[] {
   const dir = getAppPaths().drafts
   if (!existsSync(dir)) return []
 
@@ -75,11 +75,11 @@ export function 列出草稿(): DraftInfo[] {
     if (!name.endsWith('.json')) continue
     const key = name.slice(0, -'.json'.length)
     try {
-      const 元数据 = JSON.parse(readFileSync(join(dir, name), 'utf8')) as {
+      const meta = JSON.parse(readFileSync(join(dir, name), 'utf8')) as {
         rawPath?: string | null
         保存时间?: number
       }
-      const rawPath = 元数据.rawPath ?? null
+      const rawPath = meta.rawPath ?? null
       let 原文件时间: number | null = null
       if (rawPath && existsSync(rawPath)) {
         try {
@@ -93,7 +93,7 @@ export function 列出草稿(): DraftInfo[] {
       result.push({
         key,
         rawPath,
-        保存时间: 元数据.保存时间 ?? 0,
+        保存时间: meta.保存时间 ?? 0,
         原文件时间,
         原文件字符数: 取原文件字符数(rawPath),
         草稿字符数
@@ -146,7 +146,7 @@ export function 清理该文档的草稿(rawPath: string | null, content: string
  * 未命名文档（原路径为 null）一律提示：它没有落盘的地方，草稿是唯一的副本。
  */
 export function 需要恢复的草稿(): DraftInfo[] {
-  return 列出草稿().filter((draft) => {
+  return listDrafts().filter((draft) => {
     if (!draft.rawPath) return draft.草稿字符数 > 0
     if (!existsSync(draft.rawPath)) return draft.草稿字符数 > 0
     // 内容没变就不提示——纯粹是时间戳造成的差异不值得打扰用户

@@ -31,7 +31,7 @@ const 最大深度 = 8
 
 export interface 样式处理选项 {
   /** 相对路径的解析基准（通常是主题目录）。 */
-  基准目录: string;
+  baseDir: string;
   /** 是否内联 `@include-when-export` 指定的地址。屏幕预览时传 false。 */
   导出模式?: boolean
 }
@@ -39,26 +39,26 @@ export interface 样式处理选项 {
 /** 解析一个地址：远程走网络，本地读文件。取不到时返回 null，不抛。 */
 async function 取资源(
   url: string,
-  基准目录: string
-): Promise<{ content: string; 基准: string } | null> {
+  baseDir: string
+): Promise<{ content: string; baseline: string } | null> {
   if (/^https?:\/\//i.test(url)) {
     try {
-      const 响应 = await net.fetch(url)
-      if (!响应.ok) return null
+      const response = await net.fetch(url)
+      if (!response.ok) return null
       // 远程样式表里的相对地址以它自己的 URL 为基准
       const 新基准 = new URL('.', url).toString()
-      return { content: await 响应.text(), 基准: 新基准 }
+      return { content: await response.text(), baseline: 新基准 }
     } catch {
       // 离线或对方不可达：导出不该因此失败，只是少了这段样式。
       return null
     }
   }
-  const 全 = isAbsolute(url) ? url : resolve(基准目录, url)
+  const whole = isAbsolute(url) ? url : resolve(baseDir, url)
   try {
-    if (!existsSync(全)) return null
+    if (!existsSync(whole)) return null
     // 嵌套 @import 的相对路径以**被导入文件所在目录**为基准，
     // 不是最初那个目录。用同一个基准会让二级导入全部找不到。
-    return { content: readFileSync(全, 'utf8'), 基准: dirname(全) }
+    return { content: readFileSync(whole, 'utf8'), baseline: dirname(whole) }
   } catch {
     return null
   }
@@ -67,11 +67,11 @@ async function 取资源(
 /** 把内联进来的内容再递归处理一遍（它自己可能还有 @import）。 */
 async function 内联(
   docText: string,
-  基准目录: string,
-  深度: number,
+  baseDir: string,
+  depth: number,
   options: 样式处理选项
 ): Promise<string> {
-  if (深度 >= 最大深度) return docText
+  if (depth >= 最大深度) return docText
 
   let result = docText
 
@@ -82,10 +82,10 @@ async function 内联(
       待替换.push({ originalText: match[0], url: match[3] })
     }
     for (const { originalText, url } of 待替换) {
-      const resource = await 取资源(url, 基准目录)
+      const resource = await 取资源(url, baseDir)
       // 取不到就**删掉这一行**而不是留着：这不是浏览器认识的规则，
       // 留着只会变成一条无效样式，还容易让人以为它生效了。
-      const replace = resource ? await 内联(resource.content, resource.基准, 深度 + 1, options) : ''
+      const replace = resource ? await 内联(resource.content, resource.baseline, depth + 1, options) : ''
       result = result.replace(originalText, () => replace)
     }
   }
@@ -98,9 +98,9 @@ async function 内联(
     导入项.push({ originalText: match[0], url: match[3] })
   }
   for (const { originalText, url } of 导入项) {
-    const resource = await 取资源(url, 基准目录)
+    const resource = await 取资源(url, baseDir)
     if (!resource) continue
-    const replace = await 内联(resource.content, resource.基准, 深度 + 1, options)
+    const replace = await 内联(resource.content, resource.baseline, depth + 1, options)
     result = result.replace(originalText, () => replace)
   }
 
@@ -117,7 +117,7 @@ export async function 处理样式表(
   docText: string,
   options: 样式处理选项
 ): Promise<string> {
-  return 内联(docText, options.基准目录, 0, options)
+  return 内联(docText, options.baseDir, 0, options)
 }
 
 /**
@@ -126,11 +126,11 @@ export async function 处理样式表(
  * 导出的 HTML 可能被放到别处打开，相对路径就失效了；转成绝对地址至少
  * 在本机可用。若开启了图片内嵌，则由另一处把图片换成 data:。
  */
-export function 绝对化本地地址(docText: string, 基准目录: string): string {
+export function 绝对化本地地址(docText: string, baseDir: string): string {
   return docText.replace(/url\(\s*(['"]?)([^'")]+)\1\s*\)/gi, (整体, _引号, url: string) => {
     if (/^(https?:|data:|file:|#)/i.test(url)) return 整体
-    const 全 = isAbsolute(url) ? url : join(基准目录, url)
-    return `url("${pathToFileURL(全).toString()}")`
+    const whole = isAbsolute(url) ? url : join(baseDir, url)
+    return `url("${pathToFileURL(whole).toString()}")`
   })
 }
 

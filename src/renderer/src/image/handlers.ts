@@ -2,7 +2,7 @@ import type { Extension } from '@codemirror/state'
 import { EditorView } from '@codemirror/view'
 import { 扩展名由类型, 时间戳图片名, 是图片文件 } from '@shared/image-path'
 import {
-  type 插入请求,
+  type InsertRequest,
   本次目标目录,
   从地址插入,
   从剪贴板插入,
@@ -23,7 +23,7 @@ import {
 
 export interface 图片处理依赖 {
   /** 构造插入请求；编辑器尚未就绪时返回 null。 */
-  构造请求: () => 插入请求 | null
+  构造请求: () => InsertRequest | null
   /** 用户可见的提示。 */
   hint: (消息: string) => void
 }
@@ -81,8 +81,8 @@ export function 图片粘贴与拖放(deps: 图片处理依赖): Extension {
         deps.hint('无法读取图片数据。')
         return
       }
-      const 扩展 = 扩展名由类型(file.type) ?? '.png'
-      const name = `${时间戳图片名(new Date())}${扩展}`
+      const extension = 扩展名由类型(file.type) ?? '.png'
+      const name = `${时间戳图片名(new Date())}${extension}`
       const dir = await 本次目标目录(request)
       if (!dir) return
       const 写回 = await window.selfmd.image.saveBytes(dir, name, data)

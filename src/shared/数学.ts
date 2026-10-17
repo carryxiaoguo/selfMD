@@ -27,7 +27,7 @@ export interface 数学区间 {
   /** `$` 之间的公式源码。 */
   formula: string
   /** 是 `$$…$$` 块级公式。 */
-  块级: boolean
+  blockLevel: boolean
 }
 
 /** 判断一个位置上的 `$` 是否是转义的。 */
@@ -46,11 +46,11 @@ function 被转义(docText: string, position: number): boolean {
  * 不做"`$$` 必须独占一行"的要求——用户在段落里直接敲 `$$x$$` 也希望它渲染。
  */
 export function 识别块级公式(docText: string): string | null {
-  const 修剪 = docText.trim()
-  if (修剪.length < 4) return null
-  if (!修剪.startsWith('$$') || !修剪.endsWith('$$')) return null
+  const trimmed = docText.trim()
+  if (trimmed.length < 4) return null
+  if (!trimmed.startsWith('$$') || !trimmed.endsWith('$$')) return null
   // 首尾各去掉两个 `$`
-  const formula = 修剪.slice(2, -2).trim()
+  const formula = trimmed.slice(2, -2).trim()
   return formula.length > 0 ? formula : null
 }
 
@@ -61,7 +61,7 @@ export function 识别块级公式(docText: string): string | null {
  * @param 基准 文本在文档中的起始偏移（返回的区间是文档坐标）
  * @param 启用 设置里是否开启了行内公式；关闭时直接返回空数组
  */
-export function 扫描行内公式(docText: string, 基准: number, 启用 = true): 数学区间[] {
+export function 扫描行内公式(docText: string, baseline: number, 启用 = true): 数学区间[] {
   if (!启用) return []
   const result: 数学区间[] = []
 
@@ -111,7 +111,7 @@ export function 扫描行内公式(docText: string, 基准: number, 启用 = tru
       continue
     }
 
-    result.push({ from: 基准 + position, to: 基准 + 结束, formula, 块级: false })
+    result.push({ from: baseline + position, to: baseline + 结束, formula, blockLevel: false })
     i = 结束 + 1
   }
 

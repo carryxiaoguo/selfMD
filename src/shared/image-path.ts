@@ -21,7 +21,7 @@ export function 是绝对路径(filePath: string): boolean {
  * 必须保留 UNC 前缀的 `//`，否则 `//服务器/共享` 会被压成 `/服务器/共享`，
  * 在 Windows 上直接变成另一个位置。
  */
-export function 归一化路径(filePath: string): string {
+export function normalizePath(filePath: string): string {
   const 有UNC前缀 = /^[\\/]{2}[^\\/]/.test(filePath)
   let result = filePath
     .replace(/\\/g, '/')
@@ -34,19 +34,19 @@ export function 归一化路径(filePath: string): string {
 
 /** 用正斜杠拼接路径段，折叠重复分隔符。空段被忽略。 */
 export function 拼接(...segment: (string | null | undefined)[]): string {
-  const 有效 = segment.filter((s): s is string => typeof s === 'string' && s.length > 0)
-  if (有效.length === 0) return ''
-  let result = 有效[0].replace(/[\\/]+$/, '')
-  for (let i = 1; i < 有效.length; i++) {
-    const 段值 = 有效[i].replace(/^[\\/]+/, '').replace(/[\\/]+$/, '')
+  const valid = segment.filter((s): s is string => typeof s === 'string' && s.length > 0)
+  if (valid.length === 0) return ''
+  let result = valid[0].replace(/[\\/]+$/, '')
+  for (let i = 1; i < valid.length; i++) {
+    const 段值 = valid[i].replace(/^[\\/]+/, '').replace(/[\\/]+$/, '')
     if (段值.length === 0) continue
     result = result.length === 0 ? 段值 : `${result}/${段值}`
   }
-  return 归一化路径(result)
+  return normalizePath(result)
 }
 
 /** 取路径中的文件名（含扩展名）。 */
-export function 取文件名(filePath: string): string {
+export function takeFileName(filePath: string): string {
   const segment = filePath.split(/[\\/]/)
   return segment[segment.length - 1] ?? ''
 }
@@ -69,15 +69,15 @@ export function 取目录(filePath: string): string {
  * 用户往往在几周后才发现某张图变成了另一张。
  */
 export function 唯一文件名(
-  期望名: string,
+  expectedName: string,
   /** 询问"该名字是否已被占用"。由调用方注入，便于测试与异步实现。 */
   已存在: (候选名: string) => boolean
 ): string {
-  if (!已存在(期望名)) return 期望名
+  if (!已存在(expectedName)) return expectedName
 
-  const 扩展名位置 = 期望名.lastIndexOf('.')
-  const 主干 = 扩展名位置 > 0 ? 期望名.slice(0, 扩展名位置) : 期望名
-  const ext = 扩展名位置 > 0 ? 期望名.slice(扩展名位置) : ''
+  const 扩展名位置 = expectedName.lastIndexOf('.')
+  const 主干 = 扩展名位置 > 0 ? expectedName.slice(0, 扩展名位置) : expectedName
+  const ext = 扩展名位置 > 0 ? expectedName.slice(扩展名位置) : ''
 
   for (let i = 1; i < 1000; i++) {
     const candidate = `${主干}-${i}${ext}`
@@ -121,8 +121,8 @@ export function 扩展名由类型(kind: string | null | undefined): string | nu
 
 /** 由文件名推断 MIME 类型；无法识别时返回 null。 */
 export function 类型由扩展名(fileName: string): string | null {
-  const 扩展 = fileName.toLowerCase().match(/\.[a-z0-9]+$/)?.[0]
-  if (!扩展) return null
+  const extension = fileName.toLowerCase().match(/\.[a-z0-9]+$/)?.[0]
+  if (!extension) return null
   const tbl: Record<string, string> = {
     '.png': 'image/png',
     '.jpg': 'image/jpeg',
@@ -135,7 +135,7 @@ export function 类型由扩展名(fileName: string): string | null {
     '.tiff': 'image/tiff',
     '.avif': 'image/avif'
   }
-  return tbl[扩展] ?? null
+  return tbl[extension] ?? null
 }
 
 /** 判断一个扩展名是否属于受支持的图片类型。 */

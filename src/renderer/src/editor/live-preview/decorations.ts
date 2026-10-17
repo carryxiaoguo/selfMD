@@ -12,14 +12,14 @@ import { Decoration, type WidgetType } from '@codemirror/view'
 // ---------------------------------------------------------------------------
 
 /** 零宽替换：把语法标记折叠掉，但字符仍留在文档里。 */
-export const 隐藏 = Decoration.replace({})
+export const hidden = Decoration.replace({})
 
 /**
  * 用一个 widget 替换某段源码。
  *
  * 注意 `Decoration` 实例上没有 `.replace()` 方法——替换型装饰必须重新构造。
  */
-export function 替换为(widget: WidgetType): Decoration {
+export function replaceWith(widget: WidgetType): Decoration {
   return Decoration.replace({ widget })
 }
 
@@ -41,7 +41,7 @@ export function 块级替换为(widget: WidgetType): Decoration {
 }
 
 /** 在某个位置插入一个 widget，不替换任何字符（例如围栏的语言标签）。 */
-export function 插入(widget: WidgetType, side: number): Decoration {
+export function insert(widget: WidgetType, side: number): Decoration {
   return Decoration.widget({ widget, side })
 }
 
@@ -58,16 +58,16 @@ export function 插入(widget: WidgetType, side: number): Decoration {
  */
 const 标点装饰缓存 = new Map<string, Decoration>()
 
-export function 渲染标点装饰(显示: string): Decoration {
-  let 装饰 = 标点装饰缓存.get(显示)
-  if (!装饰) {
-    装饰 = Decoration.mark({
+export function 渲染标点装饰(show: string): Decoration {
+  let deco = 标点装饰缓存.get(show)
+  if (!deco) {
+    deco = Decoration.mark({
       class: 'cm-typo-punct',
-      attributes: { 'data-typo': 显示 }
+      attributes: { 'data-typo': show }
     })
-    标点装饰缓存.set(显示, 装饰)
+    标点装饰缓存.set(show, deco)
   }
-  return 装饰
+  return deco
 }
 
 // ---------------------------------------------------------------------------
@@ -98,7 +98,7 @@ export function 标题行装饰(级: number): Decoration {
   return 标题行[Math.min(6, Math.max(1, 级)) - 1]
 }
 
-export const 块级行样式 = {
+export const blockLineStyles = {
   引言: Decoration.line({ class: 'cm-lp-quote' }),
   /**
    * 提示框（`> [!NOTE]`）。
@@ -178,10 +178,10 @@ export function 代码块行装饰(
   if (lineNo !== null) return Decoration.line({ class: className.join(' '), attributes: attr })
 
   const key = `${配色}|${fontStack}|${position}`
-  let 装饰 = 代码块行缓存.get(key)
-  if (!装饰) {
-    装饰 = Decoration.line({ class: className.join(' '), attributes: attr })
-    代码块行缓存.set(key, 装饰)
+  let deco = 代码块行缓存.get(key)
+  if (!deco) {
+    deco = Decoration.line({ class: className.join(' '), attributes: attr })
+    代码块行缓存.set(key, deco)
   }
-  return 装饰
+  return deco
 }

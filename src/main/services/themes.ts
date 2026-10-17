@@ -38,20 +38,20 @@ export function themePath(id: string): string | null {
  *   2. 解析后确认结果仍落在主题目录内（防符号链接绕过）
  */
 export function 主题目录文件(相对路径: string): string | null {
-  let 归一: string
+  let normalize: string
   try {
-    归一 = decodeURIComponent(相对路径)
+    normalize = decodeURIComponent(相对路径)
   } catch {
     return null
   }
-  归一 = 归一.replace(/\\/g, '/').replace(/^\/+/, '').replace(/[?#].*$/, '')
-  if (归一.length === 0 || 归一.includes('..') || 归一.includes('\0')) return null
+  normalize = normalize.replace(/\\/g, '/').replace(/^\/+/, '').replace(/[?#].*$/, '')
+  if (normalize.length === 0 || normalize.includes('..') || normalize.includes('\0')) return null
 
   const root = getAppPaths().themes
-  const 全 = join(root, 归一)
-  const 回退 = relative(root, 全)
-  if (回退.startsWith('..') || isAbsolute(回退)) return null
-  return 全
+  const whole = join(root, normalize)
+  const fallback = relative(root, whole)
+  if (fallback.startsWith('..') || isAbsolute(fallback)) return null
+  return whole
 }
 
 /** 全局自定义 CSS 的路径（对所有主题生效）。 */

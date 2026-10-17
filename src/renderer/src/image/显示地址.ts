@@ -21,7 +21,7 @@ import { localFileUrl } from '@shared/url'
 let 当前文档目录: string | null = null
 
 /** 文档切换时调用。传 null 表示文档尚未保存。 */
-export function 设置文档目录(dir: string | null): void {
+export function setDocDir(dir: string | null): void {
   当前文档目录 = dir
 }
 
@@ -40,14 +40,14 @@ function 是绝对路径(url: string): boolean {
 }
 
 /** 把反斜杠统一成正斜杠，便于拼接与比较。 */
-function 归一(filePath: string): string {
+function normalize(filePath: string): string {
   return filePath.replace(/\\/g, '/')
 }
 
 /** 拼两段路径，处理中间的斜杠与 `./`。 */
-function 拼接(dir: string, 相对: string): string {
-  const 左 = 归一(dir).replace(/\/+$/, '')
-  const 右 = 归一(相对).replace(/^\.\//, '')
+function 拼接(dir: string, relativePath: string): string {
+  const 左 = normalize(dir).replace(/\/+$/, '')
+  const 右 = normalize(relativePath).replace(/^\.\//, '')
   return `${左}/${右}`
 }
 

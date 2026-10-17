@@ -23,11 +23,11 @@ export interface 设置项 {
   description?: string
    /** 下拉/列表的可选项。 */
   options?: { value: string; text: string }[]
-  最小?: number
-  最大?: number
+  minValue?: number
+  maxValue?: number
   步长?: number
   /** 数值与文本项的单位后缀。 */
-  单位?: string
+  unit?: string
 }
 
 export interface 设置小节 {
@@ -39,14 +39,14 @@ export interface 设置小节 {
 
 export interface 设置分区 {
   title: string
-  小节: 设置小节[]
+  subsection: 设置小节[]
 }
 
 /** 各分区的中文标题。 */
 export const 偏好设置结构: 设置分区[] = [
   {
     title: '通用',
-    小节: [
+    subsection: [
       {
         item: [
           {
@@ -79,9 +79,9 @@ export const 偏好设置结构: 设置分区[] = [
             key: 'fontSize',
             kind: '数字',
             label: '字体大小',
-            单位: 'px',
-            最小: 0,
-            最大: 32,
+            unit: 'px',
+            minValue: 0,
+            maxValue: 32,
             步长: 1,
             description: '填 0 表示跟随主题——主题会按自己的气质定正文字号。'
           },
@@ -89,8 +89,8 @@ export const 偏好设置结构: 设置分区[] = [
             key: 'lineHeight',
             kind: '数字',
             label: '行高',
-            最小: 0,
-            最大: 3,
+            minValue: 0,
+            maxValue: 3,
             步长: 0.05,
             description: '填 0 表示跟随主题。'
           },
@@ -120,9 +120,9 @@ export const 偏好设置结构: 设置分区[] = [
             key: 'zoomLevel',
             kind: '数字',
             label: '缩放',
-            单位: '%',
-            最小: 50,
-            最大: 300,
+            unit: '%',
+            minValue: 50,
+            maxValue: 300,
             步长: 10
           }
         ]
@@ -131,7 +131,7 @@ export const 偏好设置结构: 设置分区[] = [
   },
   {
     title: '编辑器',
-    小节: [
+    subsection: [
       {
         item: [
           {
@@ -161,9 +161,9 @@ export const 偏好设置结构: 设置分区[] = [
             key: 'tabSize',
             kind: '数字',
             label: 'Tab 宽度',
-            单位: '空格',
-            最小: 1,
-            最大: 12,
+            unit: '空格',
+            minValue: 1,
+            maxValue: 12,
             步长: 1
           },
           {
@@ -242,7 +242,7 @@ export const 偏好设置结构: 设置分区[] = [
   },
   {
     title: '图片',
-    小节: [
+    subsection: [
       {
         item: [
           {
@@ -337,7 +337,7 @@ export const 偏好设置结构: 设置分区[] = [
   },
   {
     title: '保存与恢复',
-    小节: [
+    subsection: [
       {
         item: [
           {
@@ -384,7 +384,7 @@ export const 偏好设置结构: 设置分区[] = [
   },
   {
     title: '拼写检查',
-    小节: [
+    subsection: [
       {
         description:
           '由 Chromium 自带的拼写检查器完成，提供红波浪线与右键"建议替换"。' +
@@ -408,7 +408,7 @@ export const 偏好设置结构: 设置分区[] = [
   },
   {
     title: '侧边栏',
-    小节: [
+    subsection: [
       {
         description: '侧边栏占着 260px 宽。写长文时想让它彻底消失、又不想被误按快捷键叫回来，就选「始终隐藏」。',
         item: [
@@ -445,7 +445,7 @@ export const 偏好设置结构: 设置分区[] = [
   },
   {
     title: '导出',
-    小节: [
+    subsection: [
       {
         description:
           '这些选项对 HTML 与 PDF 生效。Word、LaTeX 等格式由 Pandoc 转换，不受影响。',
@@ -480,7 +480,7 @@ export const 偏好设置结构: 设置分区[] = [
 
 /** 扁平化后的全部设置项，供校验与遍历使用。 */
 export function 全部设置项(): 设置项[] {
-  return 偏好设置结构.flatMap((section) => section.小节.flatMap((小节) => 小节.item))
+  return 偏好设置结构.flatMap((section) => section.subsection.flatMap((subsection) => subsection.item))
 }
 
 /**

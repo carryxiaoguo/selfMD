@@ -54,7 +54,7 @@ export class 偏好设置面板 {
     // 定位分区：找不到就保持当前分区（不清零），
     // 免得名字写错时直接把用户丢回第一页却毫无提示。
     if (定位分区) {
-      const subscript = 偏好设置结构.findIndex((分) => 分.title === 定位分区)
+      const subscript = 偏好设置结构.findIndex((score) => score.title === 定位分区)
       if (subscript >= 0) this.当前分区 = subscript
       else console.warn(`[偏好设置] 没有名为「${定位分区}」的分区`)
     }
@@ -177,21 +177,21 @@ export class 偏好设置面板 {
     const section = 偏好设置结构[this.当前分区]
     if (!section) return
 
-    for (const 小节 of section.小节) {
+    for (const subsection of section.subsection) {
       const block = document.createElement('div')
       block.className = 'prefs-section'
-      if (小节.title) {
+      if (subsection.title) {
         const title = document.createElement('h3')
-        title.textContent = 小节.title
+        title.textContent = subsection.title
         block.append(title)
       }
-      if (小节.description) {
+      if (subsection.description) {
         const description = document.createElement('p')
         description.className = 'prefs-note'
-        description.textContent = 小节.description
+        description.textContent = subsection.description
         block.append(description)
       }
-      for (const item of 小节.item) block.append(this.渲染一行(item))
+      for (const item of subsection.item) block.append(this.渲染一行(item))
       content.append(block)
     }
   }
@@ -203,10 +203,10 @@ export class 偏好设置面板 {
 
     let hit = 0
     for (const section of 偏好设置结构) {
-      for (const 小节 of section.小节) {
-        for (const item of 小节.item) {
-          const 全 = `${item.label} ${item.description ?? ''} ${String(item.key)}`.toLowerCase()
-          if (!全.includes(词)) continue
+      for (const subsection of section.subsection) {
+        for (const item of subsection.item) {
+          const whole = `${item.label} ${item.description ?? ''} ${String(item.key)}`.toLowerCase()
+          if (!whole.includes(词)) continue
           hit++
           // 搜索时带上分区名，否则用户不知道这一项属于哪里
           const line = this.渲染一行(item, section.title)
@@ -264,12 +264,12 @@ export class 偏好设置面板 {
 
   private 渲染控件(item: 设置项): HTMLElement {
     const settings = this.deps.取设置()
-    const 当前值 = settings[item.key]
+    const currentValue = settings[item.key]
 
     if (item.kind === '开关') {
       const 框 = document.createElement('input')
       框.type = 'checkbox'
-      框.checked = Boolean(当前值)
+      框.checked = Boolean(currentValue)
       框.addEventListener('change', () => void this.提交(item.key, 框.checked))
       return 框
     }
@@ -282,7 +282,7 @@ export class 偏好设置面板 {
         条.textContent = options.text
         选.append(条)
       }
-      选.value = String(当前值 ?? '')
+      选.value = String(currentValue ?? '')
       选.addEventListener('change', () => void this.提交(item.key, 选.value))
       return 选
     }
@@ -290,27 +290,27 @@ export class 偏好设置面板 {
     if (item.kind === '数字') {
       const box = document.createElement('div')
       box.className = 'prefs-number'
-      const 数 = document.createElement('input')
-      数.type = 'number'
-      数.value = String(当前值 ?? 0)
-      if (item.最小 !== undefined) 数.min = String(item.最小)
-      if (item.最大 !== undefined) 数.max = String(item.最大)
-      if (item.步长 !== undefined) 数.step = String(item.步长)
+      const numItems = document.createElement('input')
+      numItems.type = 'number'
+      numItems.value = String(currentValue ?? 0)
+      if (item.minValue !== undefined) numItems.min = String(item.minValue)
+      if (item.maxValue !== undefined) numItems.max = String(item.maxValue)
+      if (item.步长 !== undefined) numItems.step = String(item.步长)
       // 用 change 而不是 input：拖数字框的箭头或长按删除键时，
       // input 会在每一个中间值上触发一次写盘，产生一串无意义的历史。
-      数.addEventListener('change', () => {
-        const value = Number(数.value)
+      numItems.addEventListener('change', () => {
+        const value = Number(numItems.value)
         if (!Number.isFinite(value)) return
-        const 夹紧 = Math.min(item.最大 ?? value, Math.max(item.最小 ?? value, value))
-        if (夹紧 !== value) 数.value = String(夹紧)
+        const 夹紧 = Math.min(item.maxValue ?? value, Math.max(item.minValue ?? value, value))
+        if (夹紧 !== value) numItems.value = String(夹紧)
         void this.提交(item.key, 夹紧)
       })
-      box.append(数)
-      if (item.单位) {
-        const 单位 = document.createElement('span')
-        单位.className = 'prefs-unit'
-        单位.textContent = item.单位
-        box.append(单位)
+      box.append(numItems)
+      if (item.unit) {
+        const unit = document.createElement('span')
+        unit.className = 'prefs-unit'
+        unit.textContent = item.unit
+        box.append(unit)
       }
       return box
     }
@@ -321,38 +321,38 @@ export class 偏好设置面板 {
     // 手打逗号比点加号快。但**解析要容错**——用户会打成中文逗号、
     // 会在逗号后多打空格，这些都不该变成空条目。
     if (item.kind === '列表') {
-      const 输 = document.createElement('input')
-      输.type = 'text'
-      输.value = Array.isArray(当前值) ? (当前值 as string[]).join(', ') : String(当前值 ?? '')
-      输.addEventListener('change', () => {
+      const inputText = document.createElement('input')
+      inputText.type = 'text'
+      inputText.value = Array.isArray(currentValue) ? (currentValue as string[]).join(', ') : String(currentValue ?? '')
+      inputText.addEventListener('change', () => {
         const entry = [
           ...new Set(
-            输.value
+            inputText.value
               .split(/[,，]/)
               .map((segment) => segment.trim())
               .filter((segment) => segment.length > 0)
           )
         ]
         // 回写规范化后的文本，让用户看到实际存下来的样子
-        输.value = entry.join(', ')
+        inputText.value = entry.join(', ')
         void this.提交(item.key, entry)
       })
-      return 输
+      return inputText
     }
 
     // 文本（也用于展示只读值）
-    const 输 = document.createElement('input')
-    输.type = 'text'
-    输.value = String(当前值 ?? '')
+    const inputText = document.createElement('input')
+    inputText.type = 'text'
+    inputText.value = String(currentValue ?? '')
     const 只读值 = this.deps.取只读值?.(item.key)
     if (只读值 !== null && 只读值 !== undefined) {
-      输.value = 只读值
+      inputText.value = 只读值
       // 只读项（例如「当前主题」）在界面上不可编辑——它由别的入口决定
-      输.readOnly = true
-      输.classList.add('prefs-readonly')
+      inputText.readOnly = true
+      inputText.classList.add('prefs-readonly')
     }
-    输.addEventListener('change', () => void this.提交(item.key, 输.value))
-    return 输
+    inputText.addEventListener('change', () => void this.提交(item.key, inputText.value))
+    return inputText
   }
 
   private async 提交(key: keyof Settings, value: unknown): Promise<void> {

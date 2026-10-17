@@ -16,7 +16,7 @@ import type { SyntaxNode } from '../editor/syntax-node'
 
 export interface 标题项 {
   /** 1–6。 */
-  级别: number
+  level: number
   /** 去掉 `#` 与收尾井号之后的正文。 */
   docText: string
   /** 标题在文档中的起始偏移。 */
@@ -36,9 +36,9 @@ const 标题节点 = /^(?:ATX|Setext)Heading(\d)$/
  */
 export function 提取标题(state: EditorState): 标题项[] {
   const result: 标题项[] = []
-  const 树 = syntaxTree(state)
+  const tree = syntaxTree(state)
 
-  树.iterate({
+  tree.iterate({
     enter: (quote) => {
       const node = quote.node as unknown as SyntaxNode
       const match = 标题节点.exec(node.name)
@@ -47,7 +47,7 @@ export function 提取标题(state: EditorState): 标题项[] {
       // 空标题（只有 `#`）也收进来：大纲里留一行空项比整段消失更符合预期。
       const originalText = state.sliceDoc(node.from, node.to)
       result.push({
-        级别: Number(match[1]),
+        level: Number(match[1]),
         docText: 清理标题文本(originalText, node.name.startsWith('ATX')),
         position: node.from,
         lineNo: state.doc.lineAt(node.from).number

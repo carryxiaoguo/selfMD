@@ -3,12 +3,12 @@ import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { dirname } from 'node:path'
 import type { AppInfo, AppPaths, TaskProgress } from '@shared/ipc'
 import { CH, EV } from '@shared/ipc'
-import { 生效主题, type Settings } from '@shared/types'
+import { activeTheme, type Settings } from '@shared/types'
 import { 可用格式, 执行导出, 取Pandoc版本 } from '../export'
 import { 复制为图片 } from '../export/图片'
 import {
   写草稿,
-  列出草稿,
+  listDrafts,
   删除草稿,
   清理该文档的草稿,
   读草稿,
@@ -172,11 +172,11 @@ export function registerAppIpc(): void {
   ipcMain.handle(CH.themeOpenCustom, async (_e, rangeBounds: 'base' | 'theme') => {
     const settings = getSettings()
     const target =
-      rangeBounds === 'base' ? 全局自定义样式路径() : 主题自定义样式路径(生效主题(settings))
+      rangeBounds === 'base' ? 全局自定义样式路径() : 主题自定义样式路径(activeTheme(settings))
     if (!target) return { filePath: null }
 
     if (!existsSync(target)) {
-      const 主题名 = 生效主题(settings)
+      const 主题名 = activeTheme(settings)
       const template =
         rangeBounds === 'base'
           ? `/* 全局自定义 CSS —— 对**所有**主题生效。\n` +
@@ -266,8 +266,8 @@ export function registerAppIpc(): void {
         source: string
         docPath: string | null
         默认文件名: string
-        附大纲?: boolean
-        内嵌图片?: boolean
+        withOutline?: boolean
+        embeddedImage?: boolean
       }
     ) => {
       const ext = 格式扩展名(request.format)
@@ -280,19 +280,19 @@ export function registerAppIpc(): void {
           : `${request.默认文件名}${ext}`,
         filters: [{ name: request.format.toUpperCase(), extensions: [ext.replace(/^\./, '')] }]
       }
-      const 选择 = win
+      const choose = win
         ? await dialog.showSaveDialog(win, options)
         : await dialog.showSaveDialog(options)
-      if (选择.canceled || !选择.filePath) return { filePath: null, error: null }
+      if (choose.canceled || !choose.filePath) return { filePath: null, error: null }
 
       const result = await 执行导出({
-        target: 选择.filePath,
+        target: choose.filePath,
         source: request.source,
         docPath: request.docPath,
         format: request.format as never,
         // 导出选项由渲染层按设置传入；没传时用这里的默认值。
-        附大纲: request.附大纲 ?? true,
-        内嵌图片: request.内嵌图片 ?? false
+        withOutline: request.withOutline ?? true,
+        embeddedImage: request.embeddedImage ?? false
       })
       return { filePath: result.filePath, error: result.error }
     }
@@ -332,8 +332,8 @@ export function registerAppIpc(): void {
     const win = windowOf(e)
     if (!win) return { success: false, error: '找不到窗口' }
     return new Promise<{ success: boolean; error: string | null }>((done) => {
-      win.webContents.print({ silent: false, printBackground: true }, (success, 原因) => {
-        done({ success, error: success ? null : 原因 || '打印已取消' })
+      win.webContents.print({ silent: false, printBackground: true }, (success, reason) => {
+        done({ success, error: success ? null : reason || '打印已取消' })
       })
     })
   })
@@ -344,7 +344,7 @@ export function registerAppIpc(): void {
   ipcMain.handle(CH.draftSave, (_e, rawPath: string | null, content: string) =>
     写草稿(rawPath, content)
   )
-  ipcMain.handle(CH.draftList, () => 列出草稿())
+  ipcMain.handle(CH.draftList, () => listDrafts())
   ipcMain.handle(CH.draftRead, (_e, key: string) => 读草稿(key))
   ipcMain.handle(CH.draftDiscard, (_e, key: string) => 删除草稿(key))
   ipcMain.handle(CH.draftPending, () => 需要恢复的草稿())

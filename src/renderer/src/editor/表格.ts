@@ -27,8 +27,8 @@ export function isTableRow(lineText: string): boolean {
 
 /** 判断一行是不是对齐定义行（`| --- | :---: |`）。 */
 export function isAlignRow(lineText: string): boolean {
-  const 片 = lineText.split('|').filter((segment) => segment.trim().length > 0)
-  return 片.length > 0 && 片.every((segment) => /^\s*:?-{2,}:?\s*$/.test(segment))
+  const piece = lineText.split('|').filter((segment) => segment.trim().length > 0)
+  return piece.length > 0 && piece.every((segment) => /^\s*:?-{2,}:?\s*$/.test(segment))
 }
 
 /**
@@ -115,7 +115,7 @@ function makeEmptyRow(模板行文本: string): string {
  * 在**最后一个单元格**上继续往后跳时，自动补一行——这是表格编辑里
  * 最顺手的那个行为：一直按 Tab 就能一直往下写，不用先插行。
  */
-export function 跳到相邻单元格(view: EditorView, 方向: 1 | -1): boolean {
+export function 跳到相邻单元格(view: EditorView, direction: 1 | -1): boolean {
   const state = view.state
   const selection = state.selection.main
   if (!selection.empty) return false
@@ -129,7 +129,7 @@ export function 跳到相邻单元格(view: EditorView, 方向: 1 | -1): boolean
   const current = currentCellIndex(line.text, selection.head - line.from)
   if (current < 0) return false
 
-  const target = current + 方向
+  const target = current + direction
   if (target >= 0 && target < ranges.length) {
     const 格 = ranges[target]
     // 落在单元格内容区的起点：跳过 `| ` 之后的空白，光标贴在第一个字上
@@ -139,16 +139,16 @@ export function 跳到相邻单元格(view: EditorView, 方向: 1 | -1): boolean
   }
 
   // 越界：向右越界时补一行再落到它的第一个格子
-  if (方向 === 1) {
+  if (direction === 1) {
     const tbl = wholeTable(state, line.number)
     if (!tbl) return false
     // 对齐行不参与"按 Tab 续写"，从它下面那行取模板
     const template = state.doc.line(Math.max(tbl.head, line.number)).text
-    const 新行 = makeEmptyRow(template)
+    const newLine = makeEmptyRow(template)
     const insertAt = state.doc.line(tbl.tail).to
     view.dispatch({
-      changes: { from: insertAt, insert: `\n${新行}` },
-      selection: { anchor: insertAt + 1 + (/^\s*\|?\s*/.exec(新行)?.[0].length ?? 0) },
+      changes: { from: insertAt, insert: `\n${newLine}` },
+      selection: { anchor: insertAt + 1 + (/^\s*\|?\s*/.exec(newLine)?.[0].length ?? 0) },
       scrollIntoView: true,
       userEvent: 'input.addRow'
     })
@@ -163,10 +163,10 @@ export function 表格增行(view: EditorView): boolean {
   const state = view.state
   const line = state.doc.lineAt(state.selection.main.head)
   if (!isTableRow(line.text)) return false
-  const 新行 = makeEmptyRow(line.text)
+  const newLine = makeEmptyRow(line.text)
   view.dispatch({
-    changes: { from: line.to, insert: `\n${新行}` },
-    selection: { anchor: line.to + 1 + (/^\s*\|?\s*/.exec(新行)?.[0].length ?? 0) },
+    changes: { from: line.to, insert: `\n${newLine}` },
+    selection: { anchor: line.to + 1 + (/^\s*\|?\s*/.exec(newLine)?.[0].length ?? 0) },
     userEvent: 'input.addRow'
   })
   return true
@@ -207,15 +207,15 @@ export function 表格增列(view: EditorView): boolean {
 
   const changes: { from: number; to: number; insert: string }[] = []
   for (let n = tbl.head; n <= tbl.tail; n++) {
-    const 本行 = state.doc.line(n)
-    const thisRange = cellRanges(本行.text)
+    const thisLine = state.doc.line(n)
+    const thisRange = cellRanges(thisLine.text)
     if (thisRange.length === 0) continue
     // 插在目标列单元格的**前面**：竖线位置对齐，视觉上不会错位
     const target = thisRange[Math.min(列, thisRange.length - 1)]
-    const insertAt = 本行.from + target.start
+    const insertAt = thisLine.from + target.start
     // 对齐行插 `---`，其余插空格，宽度与本列一致
     const width = Math.max(3, target.end - target.start)
-    const content = isAlignRow(本行.text) ? '-'.repeat(width) : ' '.repeat(width)
+    const content = isAlignRow(thisLine.text) ? '-'.repeat(width) : ' '.repeat(width)
     changes.push({ from: insertAt, to: insertAt, insert: `${content}| ` })
   }
   if (changes.length === 0) return false
@@ -237,14 +237,14 @@ export function 表格删列(view: EditorView): boolean {
 
   const changes: { from: number; to: number }[] = []
   for (let n = tbl.head; n <= tbl.tail; n++) {
-    const 本行 = state.doc.line(n)
-    const thisRange = cellRanges(本行.text)
+    const thisLine = state.doc.line(n)
+    const thisRange = cellRanges(thisLine.text)
     if (thisRange.length === 0) continue
     const target = thisRange[Math.min(列, thisRange.length - 1)]
     // 连同前面那条竖线一起删，否则会留下 `||`
-    let start = 本行.from + target.start
-    if (start > 本行.from && 本行.text[target.start - 1] === '|') start--
-    changes.push({ from: start, to: 本行.from + target.end })
+    let start = thisLine.from + target.start
+    if (start > thisLine.from && thisLine.text[target.start - 1] === '|') start--
+    changes.push({ from: start, to: thisLine.from + target.end })
   }
   if (changes.length === 0) return false
   view.dispatch({ changes: changes, userEvent: 'delete' })

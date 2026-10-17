@@ -104,16 +104,16 @@ interface context {
  * 不属于任何子节点的部分才是正文，漏掉就会丢字。
  */
 function 递归(node: any, context: context): void {
-  let 游标 = node.from
+  let cursor = node.from
   for (let child = node.firstChild; child; child = child.nextSibling) {
-    if (child.from > 游标) {
-      context.output.push(转义HTML(context.source.slice(游标, child.from)))
+    if (child.from > cursor) {
+      context.output.push(转义HTML(context.source.slice(cursor, child.from)))
     }
     处理(child, context)
-    游标 = child.to
+    cursor = child.to
   }
-  if (游标 < node.to) {
-    context.output.push(转义HTML(context.source.slice(游标, node.to)))
+  if (cursor < node.to) {
+    context.output.push(转义HTML(context.source.slice(cursor, node.to)))
   }
 }
 
@@ -168,8 +168,8 @@ function 处理(node: any, context: context): void {
     // ------------------------------------------------------------ 图片 --
     case 'Image': {
       const url = 取链接地址(node, context)
-      const 替代 = 取图片替代文本(node, context)
-      output.push(`<img src="${转义属性(url)}" alt="${转义属性(替代)}"`)
+      const substitute = 取图片替代文本(node, context)
+      output.push(`<img src="${转义属性(url)}" alt="${转义属性(substitute)}"`)
       const title = 取链接标题(node, context)
       if (title) output.push(` title="${转义属性(title)}"`)
       output.push('>')
@@ -287,10 +287,10 @@ function 处理(node: any, context: context): void {
 
   const label = 标签名(name)
   if (label) {
-    const 块级 = ['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote', 'ul', 'li'].includes(label)
+    const blockLevel = ['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote', 'ul', 'li'].includes(label)
     output.push(`<${label}>`)
     递归(node, context)
-    output.push(`</${label}>${块级 ? '\n' : ''}`)
+    output.push(`</${label}>${blockLevel ? '\n' : ''}`)
     return
   }
 
@@ -312,9 +312,9 @@ function 收集代码文本(node: any, context: context): void {
     // 兜底：没有 CodeText 子节点（空代码块或解析差异）时，
     // 从 CodeMark 之间取内容，免得导出成空块。
     const docText = context.source.slice(node.from, node.to)
-    const 行们 = docText.split('\n')
-    if (行们.length > 2) {
-      context.output.push(转义HTML(行们.slice(1, -1).join('\n')))
+    const lines = docText.split('\n')
+    if (lines.length > 2) {
+      context.output.push(转义HTML(lines.slice(1, -1).join('\n')))
     }
   }
 }
@@ -333,14 +333,14 @@ function 找任务标记(node: any, context: context): string {
  * 图片的 alt 用的是另一段逻辑（结构略有不同）。
  */
 function 渲染链接文字(node: any, context: context): void {
-  let 游标 = node.from
+  let cursor = node.from
   for (let child = node.firstChild; child; child = child.nextSibling) {
     if (child.name === 'URL' || child.name === 'LinkTitle') break
-    if (child.from > 游标) {
-      context.output.push(转义HTML(context.source.slice(游标, child.from)))
+    if (child.from > cursor) {
+      context.output.push(转义HTML(context.source.slice(cursor, child.from)))
     }
     if (!标记节点.has(child.name)) 处理(child, context)
-    游标 = child.to
+    cursor = child.to
   }
 }
 
@@ -434,9 +434,9 @@ function 取对齐(行节点: any, context: context): (string | null)[] {
  * 外壳由导出模板负责，因为"网页"与"内嵌预览"需要不同的外壳。
  */
 export function 渲染Markdown为HTML(source: string, options: 渲染选项 = {}): string {
-  const 树 = 解析器.parse(source)
+  const tree = 解析器.parse(source)
   const context: context = { source, output: [], options }
-  递归(树.topNode, context)
+  递归(tree.topNode, context)
   return context.output.join('')
 }
 
@@ -446,7 +446,7 @@ export function 渲染Markdown为HTML(source: string, options: 渲染选项 = {}
 
 export interface outlineEntry {
   /** 1–6。 */
-  级别: number
+  level: number
   /** 去掉 `#` 与收尾井号之后的正文。 */
   docText: string
   /** 在文档中的起始偏移。 */
@@ -477,15 +477,15 @@ export function 清理标题文本(originalText: string, 是ATX: boolean): strin
 
 /** 从 Markdown 文本里提取标题。用于导出时生成侧边目录。 */
 export function 提取大纲(source: string): outlineEntry[] {
-  const 树 = 解析器.parse(source)
+  const tree = 解析器.parse(source)
   const result: outlineEntry[] = []
 
-  树.iterate({
+  tree.iterate({
     enter: (node) => {
       const match = 大纲标题模式.exec(node.name)
       if (!match) return true
       result.push({
-        级别: Number(match[1]),
+        level: Number(match[1]),
         docText: 清理标题文本(source.slice(node.from, node.to), node.name.startsWith('ATX')),
         position: node.from
       })

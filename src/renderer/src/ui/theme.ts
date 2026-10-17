@@ -1,5 +1,5 @@
 import { themeCssUrl, 全局自定义样式Url, 主题自定义样式Url } from '@shared/url'
-import { 生效主题, type Settings } from '@shared/types'
+import { activeTheme, type Settings } from '@shared/types'
 
 /**
  * 主题应用。
@@ -60,7 +60,7 @@ function 设置链接(id: string, href: string): void {
 
 /** 给定设置下实际生效的主题 id。 */
 export function activeThemeId(settings: Settings): string {
-  return 生效主题(settings)
+  return activeTheme(settings)
 }
 
 /** 强制重新拉取当前三层样式表（用户在外部编辑器里改了 CSS 之后用）。 */

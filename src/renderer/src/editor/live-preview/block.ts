@@ -2,16 +2,16 @@ import type { EditorState } from '@codemirror/state'
 import { 扫描行内公式 } from '@shared/数学'
 import { 扫描渲染标点 } from '../smart-punctuation'
 import {
-  块级行样式,
+  blockLineStyles,
   代码块行装饰,
   标题行装饰,
-  隐藏,
-  插入,
-  替换为,
+  hidden,
+  insert,
+  replaceWith,
   渲染标点装饰
 } from './decorations'
 import type { 构建上下文, SyntaxNode } from './types'
-import { 加行装饰, 行内公式已启用, 渲染标点已启用 } from './types'
+import { addLineDeco, 行内公式已启用, 渲染标点已启用 } from './types'
 import {
   列表圆点,
   水平线,
@@ -42,15 +42,15 @@ import { 内置字体, infoRoundTrips, 解析围栏首行 } from '@shared/代码
 // 手工扫描：前置元数据
 // ---------------------------------------------------------------------------
 
-interface 手工块 {
+interface manualBlock {
   from: number
   to: number
   /** 该块覆盖的行号（0 基下标存进数组，便于二分判断）。 */
-  行号集合: Set<number>
+  lineNoSet: Set<number>
 }
 
 /** 首行 `---` 开头、后续某行 `---` 或 `...` 收尾，即视为 YAML 前置元数据。 */
-function 检测前置元数据(state: EditorState): 手工块 | null {
+function 检测前置元数据(state: EditorState): manualBlock | null {
   if (state.doc.lines < 2) return null
   const firstLine = state.doc.line(1)
   if (firstLine.text.trim() !== '---') return null
@@ -59,9 +59,9 @@ function 检测前置元数据(state: EditorState): 手工块 | null {
     const line = state.doc.line(no)
     const docText = line.text.trim()
     if (docText === '---' || docText === '...') {
-      const 行号集合 = new Set<number>()
-      for (let n = 1; n <= no; n++) 行号集合.add(n)
-      return { from: firstLine.from, to: line.to, 行号集合 }
+      const lineNoSet = new Set<number>()
+      for (let n = 1; n <= no; n++) lineNoSet.add(n)
+      return { from: firstLine.from, to: line.to, lineNoSet }
     }
   }
   return null
@@ -88,23 +88,23 @@ function 收集行内代码区间(node: SyntaxNode): { from: number; to: number 
 }
 
 /** `$$` 独占一行开始，到下一个含 `$$` 的行结束；`$$x$$` 单行闭合也算。 */
-export function 检测数学块(state: EditorState): 手工块[] {
-  const result: 手工块[] = []
+export function 检测数学块(state: EditorState): manualBlock[] {
+  const result: manualBlock[] = []
   for (let no = 1; no <= state.doc.lines; no++) {
     const line = state.doc.line(no)
     const docText = line.text.trim()
     if (!docText.startsWith('$$')) continue
     // 单行闭合：形如 `$$E=mc^2$$`（长度必须大于 4，以排除 `$$` 本身）。
     if (docText.length > 4 && docText.endsWith('$$')) {
-      result.push({ from: line.from, to: line.to, 行号集合: new Set([no]) })
+      result.push({ from: line.from, to: line.to, lineNoSet: new Set([no]) })
       continue
     }
     for (let 终号 = no + 1; 终号 <= state.doc.lines; 终号++) {
       const 终行 = state.doc.line(终号)
       if (!终行.text.trim().endsWith('$$')) continue
-      const 行号集合 = new Set<number>()
-      for (let n = no; n <= 终号; n++) 行号集合.add(n)
-      result.push({ from: line.from, to: 终行.to, 行号集合 })
+      const lineNoSet = new Set<number>()
+      for (let n = no; n <= 终号; n++) lineNoSet.add(n)
+      result.push({ from: line.from, to: 终行.to, lineNoSet })
       no = 终号
       break
     }
@@ -112,7 +112,7 @@ export function 检测数学块(state: EditorState): 手工块[] {
   return result
 }
 
-function 落在手工块内(position: number, 手工块列表: 手工块[]): boolean {
+function 落在手工块内(position: number, 手工块列表: manualBlock[]): boolean {
   for (const block of 手工块列表) {
     if (position >= block.from && position <= block.to) return true
   }
@@ -124,9 +124,9 @@ function 落在手工块内(position: number, 手工块列表: 手工块[]): boo
 // ---------------------------------------------------------------------------
 
 export interface 手工扫描结果 {
-  frontMatter: 手工块 | null
-  数学块: 手工块[]
-  全部块: 手工块[]
+  frontMatter: manualBlock | null
+  数学块: manualBlock[]
+  全部块: manualBlock[]
 }
 
 /** 第一遍：处理语法树里不存在的两类块，并把它们占用的行登记好。 */
@@ -134,16 +134,16 @@ export function 扫描手工块(state: EditorState, context: 构建上下文): �
   const frontMatter = 检测前置元数据(state)
   const 数学块 = 检测数学块(state)
 
-  const 全部块: 手工块[] = []
+  const 全部块: manualBlock[] = []
   if (frontMatter) 全部块.push(frontMatter)
   全部块.push(...数学块)
 
-  for (const no of frontMatter?.行号集合 ?? []) {
-    加行装饰(context, state.doc.line(no).from, 块级行样式.frontMatter)
+  for (const no of frontMatter?.lineNoSet ?? []) {
+    addLineDeco(context, state.doc.line(no).from, blockLineStyles.frontMatter)
   }
   for (const block of 数学块) {
-    for (const no of block.行号集合) {
-      加行装饰(context, state.doc.line(no).from, 块级行样式.数学块)
+    for (const no of block.lineNoSet) {
+      addLineDeco(context, state.doc.line(no).from, blockLineStyles.数学块)
     }
     // 块级公式的**替换**装饰不在这里加。
     //
@@ -169,7 +169,7 @@ export function 处理块级(
   if (落在手工块内(node.from, 手工.全部块)) return true
 
   const lineNo = state.doc.lineAt(node.from).number
-  const 在活动行 = context.活动行.has(lineNo)
+  const onActiveLine = context.活动行.has(lineNo)
 
   switch (node.name) {
     // ---------------------------------------------------------- 段落 ----
@@ -187,7 +187,7 @@ export function 处理块级(
           context.entry.push({
             from: range.from,
             to: range.to + 1, // 含结尾的 `$`
-            deco: 替换为(new 数学公式(range.formula, false)),
+            deco: replaceWith(new 数学公式(range.formula, false)),
             rank: 2
           })
         }
@@ -198,7 +198,7 @@ export function 处理块级(
       // 只在**非活动行**生效——正在编辑的那一行必须显示真正的字符，
       // 否则用户敲下 `"` 却看到 `“`，会以为文档里存的就是弯引号。
       // 这与行内标记"活动行露出源码"是同一条规则。
-      if (渲染标点已启用() && !在活动行) {
+      if (渲染标点已启用() && !onActiveLine) {
         const 代码区间 = 收集行内代码区间(node)
         for (const segment of 扫描渲染标点(originalText, 段落起)) {
           // 行内代码里的引号与连字符是内容，不能替换
@@ -206,7 +206,7 @@ export function 处理块级(
           context.entry.push({
             from: segment.from,
             to: segment.to,
-            deco: 渲染标点装饰(segment.显示),
+            deco: 渲染标点装饰(segment.show),
             rank: 0
           })
         }
@@ -222,22 +222,22 @@ export function 处理块级(
     case 'ATXHeading5':
     case 'ATXHeading6': {
       const 级 = Number(node.name.slice(-1))
-      加行装饰(context, state.doc.lineAt(node.from).from, 标题行装饰(级))
+      addLineDeco(context, state.doc.lineAt(node.from).from, 标题行装饰(级))
       return false // 继续下沉，让 HeaderMark 被行内逻辑折叠
     }
 
     case 'SetextHeading1':
     case 'SetextHeading2': {
       const 级 = Number(node.name.slice(-1))
-      加行装饰(context, state.doc.lineAt(node.from).from, 标题行装饰(级))
+      addLineDeco(context, state.doc.lineAt(node.from).from, 标题行装饰(级))
       return false
     }
 
     case 'HeaderMark': {
       const 父名 = node.parent?.name ?? ''
       if (父名.startsWith('ATXHeading') || 父名.startsWith('SetextHeading')) {
-        if (!在活动行) {
-          context.entry.push({ from: node.from, to: node.to, deco: 隐藏, rank: 1 })
+        if (!onActiveLine) {
+          context.entry.push({ from: node.from, to: node.to, deco: hidden, rank: 1 })
         }
         return true
       }
@@ -260,7 +260,7 @@ export function 处理块级(
       // 行装饰**一行只能有一条**（`加行装饰` 会把重复的挡掉），
       // 所以提示框与普通引用是在这里二选一，不能先加引言再加提示框。
       for (let n = firstLine.number; n <= lastLine.number; n++) {
-        加行装饰(context, state.doc.line(n).from, mark ? 块级行样式.callout : 块级行样式.引言)
+        addLineDeco(context, state.doc.line(n).from, mark ? blockLineStyles.callout : blockLineStyles.引言)
       }
 
       // 首行的标记换成一个小标签；光标停在这一行时露源码，方便改回普通引用
@@ -268,7 +268,7 @@ export function 处理块级(
         context.entry.push({
           from: firstLine.from,
           to: firstLine.to,
-          deco: 替换为(new 提示标签()),
+          deco: replaceWith(new 提示标签()),
           rank: 2
         })
       }
@@ -292,7 +292,7 @@ export function 处理块级(
       //     退格。CodeMirror 的 `deleteMarkupBackward` 认得引用上下文，
       //     光标在行首按退格会整行去掉 `>`；文档里的字符一直都在，
       //     装饰只是不画出来，所以这个命令照常有效。
-      context.entry.push({ from: node.from, to: node.to, deco: 隐藏, rank: 1 })
+      context.entry.push({ from: node.from, to: node.to, deco: hidden, rank: 1 })
       // **标记后面的空格也一起吃掉。**
       // 只藏 `>` 的话，行首会剩下一个空格，整段文字比正文缩进一格——
       // 肉眼看上去仍然"像还留着标记"。要干净就干净到底。
@@ -303,7 +303,7 @@ export function 处理块级(
           context.entry.push({
             from: node.to,
             to: node.to + blank.length,
-            deco: 隐藏,
+            deco: hidden,
             rank: 1
           })
         }
@@ -316,11 +316,11 @@ export function 处理块级(
       const grandparent = node.parent?.parent?.name
       if (grandparent === 'BulletList') {
         // 无序列表：把 `-` 换成圆点。活动行保留原字符，方便看清语法。
-        if (!在活动行) {
+        if (!onActiveLine) {
           context.entry.push({
             from: node.from,
             to: node.to,
-            deco: 替换为(new 列表圆点(计算层级(state, node.from))),
+            deco: replaceWith(new 列表圆点(计算层级(state, node.from))),
             rank: 1
           })
         }
@@ -342,7 +342,7 @@ export function 处理块级(
       for (let n = firstLine.number; n <= lastLine.number; n++) {
         const isBody = n !== firstLine.number && n !== lastLine.number
         if (isBody) bodyIndex++
-        加行装饰(
+        addLineDeco(
           context,
           state.doc.line(n).from,
           代码块行装饰(
@@ -370,7 +370,7 @@ export function 处理块级(
         context.entry.push({
           from: firstLine.from,
           to: firstLine.to,
-          deco: 替换为(
+          deco: replaceWith(
             new 代码块头部(info, {
               fenceStart: node.from,
               fenceEnd: node.to,
@@ -406,7 +406,7 @@ export function 处理块级(
       if (parent?.name !== 'FencedCode') return true
       // 首行整行已经是头部栏了，这里的 ``` 不能再推一条重叠的替换装饰
       if (context.已换头部栏.has(state.doc.lineAt(node.from).from)) return true
-      context.entry.push({ from: node.from, to: node.to, deco: 隐藏, rank: 1 })
+      context.entry.push({ from: node.from, to: node.to, deco: hidden, rank: 1 })
       return true
     }
 
@@ -416,7 +416,7 @@ export function 处理块级(
       if (parent?.name !== 'FencedCode') return true
       if (context.已换头部栏.has(state.doc.lineAt(node.from).from)) return true
       if (!context.活动行.has(state.doc.lineAt(node.from).number)) {
-        context.entry.push({ from: node.from, to: node.to, deco: 隐藏, rank: 1 })
+        context.entry.push({ from: node.from, to: node.to, deco: hidden, rank: 1 })
       }
       return true
     }
@@ -437,7 +437,7 @@ export function 处理块级(
       context.entry.push({
         from: lineEnd,
         to: lineEnd,
-        deco: 插入(new 语言标签(language || '文本'), 1),
+        deco: insert(new 语言标签(language || '文本'), 1),
         rank: 2
       })
       return true
@@ -446,12 +446,12 @@ export function 处理块级(
     // --------------------------------------------------------- 水平线 ----
     case 'HorizontalRule': {
       const line = state.doc.lineAt(node.from)
-      加行装饰(context, line.from, 块级行样式.水平线行)
-      if (!在活动行) {
+      addLineDeco(context, line.from, blockLineStyles.水平线行)
+      if (!onActiveLine) {
         context.entry.push({
           from: node.from,
           to: node.to,
-          deco: 替换为(new 水平线()),
+          deco: replaceWith(new 水平线()),
           rank: 1
         })
       }
@@ -460,12 +460,12 @@ export function 处理块级(
 
     // ----------------------------------------------------------- 表格 ----
     case 'TableHeader': {
-      加行装饰(context, state.doc.lineAt(node.from).from, 块级行样式.表头行)
+      addLineDeco(context, state.doc.lineAt(node.from).from, blockLineStyles.表头行)
       return false
     }
 
     case 'TableRow': {
-      加行装饰(context, state.doc.lineAt(node.from).from, 块级行样式.table)
+      addLineDeco(context, state.doc.lineAt(node.from).from, blockLineStyles.table)
       return false
     }
 
@@ -473,17 +473,17 @@ export function 处理块级(
       const 父名 = node.parent?.name
       if (父名 === 'Table') {
         // 对齐定义行（`| :--- | :--: |`）整行折叠，只留一条分隔视觉。
-        加行装饰(context, state.doc.lineAt(node.from).from, 块级行样式.表格分隔行)
-        if (!在活动行) {
-          context.entry.push({ from: node.from, to: node.to, deco: 隐藏, rank: 1 })
+        addLineDeco(context, state.doc.lineAt(node.from).from, blockLineStyles.表格分隔行)
+        if (!onActiveLine) {
+          context.entry.push({ from: node.from, to: node.to, deco: hidden, rank: 1 })
         }
       } else {
         // 单元格之间的 `|`，淡化成视觉分隔而不是删除，方便判断列边界。
-        if (!在活动行) {
+        if (!onActiveLine) {
           context.entry.push({
             from: node.from,
             to: node.to,
-            deco: 替换为(new 表格分隔('│')),
+            deco: replaceWith(new 表格分隔('│')),
             rank: 1
           })
         }
@@ -496,14 +496,14 @@ export function 处理块级(
       if (node.parent?.name !== 'Task') return false
       // 整行挂 `md-task-list-item`：这是通用的类名，
       // 挂上之后针对它写的规则（缩进、行高、完成态淡化）可直接生效。
-      加行装饰(context, state.doc.lineAt(node.from).from, 块级行样式.任务项行)
+      addLineDeco(context, state.doc.lineAt(node.from).from, blockLineStyles.任务项行)
       const originalText = state.sliceDoc(node.from, node.to)
       const 已勾选 = /\[[xX]\]/.test(originalText)
       // 复选框始终替换，即使光标在本行——否则勾选后光标会把标记"撑开"。
       context.entry.push({
         from: node.from,
         to: node.to,
-        deco: 替换为(new 任务框(已勾选, node.from)),
+        deco: replaceWith(new 任务框(已勾选, node.from)),
         rank: 1
       })
       return true
@@ -514,7 +514,7 @@ export function 处理块级(
       const firstLine = state.doc.lineAt(node.from)
       const lastLine = state.doc.lineAt(Math.max(node.from, node.to - 1))
       for (let n = firstLine.number; n <= lastLine.number; n++) {
-        加行装饰(context, state.doc.line(n).from, 块级行样式.HTML块)
+        addLineDeco(context, state.doc.line(n).from, blockLineStyles.HTML块)
       }
       return true
     }
@@ -525,15 +525,15 @@ export function 处理块级(
 }
 
 /** 在直接子节点中按名字查找。 */
-function 找子节点(parent: SyntaxNode, 名字: string): SyntaxNode | null {
+function 找子节点(parent: SyntaxNode, nameText: string): SyntaxNode | null {
   const 带子节点 = parent as SyntaxNode & { firstChild?: SyntaxNode | null; nextSibling?: SyntaxNode | null }
   let current = 带子节点.firstChild ?? null
   while (current) {
-    if (current.name === 名字) return current
+    if (current.name === nameText) return current
     current = (current as SyntaxNode & { nextSibling?: SyntaxNode | null }).nextSibling ?? null
   }
   return null
 }
 
 /** 导出给插件用。 */
-export type { 手工块 }
+export type { manualBlock }

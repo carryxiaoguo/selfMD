@@ -102,7 +102,7 @@ export interface 围栏信息 {
 }
 
 /** 去掉首尾空白并合并内部连续空白——信息串里多余的空格没有意义。 */
-function 规整(docText: string): string {
+function tidy(docText: string): string {
   return docText.trim().replace(/\s+/g, ' ')
 }
 
@@ -118,18 +118,18 @@ function 是样式名(value: string): value is 代码块样式 {
  * "这个块没渲染出来"，很难反查。所以这里不抛，一律给合理默认值。
  */
 export function 解析围栏信息(原始: string): 围栏信息 {
-  const parts = 规整(原始).split(' ').filter(Boolean)
+  const parts = tidy(原始).split(' ').filter(Boolean)
   const language = parts.shift() ?? ''
 
   const 名称片段: string[] = []
   let style: 代码块样式 = 'follow'
   let font = 'follow'
 
-  for (const 片 of parts) {
-    const 等号 = 片.indexOf('=')
+  for (const piece of parts) {
+    const 等号 = piece.indexOf('=')
     if (等号 > 0) {
-      const key = 片.slice(0, 等号).toLowerCase()
-      const value = 片.slice(等号 + 1)
+      const key = piece.slice(0, 等号).toLowerCase()
+      const value = piece.slice(等号 + 1)
       if (key === 'style') {
         if (是样式名(value)) style = value
         // 认不出的样式值直接忽略，而不是把它当成名称的一部分——
@@ -142,7 +142,7 @@ export function 解析围栏信息(原始: string): 围栏信息 {
         continue
       }
     }
-    名称片段.push(片)
+    名称片段.push(piece)
   }
 
   return { language, displayName: 名称片段.join(' '), style, font }

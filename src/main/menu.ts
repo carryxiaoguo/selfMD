@@ -1,11 +1,11 @@
 import { app, BrowserWindow, Menu, dialog, type MenuItemConstructorOptions } from 'electron'
 import { COMMANDS, isImplemented, roadmap, 分类显示名, type CommandDef } from '@shared/commands'
 import { EV } from '@shared/ipc'
-import { 生效主题 } from '@shared/types'
+import { activeTheme } from '@shared/types'
 import { listRecent } from './services/recent'
 import { listThemes } from './services/themes'
 import { getSettings } from './services/settings'
-import { 图标路径 } from './util/资源路径'
+import { iconPath } from './util/资源路径'
 
 /**
  * 原生应用菜单。
@@ -68,7 +68,7 @@ function themesSubmenu(): MenuItemConstructorOptions[] {
 
   // 单选组要反映"当前生效的那一个"：开了深色模式就用深色槽位的选中状态，
   // 否则用户会看到菜单勾在浅色主题上、屏幕上却是深色。
-  const 当前生效 = 生效主题(settings)
+  const 当前生效 = activeTheme(settings)
 
   const items: MenuItemConstructorOptions[] = themes.map((t) => ({
     label: t.name,
@@ -121,11 +121,11 @@ function themesSubmenu(): MenuItemConstructorOptions[] {
  * 拿到结果后重建菜单。默认 false：没探测出来之前把 Word 等置灰，
  * 比点亮了却点不动要好——后者用户会以为软件坏了。
  */
-let 有Pandoc = false
+let hasPandoc = false
 
 /** 启动时探测到结果后调用，然后重建菜单。 */
-export function 设置Pandoc可用(可用: boolean): void {
-  有Pandoc = 可用
+export function 设置Pandoc可用(available: boolean): void {
+  hasPandoc = available
 }
 
 /**
@@ -138,14 +138,14 @@ export function 设置Pandoc可用(可用: boolean): void {
  * 看到它灰着并附一句说明，才知道"装了 Pandoc 就能用"。
  */
 function 导出子菜单(): MenuItemConstructorOptions[] {
-  const item = (id: string, 可用 = true): MenuItemConstructorOptions => {
+  const item = (id: string, available = true): MenuItemConstructorOptions => {
     const 定义 = pick('File', id)
     return {
       // 带上命令 id，菜单摘要才能从注册表读出真实实现状态
       id,
       label: 定义.label,
       accelerator: 定义.accelerator,
-      enabled: 可用,
+      enabled: available,
       click: () => send(id)
     }
   }
@@ -154,11 +154,11 @@ function 导出子菜单(): MenuItemConstructorOptions[] {
     item('file.exportHtml'),
     item('file.exportPdf'),
     { type: 'separator' },
-    item('file.exportDocx', 有Pandoc),
-    item('file.exportLatex', 有Pandoc),
-    item('file.exportEpub', 有Pandoc),
-    item('file.exportRtf', 有Pandoc),
-    item('file.exportOdt', 有Pandoc),
+    item('file.exportDocx', hasPandoc),
+    item('file.exportLatex', hasPandoc),
+    item('file.exportEpub', hasPandoc),
+    item('file.exportRtf', hasPandoc),
+    item('file.exportOdt', hasPandoc),
     { type: 'separator' },
     item('file.exportHtmlPlain'),
     // 导出设置放在最后：它是"调整"而不是"执行"，
@@ -166,7 +166,7 @@ function 导出子菜单(): MenuItemConstructorOptions[] {
     item('file.exportSetting')
   ]
 
-  if (!有Pandoc) {
+  if (!hasPandoc) {
     result.push({ type: 'separator' }, { label: '安装 Pandoc 后可用 Word 等格式', enabled: false })
   }
 
@@ -529,7 +529,7 @@ function helpMenu(): MenuItemConstructorOptions {
           const win = BrowserWindow.getFocusedWindow()
           if (!win) return
           const { total, done } = roadmap()
-          const icon = 图标路径('icon-128.png')
+          const icon = iconPath('icon-128.png')
           void dialog.showMessageBox(win, {
             type: 'info',
             title: '关于 selfMD',
@@ -588,7 +588,7 @@ export function 菜单摘要(): string[] {
    * 一开始两者都写成"未实现"，于是"装了 Pandoc 就能用"的功能在验证日志里
    * 显示成没做——断言会因此失去意义。实现状态一律从注册表读，不看 enabled。
    */
-  const 展开 = (item: Electron.MenuItem, 层: number): void => {
+  const expand = (item: Electron.MenuItem, 层: number): void => {
     const label = item.label || item.role || '(无标题)'
     const key = item.accelerator ? `  [${item.accelerator}]` : ''
     const 是命令 = Boolean(item.id)
@@ -600,18 +600,18 @@ export function 菜单摘要(): string[] {
     line.push(`${' '.repeat(6 + (层 - 1) * 4)}${label}${key}${态}`)
     if (item.submenu) {
       for (const child of item.submenu.items) {
-        if (child.type !== 'separator') 展开(child, 层 + 1)
+        if (child.type !== 'separator') expand(child, 层 + 1)
       }
     }
   }
 
   for (const 顶层 of menu.items) {
-    const 子项 = 顶层.submenu?.items ?? []
-    const 非分隔 = 子项.filter((i) => i.type !== 'separator')
+    const children = 顶层.submenu?.items ?? []
+    const 非分隔 = children.filter((i) => i.type !== 'separator')
     const 已启用 = 非分隔.filter((i) => i.enabled).length
     line.push(`${顶层.label || 顶层.role || '(无标题)'}（${已启用}/${非分隔.length} 可用）`)
 
-    for (const child of 非分隔) 展开(child, 1)
+    for (const child of 非分隔) expand(child, 1)
   }
   return line
 }

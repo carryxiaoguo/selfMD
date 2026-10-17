@@ -183,9 +183,9 @@ export function registerFileIpc(): void {
    * 结果要立刻用来填列表；异步反而要处理"列表先空后满"的闪烁。
    * 上限保证了它不会长时间阻塞。
    */
-  ipcMain.handle(CH.fileWalk, (_e, root: string, options?: { 上限?: number; 深度?: number }) => {
-    const 上限 = Math.min(options?.上限 ?? 4000, 20000)
-    const 最大深度 = Math.min(options?.深度 ?? 8, 16)
+  ipcMain.handle(CH.fileWalk, (_e, root: string, options?: { limit?: number; depth?: number }) => {
+    const limit = Math.min(options?.limit ?? 4000, 20000)
+    const 最大深度 = Math.min(options?.depth ?? 8, 16)
     const 跳过 = new Set([
       'node_modules',
       '.git',
@@ -201,11 +201,11 @@ export function registerFileIpc(): void {
       'target'
     ])
 
-    const result: { filePath: string; 名字: string; 修改时间: number; 大小: number }[] = []
-    let 已截断 = false
+    const result: { filePath: string; nameText: string; 修改时间: number; 大小: number }[] = []
+    let truncated = false
 
-    const 走 = (dir: string, 深度: number): void => {
-      if (已截断 || 深度 > 最大深度) return
+    const 走 = (dir: string, depth: number): void => {
+      if (truncated || depth > 最大深度) return
       let entry
       try {
         entry = readdirSync(dir, { withFileTypes: true })
@@ -214,17 +214,17 @@ export function registerFileIpc(): void {
         return
       }
       for (const item of entry) {
-        if (已截断) return
+        if (truncated) return
         if (item.name.startsWith('.')) continue
         if (item.isDirectory() && 跳过.has(item.name)) continue
         const 全路径 = join(dir, item.name)
         if (item.isDirectory()) {
-          走(全路径, 深度 + 1)
+          走(全路径, depth + 1)
           continue
         }
         if (!item.isFile()) continue
-        if (result.length >= 上限) {
-          已截断 = true
+        if (result.length >= limit) {
+          truncated = true
           return
         }
         let info
@@ -235,7 +235,7 @@ export function registerFileIpc(): void {
         }
         result.push({
           filePath: 全路径,
-          名字: item.name,
+          nameText: item.name,
           修改时间: info.mtimeMs,
           大小: info.size
         })
@@ -243,7 +243,7 @@ export function registerFileIpc(): void {
     }
 
     走(root, 0)
-    return { file: result, 已截断 }
+    return { file: result, truncated }
   })
 
 

@@ -23,8 +23,8 @@ const 硬终止符 = /[。！？；]/
 /** 英文句点只有在"后面是空白或行尾"时才算断句，"3.14" 里的不算。 */
 function 是英文句点(lineText: string, position: number): boolean {
   if (lineText[position] !== '.') return false
-  const 后 = lineText[position + 1]
-  return 后 === undefined || /\s/.test(后)
+  const after = lineText[position + 1]
+  return after === undefined || /\s/.test(after)
 }
 
 function 是终止符(lineText: string, position: number): boolean {
@@ -82,11 +82,11 @@ export function 词区间(lineText: string, offset: number): { start: number; en
   if (光标前 !== undefined && 中日韩.test(光标前)) return { start: offset - 1, end: offset }
 
   // 拉丁词：向两侧扩展到非词字符
-  const 起点 = 光标处 !== undefined && 拉丁词字符.test(光标处) ? offset : offset - 1
-  if (起点 < 0 || 起点 >= lineText.length || !拉丁词字符.test(lineText[起点])) return null
+  const fromPos = 光标处 !== undefined && 拉丁词字符.test(光标处) ? offset : offset - 1
+  if (fromPos < 0 || fromPos >= lineText.length || !拉丁词字符.test(lineText[fromPos])) return null
 
-  let start = 起点
-  let end = 起点 + 1
+  let start = fromPos
+  let end = fromPos + 1
   while (start > 0 && 拉丁词字符.test(lineText[start - 1])) start -= 1
   while (end < lineText.length && 拉丁词字符.test(lineText[end])) end += 1
   return { start, end }
@@ -149,10 +149,10 @@ export function 选中当前词(view: EditorView): boolean {
 export function 选中当前块(view: EditorView): boolean {
   const state = view.state
   const position = state.selection.main.head
-  const 树 = syntaxTree(state)
+  const tree = syntaxTree(state)
 
   // 向上找到 Document 的直接子节点，那就是一个"块"。
-  let node = 树.resolveInner(position, -1)
+  let node = tree.resolveInner(position, -1)
   while (node.parent && node.parent.name !== 'Document') node = node.parent
   if (node.name === 'Document') return false
 

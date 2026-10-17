@@ -2,7 +2,7 @@ import { BrowserWindow, session, shell } from 'electron'
 import { join } from 'node:path'
 import { EV } from '@shared/ipc'
 import type { Settings } from '@shared/types'
-import { 图标路径 } from './util/资源路径'
+import { iconPath } from './util/资源路径'
 import { rebuildMenu } from './menu'
 import { getSettings } from './services/settings'
 
@@ -33,10 +33,10 @@ export function 应用拼写词典(settings: Settings): void {
       会话.setSpellCheckerLanguages([])
       return
     }
-    const 可用 = new Set(会话.availableSpellCheckerLanguages)
-    const request = settings.spellCheckLanguages.filter((语) => 可用.has(语))
+    const available = new Set(会话.availableSpellCheckerLanguages)
+    const request = settings.spellCheckLanguages.filter((语) => available.has(语))
     // 一个都不匹配时回退到英语：有检查总比静默失效好，而且这是最常见的用法。
-    const 最终 = request.length > 0 ? request : ['en-US'].filter((语) => 可用.has(语))
+    const 最终 = request.length > 0 ? request : ['en-US'].filter((语) => available.has(语))
     if (最终.length > 0) 会话.setSpellCheckerLanguages(最终)
   } catch (error) {
     // 拿不到会话时静默跳过：拼写检查是锦上添花，不该影响启动。
@@ -95,7 +95,7 @@ export function createWindow(options: WindowOptions = {}): BrowserWindow {
     title: 'selfMD',
     // Windows 下窗口图标不会自动继承 exe 图标，必须显式给。
     // 用 256×256：Windows 会自己缩到标题栏与任务栏需要的尺寸。
-    ...(图标路径('icon-256.png') ? { icon: 图标路径('icon-256.png') } : {}),
+    ...(iconPath('icon-256.png') ? { icon: iconPath('icon-256.png') } : {}),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,

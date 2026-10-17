@@ -5,10 +5,10 @@ import { CH, type ClipboardContent, type ImageDownloadResult } from '@shared/ipc
 import { 上传图片, 上传器可用 } from '../services/uploader'
 import {
   去扩展名,
-  取文件名,
+  takeFileName,
   唯一文件名,
   扩展名由类型,
-  归一化路径,
+  normalizePath,
   是图片文件,
   类型由扩展名
 } from '@shared/image-path'
@@ -70,9 +70,9 @@ function 读剪贴板(): ClipboardContent {
 // ---------------------------------------------------------------------------
 
 /** 在目录内挑一个不冲突的名字。 */
-function 安排路径(dir: string, 期望名: string): string {
+function 安排路径(dir: string, expectedName: string): string {
   mkdirSync(dir, { recursive: true })
-  const 最终名 = 唯一文件名(期望名, (candidate) => existsSync(join(dir, candidate)))
+  const 最终名 = 唯一文件名(expectedName, (candidate) => existsSync(join(dir, candidate)))
   return join(dir, 最终名)
 }
 
@@ -99,7 +99,7 @@ export function registerImageIpc(): void {
       try {
         const filePath = 安排路径(dir, displayName)
         writeFileSync(filePath, Buffer.from(data, 'base64'))
-        return { filePath: 归一化路径(filePath) }
+        return { filePath: normalizePath(filePath) }
       } catch (error) {
         console.error('[图片] 写入失败：', error)
         return null
@@ -112,12 +112,12 @@ export function registerImageIpc(): void {
     (_e, origin: string, dir: string, displayName?: string): { filePath: string } | null => {
       try {
         if (!existsSync(origin)) return null
-        const 期望名 = displayName && displayName.length > 0 ? displayName : 取文件名(origin)
-        const filePath = 安排路径(dir, 期望名)
+        const expectedName = displayName && displayName.length > 0 ? displayName : takeFileName(origin)
+        const filePath = 安排路径(dir, expectedName)
         // 源与目标相同时不复制，直接返回——否则会自己覆盖自己。
-        if (归一化路径(origin) === 归一化路径(filePath)) return { filePath: 归一化路径(filePath) }
+        if (normalizePath(origin) === normalizePath(filePath)) return { filePath: normalizePath(filePath) }
         copyFileSync(origin, filePath)
-        return { filePath: 归一化路径(filePath) }
+        return { filePath: normalizePath(filePath) }
       } catch (error) {
         console.error('[图片] 复制失败：', error)
         return null
@@ -147,22 +147,22 @@ export function registerImageIpc(): void {
       try {
         // 用 Electron 的 net.fetch 而不是 Node 的 fetch：它会走 Chromium 的
         // 网络栈，自动继承系统代理与证书设置，与用户在浏览器里的体验一致。
-        const 响应 = await net.fetch(url, { redirect: 'follow' })
-        if (!响应.ok) return failure(`服务端返回 ${响应.status}`)
+        const response = await net.fetch(url, { redirect: 'follow' })
+        if (!response.ok) return failure(`服务端返回 ${response.status}`)
 
-        const 声明长度 = Number(响应.headers.get('content-length') ?? '0')
+        const 声明长度 = Number(response.headers.get('content-length') ?? '0')
         if (声明长度 > 下载上限字节) {
           return failure(`图片过大（${Math.round(声明长度 / 1024 / 1024)} MB）`)
         }
 
-        const kind = 响应.headers.get('content-type')
-        const 缓冲 = Buffer.from(await 响应.arrayBuffer())
+        const kind = response.headers.get('content-type')
+        const 缓冲 = Buffer.from(await response.arrayBuffer())
         if (缓冲.length === 0) return failure('下载内容为空')
         if (缓冲.length > 下载上限字节) return failure('图片过大')
 
         const filePath = 安排路径(dir, 校正扩展名(displayName, kind))
         writeFileSync(filePath, 缓冲)
-        return { success: true, filePath: 归一化路径(filePath), kind, error: null }      } catch (error) {
+        return { success: true, filePath: normalizePath(filePath), kind, error: null }      } catch (error) {
         return failure(error instanceof Error ? error.message : String(error))
       }
     }

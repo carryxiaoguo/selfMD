@@ -19,21 +19,21 @@
  */
 
 /** 匹配上时返回分数（越大越好），匹配不上返回 null。 */
-export function 模糊评分(查询: string, docText: string): number | null {
-  if (查询.length === 0) return 0
-  if (查询.length > docText.length) return null
+export function 模糊评分(query: string, docText: string): number | null {
+  if (query.length === 0) return 0
+  if (query.length > docText.length) return null
 
-  const 低查询 = 查询.toLowerCase()
+  const 低查询 = query.toLowerCase()
   const 低文本 = docText.toLowerCase()
 
   // 完全包含时给一个很高的底分：这是最强的信号，不该被字符级评分超过
   const 直接位置 = 低文本.indexOf(低查询)
   if (直接位置 >= 0) {
-    return 1000 + 连续奖励(docText, 直接位置, 查询.length) - 直接位置
+    return 1000 + 连续奖励(docText, 直接位置, query.length) - 直接位置
   }
 
   // 退化到子序列匹配
-  let 分 = 0
+  let score = 0
   let 文本位置 = 0
   let 上次匹配 = -1
 
@@ -41,17 +41,17 @@ export function 模糊评分(查询: string, docText: string): number | null {
     const 找到 = 低文本.indexOf(ch, 文本位置)
     if (找到 < 0) return null
 
-    if (找到 === 上次匹配 + 1) 分 += 8 // 连续
-    if (是词首(docText, 找到)) 分 += 6
-    分 -= Math.min(找到 - 文本位置, 4) // 跳过的字符越多扣得越多，但有上限
+    if (找到 === 上次匹配 + 1) score += 8 // 连续
+    if (是词首(docText, 找到)) score += 6
+    score -= Math.min(找到 - 文本位置, 4) // 跳过的字符越多扣得越多，但有上限
 
     上次匹配 = 找到
     文本位置 = 找到 + 1
   }
 
   // 匹配跨度越短越好
-  分 -= Math.floor((上次匹配 - (文本位置 - 查询.length)) / 4)
-  return 分
+  score -= Math.floor((上次匹配 - (文本位置 - query.length)) / 4)
+  return score
 }
 
 /** 该位置是不是一个词的开始（串首、分隔符之后、或小写转大写处）。 */
@@ -65,9 +65,9 @@ function 是词首(docText: string, position: number): boolean {
 
 /** 连续匹配的奖励：连着命中越多，加分越高。 */
 function 连续奖励(docText: string, position: number, length: number): number {
-  let 分 = length * 2
-  if (是词首(docText, position)) 分 += 10
-  return 分
+  let score = length * 2
+  if (是词首(docText, position)) score += 10
+  return score
 }
 
 export interface candidate<T> {
@@ -83,17 +83,17 @@ export interface candidate<T> {
  *              末段命中要额外加分——用户记的是文件名，不是目录。
  */
 export function 模糊筛选<T>(
-  查询: string,
+  query: string,
   候选们: candidate<T>[],
   取末段: (docText: string) => string,
-  上限 = 50
+  limit = 50
 ): T[] {
-  if (查询.trim().length === 0) {
-    return 候选们.slice(0, 上限).map((c) => c.entry)
+  if (query.trim().length === 0) {
+    return 候选们.slice(0, limit).map((c) => c.entry)
   }
 
-  const 查询段 = 查询.trim()
-  const hit: { entry: T; 分: number }[] = []
+  const 查询段 = query.trim()
+  const hit: { entry: T; score: number }[] = []
 
   for (const candidate of 候选们) {
     const 整体分 = 模糊评分(查询段, candidate.docText)
@@ -103,16 +103,16 @@ export function 模糊筛选<T>(
     if (整体分 === null && 段分 === null) continue
 
     // 末段命中权重更高：同样匹配上，文件名对得上的一定更接近用户意图
-    const 分 = (段分 ?? 0) * 3 + (整体分 ?? 0)
-    hit.push({ entry: candidate.entry, 分 })
+    const score = (段分 ?? 0) * 3 + (整体分 ?? 0)
+    hit.push({ entry: candidate.entry, score })
   }
 
-  hit.sort((alpha, beta) => beta.分 - alpha.分)
-  return hit.slice(0, 上限).map((h) => h.entry)
+  hit.sort((alpha, beta) => beta.score - alpha.score)
+  return hit.slice(0, limit).map((h) => h.entry)
 }
 
 /** 从路径里取文件名。 */
-export function 路径末段(filePath: string): string {
+export function pathTail(filePath: string): string {
   const segment = filePath.split(/[\\/]/)
   return segment[segment.length - 1] || filePath
 }

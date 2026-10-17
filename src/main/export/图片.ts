@@ -42,7 +42,7 @@ export interface 图片结果 {
   width: number
   height: number
   /** 是否因为超过高度上限而被截断。 */
-  已截断: boolean
+  truncated: boolean
   error: string | null
 }
 
@@ -55,7 +55,7 @@ export async function 复制为图片(
     success: false,
     width: 0,
     height: 0,
-    已截断: false,
+    truncated: false,
     error
   })
 
@@ -66,8 +66,8 @@ export async function 复制为图片(
     html = await 构建导出HTML({
       ...options,
       format: 'html',
-      附大纲: false,
-      内嵌图片: true
+      withOutline: false,
+      embeddedImage: true
     })
   } catch (error) {
     return failure(`渲染失败：${error instanceof Error ? error.message : String(error)}`)
@@ -131,7 +131,7 @@ export async function 复制为图片(
       success: true,
       width: size.width,
       height: size.height,
-      已截断: 内容高 > 最大高度,
+      truncated: 内容高 > 最大高度,
       error: null
     }
   } catch (error) {

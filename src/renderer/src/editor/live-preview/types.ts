@@ -43,14 +43,14 @@ export interface 构建上下文 {
 }
 
 /** 把一条行装饰加入收集器；同一位置只保留第一条。 */
-export function 加行装饰(
+export function addLineDeco(
   context: 构建上下文,
   lineStart: number,
-  装饰: Decoration
+  deco: Decoration
 ): void {
   if (context.行装饰已用.has(lineStart)) return
   context.行装饰已用.add(lineStart)
-  context.entry.push({ from: lineStart, to: lineStart, deco: 装饰, rank: -1 })
+  context.entry.push({ from: lineStart, to: lineStart, deco: deco, rank: -1 })
 }
 
 // ---------------------------------------------------------------------------

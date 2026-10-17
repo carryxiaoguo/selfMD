@@ -2,8 +2,8 @@ import { EditorSelection, type EditorState } from '@codemirror/state'
 import type { EditorView } from '@codemirror/view'
 import { isolateHistory } from '@codemirror/commands'
 import type { Settings } from '@shared/types'
-import { 读取前置元数据 } from '@shared/front-matter'
-import { 取文件名, 时间戳图片名, 是图片文件 } from '@shared/image-path'
+import { readFrontMatter } from '@shared/front-matter'
+import { takeFileName, 时间戳图片名, 是图片文件 } from '@shared/image-path'
 import { 解析目标目录 } from './resolve-target'
 import { 生成图片语法, 生成引用地址, 生成替代文本, type 图片语法 } from './reference'
 
@@ -30,7 +30,7 @@ export interface 插入结果 {
   error: string | null
 }
 
-export interface 插入请求 {
+export interface InsertRequest {
   view: EditorView
   /** 当前文档的绝对路径；未保存为 null。 */
   docPath: string | null
@@ -45,9 +45,9 @@ export interface 插入请求 {
 
 /** 取路径的父目录（保留盘符形态）。 */
 function 去掉末段(filePath: string): string {
-  const 归一 = filePath.replace(/\\/g, '/')
-  const position = 归一.lastIndexOf('/')
-  return position <= 0 ? 归一 : 归一.slice(0, position)
+  const normalize = filePath.replace(/\\/g, '/')
+  const position = normalize.lastIndexOf('/')
+  return position <= 0 ? normalize : normalize.slice(0, position)
 }
 
 function docDir(docPath: string | null): string | null {
@@ -55,14 +55,14 @@ function docDir(docPath: string | null): string | null {
 }
 
 /** 由当前上下文构造解析输入。 */
-function 构造输入(request: 插入请求): Parameters<typeof 解析目标目录>[0] {
-  const 元数据 = 读取前置元数据(request.文档文本)
+function 构造输入(request: InsertRequest): Parameters<typeof 解析目标目录>[0] {
+  const meta = readFrontMatter(request.文档文本)
   return {
     docDir: docDir(request.docPath),
-    文档名: request.docPath ? 取文件名(request.docPath) : null,
+    docName: request.docPath ? takeFileName(request.docPath) : null,
     是文本包: /\.(textbundle|textpack)$/i.test(request.docPath ?? ''),
-    文档级设置: 元数据.attr['image-folder'] ?? null,
-    全局策略: request.settings.imageStoragePolicy,
+    docSettings: meta.attr['image-folder'] ?? null,
+    globalPolicy: request.settings.imageStoragePolicy,
     自定义目录: request.settings.customImageSaveLocation,
     允许自动上传: request.settings.allowImageUpload
   }
@@ -73,11 +73,11 @@ function 语法(settings: Settings): 图片语法 {
 }
 
 /** 由图片绝对路径生成要写进文档的引用文本。 */
-function 引用文本(图片路径: string, request: 插入请求): string {
+function 引用文本(图片路径: string, request: InsertRequest): string {
   const url = 生成引用地址(图片路径, docDir(request.docPath), {
-    用相对路径: request.settings.useRelativePathForImg,
-    加点前缀: request.settings.relativePathWithDot,
-    转义地址: request.settings.autoEscapeImageURL
+    useRelativePath: request.settings.useRelativePathForImg,
+    addDotPrefix: request.settings.relativePathWithDot,
+    escapeUrl: request.settings.autoEscapeImageURL
   })
   return 生成图片语法(url, 生成替代文本(图片路径), 语法(request.settings))
 }
@@ -133,11 +133,11 @@ function 写入引用(view: EditorView, quote: string): void {
 function 避开前置元数据(state: EditorState, position: number): number {
   if (position === 0) {
     // 快速路径：文首必然在块内，无需解析全文。
-    const 元数据 = 读取前置元数据(state.doc.toString())
-    return 元数据.exists ? 元数据.结束偏移 : 0
+    const meta = readFrontMatter(state.doc.toString())
+    return meta.exists ? meta.结束偏移 : 0
   }
-  const 元数据 = 读取前置元数据(state.doc.toString())
-  if (元数据.exists && position < 元数据.结束偏移) return 元数据.结束偏移
+  const meta = readFrontMatter(state.doc.toString())
+  if (meta.exists && position < meta.结束偏移) return meta.结束偏移
   return position
 }
 
@@ -166,7 +166,7 @@ function 失败说明(kind: '需要保存' | '上传'): string {
  * **优先按"文件"处理。** Windows 上从资源管理器复制图片时，剪贴板同时提供
  * 原图路径与一张可能是压缩预览的位图；先取位图会让用户粘进来一张糊图。
  */
-export async function 从剪贴板插入(request: 插入请求): Promise<插入结果> {
+export async function 从剪贴板插入(request: InsertRequest): Promise<插入结果> {
   const content = await window.selfmd.image.readClipboard()
 
   if (content.kind === '无') return { okCount: 0, error: '剪贴板里没有图片。' }
@@ -188,7 +188,7 @@ export async function 从剪贴板插入(request: 插入请求): Promise<插入�
 }
 
 /** 从本地文件插入（对话框选图、拖放、从资源管理器复制）。 */
-export async function 从文件插入(request: 插入请求, paths: string[]): Promise<插入结果> {
+export async function 从文件插入(request: InsertRequest, paths: string[]): Promise<插入结果> {
   const 图片们 = paths.filter(是图片文件)
   if (图片们.length === 0) return { okCount: 0, error: '没有可插入的图片文件。' }
 
@@ -206,9 +206,9 @@ export async function 从文件插入(request: 插入请求, paths: string[]): P
       引用们.push(引用文本(origin, request))
       continue
     }
-    const 写回 = await window.selfmd.image.import(origin, target.filePath, 取文件名(origin))
+    const 写回 = await window.selfmd.image.import(origin, target.filePath, takeFileName(origin))
     if (写回) 引用们.push(引用文本(写回.filePath, request))
-    else if (!error) error = `复制失败：${取文件名(origin)}`
+    else if (!error) error = `复制失败：${takeFileName(origin)}`
   }
 
   if (引用们.length === 0) return { okCount: 0, error }
@@ -224,7 +224,7 @@ export async function 从文件插入(request: 插入请求, paths: string[]): P
  * 正常流程，而落盘需要先知道目录。"不动"策略在这里退回用户数据目录下的
  * 图片仓库——位图没有原路径可留，见 `取默认图片目录` 的说明。
  */
-export async function 本次目标目录(request: 插入请求): Promise<string | null> {
+export async function 本次目标目录(request: InsertRequest): Promise<string | null> {
   const target = 解析目标目录(构造输入(request))
   if (target.kind === '目录') return target.filePath
   if (target.kind === '不动') return 取默认图片目录()
@@ -237,7 +237,7 @@ export async function 本次目标目录(request: 插入请求): Promise<string 
  * 与本地文件的差别只有一处：需要先把图下下来。若解析结果是"不动"，
  * 就直接把原始 URL 写进文档——那正是"不做特殊处理"的含义。
  */
-export async function 从地址插入(request: 插入请求, url: string): Promise<插入结果> {
+export async function 从地址插入(request: InsertRequest, url: string): Promise<插入结果> {
   const 清理后 = url.trim()
   if (!/^https?:\/\//i.test(清理后)) {
     return { okCount: 0, error: '请输入以 http:// 或 https:// 开头的图片地址。' }
@@ -254,7 +254,7 @@ export async function 从地址插入(request: 插入请求, url: string): Promi
     return { okCount: 0, error: 失败说明(target.kind) }
   }
 
-  const 下载 = await window.selfmd.image.download(清理后, target.filePath, 取文件名(清理后) || '图片')
+  const 下载 = await window.selfmd.image.download(清理后, target.filePath, takeFileName(清理后) || '图片')
   if (!下载.success || !下载.filePath) {
     return { okCount: 0, error: 下载.error ?? '下载失败。' }
   }

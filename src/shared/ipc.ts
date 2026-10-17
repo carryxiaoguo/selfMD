@@ -447,9 +447,9 @@ export interface SelfMdApi {
       docPath: string | null
       默认文件名: string
       /** 导出结果里是否附带侧边目录。省略时用主进程的默认值。 */
-      附大纲?: boolean
+      withOutline?: boolean
       /** 是否把本地图片内嵌成 base64。省略时用主进程的默认值。 */
-      内嵌图片?: boolean
+      embeddedImage?: boolean
     }): Promise<{ filePath: string | null; error: string | null }>
   }
   print(): Promise<{ success: boolean; error: string | null }>
@@ -487,7 +487,7 @@ export interface SelfMdApi {
     width: number
     height: number
     /** 内容超过高度上限时为 true——图被截断了，必须如实告诉用户。 */
-    已截断: boolean
+    truncated: boolean
     error: string | null
   }>
   draft: {
@@ -564,10 +564,10 @@ export interface SelfMdApi {
      */
     upload(paths: string[]): Promise<{
       success: { rawPath: string; url: string }[]
-      failure: { rawPath: string; 原因: string }[]
+      failure: { rawPath: string; reason: string }[]
     }>
     /** 当前上传器是否配置完整。 */
-    uploaderStatus(): Promise<{ 可用: boolean; 原因: string | null }>
+    uploaderStatus(): Promise<{ available: boolean; reason: string | null }>
   }
 }
 
@@ -600,10 +600,10 @@ export interface SelfMdExtraApi {
      */
     walk(
       root: string,
-      options?: { 上限?: number; 深度?: number }
+      options?: { limit?: number; depth?: number }
     ): Promise<{
-      file: { filePath: string; 名字: string; 修改时间: number; 大小: number }[]
-      已截断: boolean
+      file: { filePath: string; nameText: string; 修改时间: number; 大小: number }[]
+      truncated: boolean
     }>
   }
   task: {

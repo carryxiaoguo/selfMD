@@ -30,24 +30,24 @@ const 空结果: frontMatter = { exists: false, attr: {}, 结束偏移: 0 }
  * 只认**文档第一行**就是 `---` 的形态，与 Markdown 解析器的行为一致——
  * 文档中间出现的 `---` 是水平分割线，不是元数据围栏。
  */
-export function 读取前置元数据(docText: string): frontMatter {
+export function readFrontMatter(docText: string): frontMatter {
   if (!docText.startsWith('---')) return 空结果
 
   const lineList = docText.split('\n')
   if (lineList[0].trim() !== '---') return 空结果
 
-  let 结束行 = -1
+  let endLine = -1
   for (let i = 1; i < lineList.length; i++) {
     const line = lineList[i].trim()
     if (line === '---' || line === '...') {
-      结束行 = i
+      endLine = i
       break
     }
   }
-  if (结束行 < 0) return 空结果
+  if (endLine < 0) return 空结果
 
   const attr: Record<string, string> = {}
-  for (let i = 1; i < 结束行; i++) {
+  for (let i = 1; i < endLine; i++) {
     const line = lineList[i]
     // 跳过缩进行（嵌套结构）与注释
     if (/^\s/.test(line) || /^\s*#/.test(line)) continue
@@ -59,7 +59,7 @@ export function 读取前置元数据(docText: string): frontMatter {
 
   // 结束偏移 = 结束行之后那个换行的位置
   let offset = 0
-  for (let i = 0; i <= 结束行; i++) offset += lineList[i].length + 1
+  for (let i = 0; i <= endLine; i++) offset += lineList[i].length + 1
   offset = Math.min(offset, docText.length)
 
   return { exists: true, attr, 结束偏移: offset }
@@ -81,34 +81,34 @@ function 序列化值(value: string): string {
  * 时该发生的事，而不是弹一句"请先手动添加 YAML 头"。
  */
 export function 写入属性(docText: string, key: string, value: string): string {
-  const 元数据 = 读取前置元数据(docText)
-  const 新行 = `${key}: ${序列化值(value)}`
+  const meta = readFrontMatter(docText)
+  const newLine = `${key}: ${序列化值(value)}`
 
-  if (!元数据.exists) {
-    return `---\n${新行}\n---\n\n${docText}`
+  if (!meta.exists) {
+    return `---\n${newLine}\n---\n\n${docText}`
   }
 
   const lineList = docText.split('\n')
-  let 结束行 = -1
+  let endLine = -1
   for (let i = 1; i < lineList.length; i++) {
     const line = lineList[i].trim()
     if (line === '---' || line === '...') {
-      结束行 = i
+      endLine = i
       break
     }
   }
-  if (结束行 < 0) return docText
+  if (endLine < 0) return docText
 
   const 目标行 = `^${key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*:`
   let 已更新 = false
-  for (let i = 1; i < 结束行; i++) {
+  for (let i = 1; i < endLine; i++) {
     if (new RegExp(目标行).test(lineList[i])) {
-      lineList[i] = 新行
+      lineList[i] = newLine
       已更新 = true
       break
     }
   }
-  if (!已更新) lineList.splice(结束行, 0, 新行)
+  if (!已更新) lineList.splice(endLine, 0, newLine)
 
   return lineList.join('\n')
 }
@@ -120,30 +120,30 @@ export function 写入属性(docText: string, key: string, value: string): strin
  * `---\n---` 在文档开头既难看，又会被 Markdown 解析器当成 Setext 标题的下划线。
  */
 export function 移除属性(docText: string, key: string): string {
-  const 元数据 = 读取前置元数据(docText)
-  if (!元数据.exists) return docText
+  const meta = readFrontMatter(docText)
+  if (!meta.exists) return docText
 
   const lineList = docText.split('\n')
-  let 结束行 = -1
+  let endLine = -1
   for (let i = 1; i < lineList.length; i++) {
     const line = lineList[i].trim()
     if (line === '---' || line === '...') {
-      结束行 = i
+      endLine = i
       break
     }
   }
-  if (结束行 < 0) return docText
+  if (endLine < 0) return docText
 
   const 目标行 = new RegExp(`^${key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*:`)
-  const 剩余 = lineList.slice(1, 结束行).filter((line) => !目标行.test(line))
+  const 剩余 = lineList.slice(1, endLine).filter((line) => !目标行.test(line))
 
   if (剩余.length === 0) {
     // 整个元数据块都没用了，连同其后可能存在的空行一起去掉。
-    let 起点 = 结束行 + 1
-    while (起点 < lineList.length && lineList[起点].trim() === '') 起点 += 1
-    return lineList.slice(起点).join('\n')
+    let fromPos = endLine + 1
+    while (fromPos < lineList.length && lineList[fromPos].trim() === '') fromPos += 1
+    return lineList.slice(fromPos).join('\n')
   }
 
-  lineList.splice(1, 结束行 - 1, ...剩余)
+  lineList.splice(1, endLine - 1, ...剩余)
   return lineList.join('\n')
 }

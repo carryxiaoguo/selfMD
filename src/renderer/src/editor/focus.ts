@@ -93,11 +93,11 @@ const 专注插件 = ViewPlugin.fromClass(
     constructor(查看: EditorView) {
       this.decorations = 计算专注(查看.state)
     }
-    update(更新: ViewUpdate): void {
+    update(update: ViewUpdate): void {
       // 文档、选区、视口任一变化都要重算：视口变化时新进入视野的行
       // 也需要带上（或去掉）`md-focus`，否则滚动后高亮会停在旧位置。
-      if (更新.docChanged || 更新.selectionSet || 更新.viewportChanged) {
-        this.decorations = 计算专注(更新.state)
+      if (update.docChanged || update.selectionSet || update.viewportChanged) {
+        this.decorations = 计算专注(update.state)
       }
     }
   },

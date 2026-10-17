@@ -1,7 +1,7 @@
 import type { EditorState } from '@codemirror/state'
 import { 取文档目录, 解析图片地址 } from '../../image/显示地址'
-import { 块级行样式, 隐藏, 行内样式, 替换为 } from './decorations'
-import { 加行装饰 } from './types'
+import { blockLineStyles, hidden, 行内样式, replaceWith } from './decorations'
+import { addLineDeco } from './types'
 import { image } from './widgets'
 import type { 构建上下文, SyntaxNode } from './types'
 
@@ -43,11 +43,11 @@ export function 处理行内(
   context: 构建上下文
 ): boolean {
   const lineNo = state.doc.lineAt(node.from).number
-  const 在活动行 = context.活动行.has(lineNo)
+  const onActiveLine = context.活动行.has(lineNo)
 
   if (是否行内标记(node)) {
-    if (!在活动行) {
-      context.entry.push({ from: node.from, to: node.to, deco: 隐藏, rank: 1 })
+    if (!onActiveLine) {
+      context.entry.push({ from: node.from, to: node.to, deco: hidden, rank: 1 })
     }
     return true
   }
@@ -82,8 +82,8 @@ export function 处理行内(
       // 行内链接的目标地址：非活动行折叠，只留链接文字。
       // 但要避开引用定义的 URL——那里是内容本身，不能藏。
       const 父名 = node.parent?.name
-      if (父名 === 'Link' && !在活动行) {
-        context.entry.push({ from: node.from, to: node.to, deco: 隐藏, rank: 1 })
+      if (父名 === 'Link' && !onActiveLine) {
+        context.entry.push({ from: node.from, to: node.to, deco: hidden, rank: 1 })
       } else if (父名 === 'LinkReference') {
         context.entry.push({ from: node.from, to: node.to, deco: 行内样式.链接地址, rank: 0 })
       }
@@ -91,8 +91,8 @@ export function 处理行内(
     }
 
     case 'LinkTitle': {
-      if (node.parent?.name === 'Link' && !在活动行) {
-        context.entry.push({ from: node.from, to: node.to, deco: 隐藏, rank: 1 })
+      if (node.parent?.name === 'Link' && !onActiveLine) {
+        context.entry.push({ from: node.from, to: node.to, deco: hidden, rank: 1 })
       }
       return true
     }
@@ -113,8 +113,8 @@ export function 处理行内(
       const 光标在里面 = cursor.from >= node.from && cursor.to <= node.to
       if (光标在里面) return true
 
-      const { url, 替代 } = 取图片信息(node, state)
-      const 显示 = 解析图片地址(url)
+      const { url, substitute } = 取图片信息(node, state)
+      const show = 解析图片地址(url)
 
       // 图片独占一行时加个行装饰：CSS 据此把它居中并按块显示，
       // 而夹在句子中间的图片仍按行内处理。
@@ -123,14 +123,14 @@ export function 处理行内(
         const paragraph = state.sliceDoc(parent.from, parent.to).trim()
         const 自身 = state.sliceDoc(node.from, node.to).trim()
         if (paragraph === 自身) {
-          加行装饰(context, state.doc.lineAt(node.from).from, 块级行样式.图片行)
+          addLineDeco(context, state.doc.lineAt(node.from).from, blockLineStyles.图片行)
         }
       }
 
       context.entry.push({
         from: node.from,
         to: node.to,
-        deco: 替换为(new image(显示, url, 替代, 本地绝对路径(url))),
+        deco: replaceWith(new image(show, url, substitute, 本地绝对路径(url))),
         rank: 1
       })
       return true
@@ -149,15 +149,15 @@ export function 处理行内(
  * `LinkMark(![)`、`LinkMark(])`、`LinkMark(()`、`URL`、`LinkMark())`——
  * "甲"根本不在其中。
  */
-function 取图片信息(node: SyntaxNode, state: EditorState): { url: string; 替代: string } {
+function 取图片信息(node: SyntaxNode, state: EditorState): { url: string; substitute: string } {
   let url = ''
-  let 替代 = ''
+  let substitute = ''
   let 收集替代 = false
-  let 游标 = node.from
+  let cursor = node.from
 
   for (let child = node.firstChild; child; child = child.nextSibling) {
-    const 间隙 = state.sliceDoc(游标, child.from)
-    if (收集替代 && 间隙) 替代 += 间隙
+    const 间隙 = state.sliceDoc(cursor, child.from)
+    if (收集替代 && 间隙) substitute += 间隙
 
     const txt = state.sliceDoc(child.from, child.to)
     if (child.name === 'LinkMark') {
@@ -169,13 +169,13 @@ function 取图片信息(node: SyntaxNode, state: EditorState): { url: string; �
     } else if (child.name === 'LinkTitle') {
       // 标题属于目标而不属于替代文字，跳过
     } else if (收集替代) {
-      替代 += txt
+      substitute += txt
     }
 
-    游标 = child.to
+    cursor = child.to
   }
 
-  return { url, 替代: 替代.trim() }
+  return { url, substitute: substitute.trim() }
 }
 
 /** 本地图片在磁盘上的绝对路径；远程或无法解析时为 null。 */

@@ -1,4 +1,4 @@
-import { 去扩展名, 取文件名, 是绝对路径, 归一化路径 } from '@shared/image-path'
+import { 去扩展名, takeFileName, 是绝对路径, normalizePath } from '@shared/image-path'
 
 /**
  * 图片引用文本生成。
@@ -12,11 +12,11 @@ import { 去扩展名, 取文件名, 是绝对路径, 归一化路径 } from '@s
 
 export interface 引用选项 {
   /** 尽量用相对文档目录的路径。 */
-  用相对路径: boolean
+  useRelativePath: boolean
   /** 相对路径是否加 `./` 前缀（`relativePathWithDot`）。 */
-  加点前缀: boolean
+  addDotPrefix: boolean
   /** 是否把空格等字符转义成百分号编码（`autoEscapeImageURL`）。 */
-  转义地址: boolean
+  escapeUrl: boolean
 }
 
 /**
@@ -26,15 +26,15 @@ export interface 引用选项 {
  * 此时原样返回目标路径——回退成绝对路径永远比给出一个错误相对路径好。
  */
 export function 相对路径(从: string, 到: string): string {
-  const alpha = 归一化路径(从).split('/').filter(Boolean)
-  const beta = 归一化路径(到).split('/').filter(Boolean)
-  if (alpha.length === 0 || beta.length === 0) return 归一化路径(到)
-  if (alpha[0].toLowerCase() !== beta[0].toLowerCase()) return 归一化路径(到)
+  const alpha = normalizePath(从).split('/').filter(Boolean)
+  const beta = normalizePath(到).split('/').filter(Boolean)
+  if (alpha.length === 0 || beta.length === 0) return normalizePath(到)
+  if (alpha[0].toLowerCase() !== beta[0].toLowerCase()) return normalizePath(到)
 
   let 共同 = 0
   while (共同 < alpha.length && 共同 < beta.length && alpha[共同] === beta[共同]) 共同 += 1
   // 只有一个根段相同时（例如 C: 对 C:），相对关系不成立。
-  if (共同 === 0) return 归一化路径(到)
+  if (共同 === 0) return normalizePath(到)
 
   const 上行 = new Array(Math.max(0, alpha.length - 共同)).fill('..')
   const 下行 = beta.slice(共同)
@@ -92,24 +92,24 @@ export function 生成引用地址(
   docDir: string | null,
   options: 引用选项
 ): string {
-  const image = 归一化路径(图片绝对路径)
+  const image = normalizePath(图片绝对路径)
 
   let result = image
-  if (options.用相对路径 && docDir && 是绝对路径(image)) {
-    const 相对 = 相对路径(docDir, image)
+  if (options.useRelativePath && docDir && 是绝对路径(image)) {
+    const relativePath = 相对路径(docDir, image)
     // 相对路径算不出上行、又不是平级文件时（例如跨盘），回退到绝对路径。
-    if (是绝对路径(相对) === false) {
-      result = 相对
-      if (options.加点前缀 && !result.startsWith('.')) result = `./${result}`
+    if (是绝对路径(relativePath) === false) {
+      result = relativePath
+      if (options.addDotPrefix && !result.startsWith('.')) result = `./${result}`
     }
   }
 
-  return options.转义地址 ? 转义图片地址(result) : result
+  return options.escapeUrl ? 转义图片地址(result) : result
 }
 
 /** 由图片路径推断 alt 文本：取文件名去掉扩展名。 */
 export function 生成替代文本(图片路径: string): string {
-  return 去扩展名(取文件名(图片路径))
+  return 去扩展名(takeFileName(图片路径))
 }
 
 export type 图片语法 = 'markdown' | 'html'

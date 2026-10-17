@@ -67,7 +67,7 @@ const 标题正则 = /^(#{1,6})(\s+)/
  * @param 级别 1..6；传 0 表示取消标题（变回普通段落）。
  *             对已经是该级别的行再执行一次，同样取消——这就是"切换"。
  */
-export function 设置标题级别(view: EditorView, 级别: number): boolean {
+export function 设置标题级别(view: EditorView, level: number): boolean {
   const state = view.state
   const { head, tail } = 涉及行(state)
 
@@ -75,12 +75,12 @@ export function 设置标题级别(view: EditorView, 级别: number): boolean {
   let 全是目标 = true
   for (let no = head; no <= tail; no++) {
     const match = 标题正则.exec(state.doc.line(no).text)
-    if (!match || match[1].length !== 级别) {
+    if (!match || match[1].length !== level) {
       全是目标 = false
       break
     }
   }
-  const target = 全是目标 ? 0 : 级别
+  const target = 全是目标 ? 0 : level
 
   const changes = 整行变更(state, (docText) => {
     const 去标题 = docText.replace(标题正则, '')
@@ -92,12 +92,12 @@ export function 设置标题级别(view: EditorView, 级别: number): boolean {
 }
 
 /** 提升/降低标题级别；普通段落执行"提升"会变成一级标题。 */
-export function 调整标题级别(view: EditorView, 方向: 1 | -1): boolean {
+export function 调整标题级别(view: EditorView, direction: 1 | -1): boolean {
   const state = view.state
   const { head } = 涉及行(state)
   const match = 标题正则.exec(state.doc.line(head).text)
   const current = match ? match[1].length : 0
-  const 下级 = Math.min(6, Math.max(0, current + 方向))
+  const 下级 = Math.min(6, Math.max(0, current + direction))
   if (下级 === current) return false
   return 设置标题级别(view, 下级)
 }
@@ -138,7 +138,7 @@ const 任务正则 = /^(\s*)[-*+]\s+\[[ xX]\]\s+/
 
 export type 列表类型 = '无序' | '有序' | '任务'
 
-export function 切换列表(view: EditorView, kind: 列表类型): boolean {
+export function toggleList(view: EditorView, kind: 列表类型): boolean {
   const state = view.state
   const { head, tail } = 涉及行(state)
 
@@ -178,16 +178,16 @@ export function 切换列表(view: EditorView, kind: 列表类型): boolean {
 }
 
 /** 缩进 / 反缩进：块级命令按 2 个空格一层。 */
-export function 调整缩进(view: EditorView, 方向: 1 | -1): boolean {
+export function 调整缩进(view: EditorView, direction: 1 | -1): boolean {
   const state = view.state
-  const 单位 = ' '.repeat(Math.max(1, Math.min(8, state.tabSize)))
+  const unit = ' '.repeat(Math.max(1, Math.min(8, state.tabSize)))
   const changes = 整行变更(state, (docText) => {
-    if (方向 === 1) return 单位 + docText
+    if (direction === 1) return unit + docText
     // 反缩进：优先吃掉一个制表符，否则最多吃掉一个单位的空格。
     if (docText.startsWith('\t')) return docText.slice(1)
     const 前导 = /^ +/.exec(docText)?.[0] ?? ''
     if (前导.length === 0) return docText
-    return docText.slice(Math.min(单位.length, 前导.length))
+    return docText.slice(Math.min(unit.length, 前导.length))
   })
   if (changes.length === 0) return false
   view.dispatch({ changes: changes, userEvent: 'input.indent', annotations: isolatedUndo })
@@ -290,7 +290,7 @@ export function 插入前置元数据(view: EditorView): boolean {
  * 空选区时插入一对标记并把光标放到中间，符合"点一下加粗，然后开始打字"
  * 的直觉。
  */
-export function 包裹行内(view: EditorView, before: string, 后: string = before): boolean {
+export function wrapInline(view: EditorView, before: string, after: string = before): boolean {
   const state = view.state
   const changes: ChangeSpec[] = []
   const 新选区: { anchor: number; head: number }[] = []
@@ -300,34 +300,34 @@ export function 包裹行内(view: EditorView, before: string, 后: string = bef
 
   for (const selection of 选区们) {
     if (selection.empty) {
-      changes.push({ from: selection.from, to: selection.to, insert: before + 后 })
+      changes.push({ from: selection.from, to: selection.to, insert: before + after })
       新选区.push({ anchor: selection.from + before.length, head: selection.from + before.length })
       continue
     }
 
     const originalText = state.sliceDoc(selection.from, selection.to)
     const 外前 = state.sliceDoc(Math.max(0, selection.from - before.length), selection.from)
-    const 外后 = state.sliceDoc(selection.to, Math.min(state.doc.length, selection.to + 后.length))
+    const 外后 = state.sliceDoc(selection.to, Math.min(state.doc.length, selection.to + after.length))
 
-    if (外前 === before && 外后 === 后) {
+    if (外前 === before && 外后 === after) {
       // 标记在选区外侧：连同标记一起替换掉
       changes.push({
         from: selection.from - before.length,
-        to: selection.to + 后.length,
+        to: selection.to + after.length,
         insert: originalText
       })
       新选区.push({ anchor: selection.from - before.length, head: selection.to - before.length })
     } else if (
-      originalText.length > before.length + 后.length &&
+      originalText.length > before.length + after.length &&
       originalText.startsWith(before) &&
-      originalText.endsWith(后)
+      originalText.endsWith(after)
     ) {
       // 标记在选区内侧
-      const content = originalText.slice(before.length, originalText.length - 后.length)
+      const content = originalText.slice(before.length, originalText.length - after.length)
       changes.push({ from: selection.from, to: selection.to, insert: content })
       新选区.push({ anchor: selection.from, head: selection.from + content.length })
     } else {
-      changes.push({ from: selection.from, to: selection.to, insert: before + originalText + 后 })
+      changes.push({ from: selection.from, to: selection.to, insert: before + originalText + after })
       新选区.push({ anchor: selection.from + before.length, head: selection.to + before.length })
     }
   }
@@ -392,8 +392,8 @@ export function clearFormat(view: EditorView): boolean {
 
     // 用 split/join 做字面量剥离：标记里含 `*` `[` `\` 等正则元字符，
     // 走正则反而要逐个转义，容易出错。
-    for (const [before, 后] of 可清除标记) {
-      docText = docText.split(before).join('').split(后).join('')
+    for (const [before, after] of 可清除标记) {
+      docText = docText.split(before).join('').split(after).join('')
     }
     // 链接保留可见文字，丢弃地址。
     docText = docText.replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')

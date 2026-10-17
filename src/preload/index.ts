@@ -108,7 +108,7 @@ const api: SelfMdApi = {
     ),
   openDefaultApps: () => invoke<void>(CH.appOpenDefaultApps),
   copyAsImage: (request: { source: string; docPath: string | null; widthPx?: number }) =>
-    invoke<{ success: boolean; width: number; height: number; 已截断: boolean; error: string | null }>(
+    invoke<{ success: boolean; width: number; height: number; truncated: boolean; error: string | null }>(
       CH.editCopyAsImage,
       request
     ),
@@ -170,9 +170,9 @@ const api: SelfMdApi = {
     upload: (paths) =>
       invoke<{
         success: { rawPath: string; url: string }[]
-        failure: { rawPath: string; 原因: string }[]
+        failure: { rawPath: string; reason: string }[]
       }>(CH.imageUpload, paths),
-    uploaderStatus: () => invoke<{ 可用: boolean; 原因: string | null }>(CH.imageUploaderStatus)
+    uploaderStatus: () => invoke<{ available: boolean; reason: string | null }>(CH.imageUploaderStatus)
   }
 }
 
@@ -197,10 +197,10 @@ const extras = {
     copy: (from: string, to: string) => invoke<void>(CH.fileCopy, from, to),
     move: (from: string, to: string) => invoke<void>(CH.fileMove, from, to),
     rename: (from: string, to: string) => invoke<void>(CH.fileRename, from, to),
-    walk: (root: string, options?: { 上限?: number; 深度?: number }) =>
+    walk: (root: string, options?: { limit?: number; depth?: number }) =>
       invoke<{
-        file: { filePath: string; 名字: string; 修改时间: number; 大小: number }[]
-        已截断: boolean
+        file: { filePath: string; nameText: string; 修改时间: number; 大小: number }[]
+        truncated: boolean
       }>(CH.fileWalk, root, options)
   },
   task: {

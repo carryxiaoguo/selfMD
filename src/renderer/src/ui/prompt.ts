@@ -13,7 +13,7 @@ export interface 询问选项 {
   /** 初始值。 */
   初值?: string
    /** 占位提示。 */
-  占位?: string
+  placeholder?: string
   /** 标题下方的一段说明文字。 */
   description?: string
   /** 确定按钮文字。 */
@@ -45,7 +45,7 @@ export function 询问文本(options: 询问选项): Promise<string | null> {
     input.className = 'selfmd-modal-input'
     input.type = 'text'
     input.value = options.初值 ?? ''
-    if (options.占位) input.placeholder = options.占位
+    if (options.placeholder) input.placeholder = options.placeholder
 
     const 按钮行 = document.createElement('div')
     按钮行.className = 'selfmd-modal-buttons'

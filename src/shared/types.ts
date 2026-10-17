@@ -45,7 +45,7 @@ export type ImageStoragePolicy =
  * `picgo-app` 与 `piclist-app` 是**哨兵值**：它们不走命令行，而是先试本地 HTTP
  * 端点 `http://127.0.0.1:36677/upload`，失败再启动应用后重试。
  */
-export type 上传器类型 =
+export type uploaderType =
   | 'none'
   | 'picgo-app'
   | 'piclist-app'
@@ -136,7 +136,7 @@ export interface Settings {
   allowImageUpload: boolean
   noWarningUploadDisabled: boolean
   /** 图床上传器的类型。从 通行的 `getImageUploaderCommand` 提取。 */
-  imageUploader: 上传器类型
+  imageUploader: uploaderType
   /** PicGo / PicList 应用可执行文件的路径（本地 HTTP 不通时用它启动）。 */
   picgoPath: string
   /** 自定义上传命令；支持 `${filepath}` 与 `${filename}` 占位符。 */
@@ -322,7 +322,7 @@ export interface ThemeInfo {
  * 由「是否深色模式」与「是否使用独立深色主题」共同决定。主进程与渲染层都要用，
  * 所以放在共享层——两边各写一份，迟早会在某个分支上分叉。
  */
-export function 生效主题(settings: Settings): string {
+export function activeTheme(settings: Settings): string {
   if (settings.isDarkMode && settings.useSeparateDarkTheme) return settings.darkTheme
   return settings.theme
 }

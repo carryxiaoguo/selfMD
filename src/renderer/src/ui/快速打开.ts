@@ -9,18 +9,18 @@
  * 为什么建一次索引而不是每次敲键都查盘：查盘是毫秒级的，但目录一大
  * 就会让每次按键都卡一下，而"快速打开"的全部意义就在于快。
  */
-import { 模糊筛选, 路径末段 } from '@shared/模糊匹配'
+import { 模糊筛选, pathTail } from '@shared/模糊匹配'
 
 interface 文件项 {
   filePath: string
-  名字: string
+  nameText: string
   修改时间: number
   大小: number
 }
 
 export interface 快速打开选项 {
   /** 建立索引：返回候选文件。失败时返回空数组。 */
-  取文件: () => Promise<{ file: 文件项[]; 已截断: boolean }>
+  取文件: () => Promise<{ file: 文件项[]; truncated: boolean }>
   /** 用户选中某个文件。 */
   open: (filePath: string) => void
 }
@@ -81,7 +81,7 @@ export async function 打开快速打开面板(options: 快速打开选项): Pro
 
       const name = document.createElement('div')
       name.className = 'quick-open-name'
-      name.textContent = item.名字
+      name.textContent = item.nameText
 
       const 路径元素 = document.createElement('div')
       路径元素.className = 'quick-open-path'
@@ -107,18 +107,18 @@ export async function 打开快速打开面板(options: 快速打开选项): Pro
   }
 
   const 过滤 = (): void => {
-    const 查询 = input.value
+    const query = input.value
     // 文件越小越新，越可能是用户想找的；把它作为同分时的第二排序键
     hit = 模糊筛选(
-      查询,
+      query,
       all.map((f) => ({ entry: f, docText: f.filePath })),
-      路径末段
+      pathTail
     )
     选中 = 0
     重绘()
     页脚.textContent =
       `共 ${all.length} 个文件` +
-      (查询.trim() ? ` · 匹配 ${hit.length} 个` : '') +
+      (query.trim() ? ` · 匹配 ${hit.length} 个` : '') +
       (all.length >= 50 ? ' · ↑↓ 选择，Enter 打开，Esc 关闭' : '')
   }
 
@@ -161,7 +161,7 @@ export async function 打开快速打开面板(options: 快速打开选项): Pro
     // 索引是异步建的，期间用户可能已经打了不少字——这里必须按**当前**输入重算，
     // 而不是用建索引时捕获的旧值
     过滤()
-    if (result.已截断) 页脚.textContent += ' · 文件太多，只索引了一部分'
+    if (result.truncated) 页脚.textContent += ' · 文件太多，只索引了一部分'
   } catch {
     页脚.textContent = '建立索引失败'
   }

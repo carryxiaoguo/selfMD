@@ -1,5 +1,5 @@
 import type { ImageStoragePolicy } from '@shared/types'
-import { 去扩展名, 是绝对路径, 归一化路径, 拼接 } from '@shared/image-path'
+import { 去扩展名, 是绝对路径, normalizePath, 拼接 } from '@shared/image-path'
 
 /**
  * 图片存储目标解析。
@@ -18,8 +18,8 @@ import { 去扩展名, 是绝对路径, 归一化路径, 拼接 } from '@shared/
  */
 
 // 路径工具从 shared 转出，方便调用方只 import 一处。
-export { 是绝对路径, 归一化路径, 拼接, 去扩展名 } from '@shared/image-path'
-export { 取文件名, 取目录, 唯一文件名, 时间戳图片名 } from '@shared/image-path'
+export { 是绝对路径, normalizePath, 拼接, 去扩展名 } from '@shared/image-path'
+export { takeFileName, 取目录, 唯一文件名, 时间戳图片名 } from '@shared/image-path'
 
 // ---------------------------------------------------------------------------
 // 解析
@@ -29,13 +29,13 @@ export interface 目标解析输入 {
   /** 当前文档所在目录的绝对路径；未保存的文档为 null。 */
   docDir: string | null
   /** 当前文档的文件名（含扩展名）；未保存的文档为 null。 */
-  文档名: string | null
+  docName: string | null
   /** TextBundle / TextPack：图片一律进包的 `assets/`。 */
   是文本包: boolean
   /** 文档内 `image-folder` 的值；没有则为 null。 */
-  文档级设置: string | null
+  docSettings: string | null
   /** 全局的图片存储策略。 */
-  全局策略: ImageStoragePolicy
+  globalPolicy: ImageStoragePolicy
   /** `custom` 策略下使用的目录模板。 */
   自定义目录: string
   /** 是否允许依据文档级设置自动上传。 */
@@ -59,8 +59,8 @@ function 是上传标记(value: string): boolean {
 }
 
 /** 把 `${filename}` 换成不含扩展名的文档名。 */
-function 替换文件名占位符(template: string, 文档名: string | null): string {
-  const 基名 = 文档名 ? 去扩展名(文档名) : ''
+function 替换文件名占位符(template: string, docName: string | null): string {
+  const 基名 = docName ? 去扩展名(docName) : ''
   return template.replace(/\$\{filename\}/g, 基名)
 }
 
@@ -80,19 +80,19 @@ export function 解析目标目录(input: 目标解析输入): 目标结果 {
   }
 
   // --- 2. 文档级设置优先于全局 ------------------------------------------
-  const 文档级 = input.文档级设置?.trim()
+  const 文档级 = input.docSettings?.trim()
   if (文档级 && 文档级.length > 0) {
     if ((input.允许自动上传 || input.强制上传) && 是上传标记(文档级)) {
       return { kind: '上传', origin: '文档级设置' }
     }
-    const 展开 = 替换文件名占位符(文档级, input.文档名)
-    if (是绝对路径(展开)) return { kind: '目录', filePath: 归一化路径(展开), origin: '文档级设置' }
+    const expand = 替换文件名占位符(文档级, input.docName)
+    if (是绝对路径(expand)) return { kind: '目录', filePath: normalizePath(expand), origin: '文档级设置' }
     if (!input.docDir) return { kind: '需要保存' }
-    return { kind: '目录', filePath: 拼接(input.docDir, 展开), origin: '文档级设置' }
+    return { kind: '目录', filePath: 拼接(input.docDir, expand), origin: '文档级设置' }
   }
 
   // --- 3. 全局策略 -------------------------------------------------------
-  switch (input.全局策略) {
+  switch (input.globalPolicy) {
     case '':
       return { kind: '不动' }
 
@@ -108,10 +108,10 @@ export function 解析目标目录(input: 目标解析输入): 目标结果 {
       return { kind: '目录', filePath: 拼接(input.docDir, 'assets'), origin: '全局设置' }
 
     case 'per-file-assets': {
-      if (!input.docDir || !input.文档名) return { kind: '需要保存' }
+      if (!input.docDir || !input.docName) return { kind: '需要保存' }
       return {
         kind: '目录',
-        filePath: 拼接(input.docDir, `${去扩展名(input.文档名)}.assets`),
+        filePath: 拼接(input.docDir, `${去扩展名(input.docName)}.assets`),
         origin: '全局设置'
       }
     }
@@ -120,10 +120,10 @@ export function 解析目标目录(input: 目标解析输入): 目标结果 {
       const template = input.自定义目录?.trim()
       // 自定义目录没填时退回"不动"，而不是悄悄把图片丢到某个默认位置。
       if (!template) return { kind: '不动' }
-      const 展开 = 替换文件名占位符(template, input.文档名)
-      if (是绝对路径(展开)) return { kind: '目录', filePath: 归一化路径(展开), origin: '全局设置' }
+      const expand = 替换文件名占位符(template, input.docName)
+      if (是绝对路径(expand)) return { kind: '目录', filePath: normalizePath(expand), origin: '全局设置' }
       if (!input.docDir) return { kind: '需要保存' }
-      return { kind: '目录', filePath: 拼接(input.docDir, 展开), origin: '全局设置' }
+      return { kind: '目录', filePath: 拼接(input.docDir, expand), origin: '全局设置' }
     }
 
     default:
@@ -148,7 +148,7 @@ export interface 搬运判定输入 {
   /** 图片的原始 src。 */
   source: string
   /** 解析出的目标目录绝对路径（`上传` 与 `不动` 不参与本判定）。 */
-  目标目录: string
+  targetDir: string
   /** 本地图片是否自动搬运。 */
   搬运本地: boolean
   /** 在线图片是否自动搬运。 */
@@ -164,10 +164,10 @@ export interface 搬运判定输入 {
  *   - 用户关掉了对应来源的自动搬运
  */
 export function 应当搬运(input: 搬运判定输入): boolean {
-  const { source, 目标目录 } = input
-  if (!source || !目标目录) return false
+  const { source, targetDir } = input
+  if (!source || !targetDir) return false
   // 已经在目标目录内：路径前缀匹配，且后面确实还有一层，不是目录本身。
-  const 归一目标 = 目标目录.replace(/[\\/]+$/, '').replace(/\\/g, '/')
+  const 归一目标 = targetDir.replace(/[\\/]+$/, '').replace(/\\/g, '/')
   const 归一本源 = source.replace(/^file:\/\//, '').replace(/\\/g, '/')
   if (归一本源 === 归一目标) return false
   if (归一本源.startsWith(`${归一目标}/`)) return false

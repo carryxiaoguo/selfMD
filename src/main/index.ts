@@ -3,7 +3,7 @@ import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { EV } from '@shared/ipc'
-import { 图标路径 } from './util/资源路径'
+import { iconPath } from './util/资源路径'
 import { registerIpc } from './ipc'
 import { whenDocumentOpened, whenRendererReady } from './ipc/app'
 import { registerPrivilegedSchemes, registerProtocolHandlers } from './protocol'
@@ -12,7 +12,7 @@ import { 检测Pandoc, 执行导出 } from './export'
 import { 取关联状态 } from './services/文件关联'
 import {
   写草稿,
-  列出草稿,
+  listDrafts,
   删除草稿,
   清理该文档的草稿,
   读草稿,
@@ -229,8 +229,8 @@ async function 运行导出测试(): Promise<boolean> {
     source: 导出测试文档,
     docPath: null,
     format: 'html',
-    附大纲: true,
-    内嵌图片: false
+    withOutline: true,
+    embeddedImage: false
   })
 
   if (!result.success) {
@@ -283,7 +283,7 @@ async function 运行草稿测试(): Promise<boolean> {
   writeFileSync(docModel, '磁盘上的旧内容\n', 'utf8')
 
   const 检查: [string, boolean][] = []
-  const 记录 = (name: string, 好: boolean): void => {
+  const record = (name: string, 好: boolean): void => {
     检查.push([name, 好])
   }
 
@@ -293,53 +293,53 @@ async function 运行草稿测试(): Promise<boolean> {
   // 而"删除后应当没有无名草稿"这条断言看的是全局列表，
   // 不先打扫就会因为别人的残渣而失败——表现为单独跑能过、
   // 放进完整流水线就挂，这类顺序依赖最难排查。
-  for (const 旧 of 列出草稿()) {
+  for (const 旧 of listDrafts()) {
     if (旧.rawPath === null) 删除草稿(旧.key)
   }
 
   // 1) 写一份比原文件新的草稿
   const 草稿内容 = '磁盘上的旧内容\n\n用户后来敲的新内容\n'
-  记录('写入草稿', 写草稿(docModel, 草稿内容))
+  record('写入草稿', 写草稿(docModel, 草稿内容))
 
   // 2) 能列出来
-  const 这条 = 列出草稿().find((c) => c.rawPath === docModel)
-  记录('能列出草稿', 这条 !== undefined)
+  const 这条 = listDrafts().find((c) => c.rawPath === docModel)
+  record('能列出草稿', 这条 !== undefined)
 
   // 3) 能读回同样的内容
-  记录('读回内容一致', 这条 !== undefined && 读草稿(这条.key) === 草稿内容)
+  record('读回内容一致', 这条 !== undefined && 读草稿(这条.key) === 草稿内容)
 
   // 4) 需要恢复：草稿比原文件新，且内容长度不同
-  记录(
+  record(
     '被判定为需要恢复',
     需要恢复的草稿().some((c) => c.rawPath === docModel)
   )
 
   // 5) 竞态守卫：内容不一致时**不能**清掉草稿
   清理该文档的草稿(docModel, '这是另一个内容')
-  记录('内容不一致时保留草稿', 列出草稿().some((c) => c.rawPath === docModel))
+  record('内容不一致时保留草稿', listDrafts().some((c) => c.rawPath === docModel))
 
   // 6) 内容一致时才清掉
   清理该文档的草稿(docModel, 草稿内容)
-  记录('内容一致时清除草稿', !列出草稿().some((c) => c.rawPath === docModel))
+  record('内容一致时清除草稿', !listDrafts().some((c) => c.rawPath === docModel))
 
   // 7) 未命名文档（原路径为 null）也要能存与恢复
-  记录('未命名文档可写草稿', 写草稿(null, '未命名的内容'))
-  const 未命名 = 列出草稿().find((c) => c.rawPath === null)
-  记录(
+  record('未命名文档可写草稿', 写草稿(null, '未命名的内容'))
+  const 未命名 = listDrafts().find((c) => c.rawPath === null)
+  record(
     '未命名文档需要恢复',
     未命名 !== undefined && 需要恢复的草稿().some((c) => c.key === 未命名.key)
   )
   if (未命名) 删除草稿(未命名.key)
-  记录('未命名草稿可删除', !列出草稿().some((c) => c.rawPath === null))
+  record('未命名草稿可删除', !listDrafts().some((c) => c.rawPath === null))
 
   // 8) 原文件已被删除时也要提示恢复——草稿是唯一副本
   const 幽灵 = join(dir, '已经不存在了.md')
   写草稿(幽灵, '文件被删了但草稿还在')
-  记录(
+  record(
     '原文件缺失时提示恢复',
     需要恢复的草稿().some((c) => c.rawPath === 幽灵)
   )
-  const 幽灵条目 = 列出草稿().find((c) => c.rawPath === 幽灵)
+  const 幽灵条目 = listDrafts().find((c) => c.rawPath === 幽灵)
   if (幽灵条目) 删除草稿(幽灵条目.key)
 
   const failure = 检查.filter(([, 好]) => !好)
@@ -352,7 +352,7 @@ async function 运行草稿测试(): Promise<boolean> {
 }
 
 /** 图标是否真的能解码，而不是"文件存在"就算数。 */
-function 报告图标(): void {  const file = 图标路径('icon-256.png')
+function 报告图标(): void {  const file = iconPath('icon-256.png')
   if (!file) {
     console.log('[selfMD] 窗口图标：未找到（将使用系统默认图标）')
     return
@@ -364,7 +364,7 @@ function 报告图标(): void {  const file = 图标路径('icon-256.png')
       `${size.width}×${size.height}  ${img.isEmpty() ? '解码失败' : '可正常解码'}`
   )
   for (const name of ['icon.ico', 'icon-16.png', 'icon-64.png']) {
-    const filePath = 图标路径(name)
+    const filePath = iconPath(name)
     console.log(`    附属图标 ${name}：${filePath ? '存在' : '缺失'}`)
   }
 }
@@ -389,10 +389,10 @@ const 最小PNG = Buffer.from(
  * 刻意在文档里写上 `image-folder: 图`：它同时验证了
  * "能读出 YAML 前置元数据"与"文档级设置压过全局"两条规则。
  */
-function 准备图片素材(): { docModel: string; image: string; 目标目录: string } {
+function 准备图片素材(): { docModel: string; image: string; targetDir: string } {
   const root = join(app.getPath('temp'), `selfmd-图片测试-${Date.now()}`)
-  const 目标目录 = join(root, '图')
-  mkdirSync(目标目录, { recursive: true })
+  const targetDir = join(root, '图')
+  mkdirSync(targetDir, { recursive: true })
 
   const docModel = join(root, '测试.md')
   writeFileSync(docModel, '---\nimage-folder: 图\n---\n\n# 图片测试\n\n', 'utf8')
@@ -400,7 +400,7 @@ function 准备图片素材(): { docModel: string; image: string; 目标目录: 
   const image = join(root, '样本.png')
   writeFileSync(image, 最小PNG)
 
-  return { docModel, image, 目标目录 }
+  return { docModel, image, targetDir }
 }
 
 // 把解析后的路径打印一次，这样首次运行就能从日志里核对。
@@ -506,10 +506,10 @@ async function runSmokeTest(): Promise<void> {  const target = smokeOpenPath()
   // 文件关联是可读的状态而不是"设好了没有"的布尔值：
   // 用户以为设好了、其实没有，是这件事上最常见的误会。
   {
-    const 关联 = 取关联状态()
+    const association = 取关联状态()
     console.log(
-      `[selfMD] 文件关联：当前=${关联.current || '（未设置）'} ` +
-        `是默认=${关联.是默认} 有新建菜单=${关联.有新建菜单}`
+      `[selfMD] 文件关联：当前=${association.current || '（未设置）'} ` +
+        `是默认=${association.是默认} 有新建菜单=${association.有新建菜单}`
     )
   }
 

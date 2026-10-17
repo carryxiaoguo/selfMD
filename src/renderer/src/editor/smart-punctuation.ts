@@ -74,9 +74,9 @@ const 开引号前导 = /[\s([{<（【《「『〔〈“‘’”‘’—–-]/
  * @param 字符 用户刚敲下的字符，`"` 或 `'`
  * @param 前文 光标之前的本行文本
  */
-export function 换引号(ch: '"' | "'", 前文: string): string {
-  const 前一个 = 前文.slice(-1)
-  const 是开头 = 前文.length === 0 || 开引号前导.test(前一个)
+export function 换引号(ch: '"' | "'", preamble: string): string {
+  const 前一个 = preamble.slice(-1)
+  const 是开头 = preamble.length === 0 || 开引号前导.test(前一个)
 
   if (ch === '"') {
     return 是开头 ? '“' : '”'
@@ -96,7 +96,7 @@ export interface 渲染标点段 {
   from: number
   to: number
   /** 屏幕上显示的字符。 */
-  显示: string
+  show: string
   /** 文档里实际存的字符。 */
   originalText: string
 }
@@ -113,7 +113,7 @@ export interface 渲染标点段 {
  * 扫描是**逐字符推进**而非逐个正则匹配：`---` 必须优先于 `--` 匹配，
  * 用正则轮流试会先命中 `--`，把破折号拆成"连接号 + 连字符"。
  */
-export function 扫描渲染标点(docText: string, 基准: number): 渲染标点段[] {
+export function 扫描渲染标点(docText: string, baseline: number): 渲染标点段[] {
   const result: 渲染标点段[] = []
   let i = 0
 
@@ -123,12 +123,12 @@ export function 扫描渲染标点(docText: string, 基准: number): 渲染标�
     // --- 破折号：先试三连，再试两连 ---
     if (ch === '-') {
       if (docText.startsWith('---', i)) {
-        result.push({ from: 基准 + i, to: 基准 + i + 3, 显示: '—', originalText: '---' })
+        result.push({ from: baseline + i, to: baseline + i + 3, show: '—', originalText: '---' })
         i += 3
         continue
       }
       if (docText.startsWith('--', i)) {
-        result.push({ from: 基准 + i, to: 基准 + i + 2, 显示: '–', originalText: '--' })
+        result.push({ from: baseline + i, to: baseline + i + 2, show: '–', originalText: '--' })
         i += 2
         continue
       }
@@ -138,7 +138,7 @@ export function 扫描渲染标点(docText: string, 基准: number): 渲染标�
 
     // --- 省略号 ---
     if (ch === '.' && docText.startsWith('...', i)) {
-      result.push({ from: 基准 + i, to: 基准 + i + 3, 显示: '…', originalText: '...' })
+      result.push({ from: baseline + i, to: baseline + i + 3, show: '…', originalText: '...' })
       i += 3
       continue
     }
@@ -146,9 +146,9 @@ export function 扫描渲染标点(docText: string, 基准: number): 渲染标�
     // --- 引号 ---
     if (ch === '"' || ch === "'") {
       // 用扫描到当前位置为止的文本作为"前文"，与输入时的判断依据一致
-      const 显示 = 换引号(ch, docText.slice(0, i))
-      if (显示 !== ch) {
-        result.push({ from: 基准 + i, to: 基准 + i + 1, 显示, originalText: ch })
+      const show = 换引号(ch, docText.slice(0, i))
+      if (show !== ch) {
+        result.push({ from: baseline + i, to: baseline + i + 1, show, originalText: ch })
       }
       i++
       continue
@@ -163,9 +163,9 @@ export function 扫描渲染标点(docText: string, 基准: number): 渲染标�
 
 export interface 破折号替换 {
   /** 需要回退删除的字符数。 */
-  回退: number
+  fallback: number
   /** 回退之后要插入的字符。 */
-  插入: string
+  insert: string
 }
 
 // ---------------------------------------------------------------------------
@@ -186,12 +186,12 @@ export interface 破折号替换 {
  *
  * @returns 需要替换时给出方案，否则返回 null 表示按原样插入
  */
-export function 换破折号(前文: string): 破折号替换 | null {
-  const 前一个 = 前文.slice(-1)
-  const 再前一个 = 前文.slice(-2, -1)
+export function 换破折号(preamble: string): 破折号替换 | null {
+  const 前一个 = preamble.slice(-1)
+  const 再前一个 = preamble.slice(-2, -1)
 
   // 已经转换出连接号，再敲一个连字符 → 升格为破折号。
-  if (前一个 === '–') return { 回退: 1, 插入: '—' }
+  if (前一个 === '–') return { fallback: 1, insert: '—' }
 
   if (前一个 !== '-') return null
   // 文档里本来就存在的连续连字符不动它，避免把既有内容改坏。
@@ -203,10 +203,10 @@ export function 换破折号(前文: string): 破折号替换 | null {
   // 这里用"连字符之前还有没有正文"来判断，而不是"整行是不是只有连字符"——
   // 后者要预知用户接下来敲什么，做不到；前者只看已有内容，无状态且够用。
   // 代价是行首永远得不到连接号，这是刻意的取舍：结构正确优先于标点美观。
-  const 之前 = 前文.slice(0, -1)
+  const 之前 = preamble.slice(0, -1)
   if (之前.trim() === '') return null
 
-  return { 回退: 1, 插入: '–' }
+  return { fallback: 1, insert: '–' }
 }
 
 // ---------------------------------------------------------------------------
@@ -215,7 +215,7 @@ export function 换破折号(前文: string): 破折号替换 | null {
 
 export interface 智能标点选项 {
   /** 转换引号。 */
-  引号: boolean
+  quoteChar: boolean
   /** 转换破折号。 */
   破折号: boolean
 }
@@ -227,7 +227,7 @@ export interface 智能标点选项 {
  * 程序化编辑、输入法提交多字符都不经过这里，因此不会破坏这些路径。
  */
 export function 智能标点(options: 智能标点选项): Extension {
-  if (!options.引号 && !options.破折号) return []
+  if (!options.quoteChar && !options.破折号) return []
 
   return EditorView.inputHandler.of((view, 从, 到, input) => {
     // 只处理单字符键入。多字符意味着输入法或粘贴，不该插手。
@@ -237,26 +237,26 @@ export function 智能标点(options: 智能标点选项): Extension {
 
     const state = view.state
     if (在代码上下文(state, 从)) return false
-    const 前文 = 本行前文(state, 从)
+    const preamble = 本行前文(state, 从)
 
-    let 方案: { 回退: number; 插入: string } | null = null
+    let plan: { fallback: number; insert: string } | null = null
 
-    if (options.引号 && (input === '"' || input === "'")) {
-      方案 = { 回退: 0, 插入: 换引号(input, 前文) }
+    if (options.quoteChar && (input === '"' || input === "'")) {
+      plan = { fallback: 0, insert: 换引号(input, preamble) }
     } else if (options.破折号 && input === '-') {
-      方案 = 换破折号(前文)
+      plan = 换破折号(preamble)
     }
 
-    if (!方案) return false
+    if (!plan) return false
 
     // 转换结果与原字符相同就没必要接管，让默认行为处理，
     // 这样中文输入法的候选、自动补全等附加行为不受影响。
-    if (方案.回退 === 0 && 方案.插入 === input) return false
+    if (plan.fallback === 0 && plan.insert === input) return false
 
-    const 起点 = 从 - 方案.回退
+    const fromPos = 从 - plan.fallback
     view.dispatch({
-      changes: { from: 起点, to: 从, insert: 方案.插入 },
-      selection: { anchor: 起点 + 方案.插入.length },
+      changes: { from: fromPos, to: 从, insert: plan.insert },
+      selection: { anchor: fromPos + plan.insert.length },
       userEvent: 'input.type',
       scrollIntoView: true
     })
@@ -268,5 +268,5 @@ export function 智能标点(options: 智能标点选项): Extension {
 export function 按设置构建智能标点(settings: Settings): Extension {
   // '渲染时转换' 尚未实现，此时不做输入期转换——否则两种模式会同时生效。
   if (settings.smartPunctuationMode !== 'input') return []
-  return 智能标点({ 引号: settings.smartQuotes, 破折号: settings.smartDashes })
+  return 智能标点({ quoteChar: settings.smartQuotes, 破折号: settings.smartDashes })
 }

@@ -67,9 +67,9 @@ function 构建装饰(view: EditorView): DecorationSet {
 
   // 第二遍：按语法树分派。只遍历可视范围——CodeMirror 会虚拟化长文档，
   // 视口外的内容根本没有 DOM，为其构建装饰纯属浪费。
-  const 树 = syntaxTree(state)
+  const tree = syntaxTree(state)
   for (const rangeBounds of view.visibleRanges) {
-    树.iterate({
+    tree.iterate({
       from: rangeBounds.from,
       to: rangeBounds.to,
       enter: (quote) => {
@@ -119,9 +119,9 @@ class 实时预览 implements PluginValue {
     this.decorations = this.安全构建(view)
   }
 
-  update(更新: ViewUpdate): void {
-    if (更新.docChanged || 更新.selectionSet || 更新.viewportChanged) {
-      this.decorations = this.安全构建(更新.view)
+  update(update: ViewUpdate): void {
+    if (update.docChanged || update.selectionSet || update.viewportChanged) {
+      this.decorations = this.安全构建(update.view)
     }
   }
 

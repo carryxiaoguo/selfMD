@@ -1,4 +1,4 @@
-import type { 上传器类型 } from './types'
+import type { uploaderType } from './types'
 
 /**
  * 上传结果解析。
@@ -48,11 +48,11 @@ export function 识别地址行(line: string): string | null {
  * 结果在下方。
  */
 export function 解析命令行输出(output: string): string[] {
-  const 行们 = output.split(/\r?\n/)
+  const lines = output.split(/\r?\n/)
   const result: string[] = []
 
-  for (let i = 行们.length - 1; i >= 0; i--) {
-    const url = 识别地址行(行们[i] ?? '')
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const url = 识别地址行(lines[i] ?? '')
     if (url) {
       result.unshift(url) // 从后往前扫，所以往前插，最终保持原有顺序
       continue
@@ -62,7 +62,7 @@ export function 解析命令行输出(output: string): string[] {
     // 但遇到有内容的非地址行也要停——否则会把整个日志扫完，
     // 反而把日志里提到的老网址收进来。
     if (result.length > 0) break
-    if ((行们[i] ?? '').trim().length > 0) break
+    if ((lines[i] ?? '').trim().length > 0) break
   }
 
   return result
@@ -99,10 +99,10 @@ function 解析JSON应答(docText: string): string[] | null {
  */
 export function 解析上传结果(
   output: string,
-  上传器: 上传器类型,
+  uploader: uploaderType,
   期望数量: number
 ): { url: string[]; error: string | null } {
-  const 用JSON = 上传器 === 'picgo-app' || 上传器 === 'piclist-app'
+  const 用JSON = uploader === 'picgo-app' || uploader === 'piclist-app'
 
   let url: string[] = []
   if (用JSON) {
@@ -138,7 +138,7 @@ export function 解析上传结果(
  * 断言三个平台的命令形态，不必真的换系统。
  */
 export function 生成上传命令(
-  上传器: 上传器类型,
+  uploader: uploaderType,
   文件路径: string,
   config: {
     自定义命令: string
@@ -151,20 +151,20 @@ export function 生成上传命令(
   // `C:\我的文档\a.png` 会被拆得面目全非。
   const filePath = 文件路径.replace(/\\/g, '/')
 
-  switch (上传器) {
+  switch (uploader) {
     case 'upic':
       // macOS 专用；本项目目标平台是 Windows，保留以防将来移植
-      return `/Applications/uPic.app/Contents/MacOS/uPic -o url -u ${引号(filePath)}`
+      return `/Applications/uPic.app/Contents/MacOS/uPic -o url -u ${quoteChar(filePath)}`
     case 'picsee':
-      return `/Applications/Picsee.app/Contents/MacOS/Picsee -u ${引号(filePath)}`
+      return `/Applications/Picsee.app/Contents/MacOS/Picsee -u ${quoteChar(filePath)}`
     case 'picgo-cli': {
       // Windows 下必须先切到 UTF-8 代码页，否则 PicGo 输出的中文路径会乱码
       const 前缀 = config.platform === 'win32' ? 'chcp 65001>nul && ' : ''
       const 子目录 =
         config.platform === 'win32' ? 'win64' : config.platform === 'darwin' ? 'mac' : 'linux'
-      const 扩展 = config.platform === 'win32' ? '.exe' : ''
-      const 程序 = `${config.用户数据目录}/picgo/${子目录}/picgo${扩展}`
-      return `${前缀}${引号(程序)} u ${引号(filePath)}`
+      const extension = config.platform === 'win32' ? '.exe' : ''
+      const program = `${config.用户数据目录}/picgo/${子目录}/picgo${extension}`
+      return `${前缀}${quoteChar(program)} u ${quoteChar(filePath)}`
     }
     case 'custom': {
       const template = config.自定义命令.trim()
@@ -191,7 +191,7 @@ export function 生成上传命令(
  * 不加引号时含空格的路径（`C:/我的 文档/a.png`）会被 shell 拆成两个参数，
  * 上传器只会拿到前一半，报"文件不存在"。
  */
-export function 引号(filePath: string): string {
+export function quoteChar(filePath: string): string {
   return `"${filePath.replace(/"/g, '\\"')}"`
 }
 
@@ -206,5 +206,5 @@ export function 按需引号(value: string): string {
   if (docText.length === 0) return value
   // 模板里已经带了引号
   if (/^".*"$/.test(docText) || /^'.*'$/.test(docText)) return value
-  return /\s/.test(value) ? 引号(value) : value
+  return /\s/.test(value) ? quoteChar(value) : value
 }

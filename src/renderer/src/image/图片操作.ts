@@ -2,7 +2,7 @@ import { syntaxTree } from '@codemirror/language'
 import { EditorSelection, type EditorState } from '@codemirror/state'
 import type { EditorView } from '@codemirror/view'
 import { isolatedUndo } from '../editor/独立撤销'
-import { 取文件名 } from '@shared/image-path'
+import { takeFileName } from '@shared/image-path'
 
 /**
  * 图片的右键操作。
@@ -15,7 +15,7 @@ import { 取文件名 } from '@shared/image-path'
  * 这些情况下改错地方，而且改完看起来一切正常。
  */
 
-export interface 图片上下文 {
+export interface imageContext {
   /** Image 节点在文档中的区间。 */
   from: number
   to: number
@@ -25,7 +25,7 @@ export interface 图片上下文 {
   /** 文档里写的原始地址。 */
   url: string
   /** 替代文字。 */
-  替代: string
+  substitute: string
   /** 本地绝对路径；远程图片为 null。 */
   localPath: string | null
 }
@@ -51,7 +51,7 @@ function 取URL区间(node: {
 function 取替代(node: { from: number; to: number; firstChild: unknown }, state: EditorState): string {
   let docText = ''
   let 收集 = false
-  let 游标 = node.from
+  let cursor = node.from
   let child = node.firstChild as {
     name: string
     from: number
@@ -59,7 +59,7 @@ function 取替代(node: { from: number; to: number; firstChild: unknown }, stat
     nextSibling: unknown
   } | null
   while (child) {
-    const 间隙 = state.sliceDoc(游标, child.from)
+    const 间隙 = state.sliceDoc(cursor, child.from)
     if (收集 && 间隙) docText += 间隙
     const txt = state.sliceDoc(child.from, child.to)
     if (child.name === 'LinkMark') {
@@ -72,7 +72,7 @@ function 取替代(node: { from: number; to: number; firstChild: unknown }, stat
     } else if (收集) {
       docText += txt
     }
-    游标 = child.to
+    cursor = child.to
     child = child.nextSibling as typeof child
   }
   return docText.trim()
@@ -83,8 +83,8 @@ function 取替代(node: { from: number; to: number; firstChild: unknown }, stat
  *
  * 找不到时返回 null——菜单据此整体置灰，而不是让用户点了没反应。
  */
-export function 取当前图片(state: EditorState, position: number): 图片上下文 | null {
-  let result: 图片上下文 | null = null
+export function 取当前图片(state: EditorState, position: number): imageContext | null {
+  let result: imageContext | null = null
 
   syntaxTree(state).iterate({
     enter: (quote) => {
@@ -107,7 +107,7 @@ export function 取当前图片(state: EditorState, position: number): 图片上
         地址from: range.from,
         地址to: range.to,
         url,
-        替代: 取替代(node, state),
+        substitute: 取替代(node, state),
         localPath: 本地绝对路径(url)
       }
       return false
@@ -146,9 +146,9 @@ function 当前目录(): string | null {
 // ---------------------------------------------------------------------------
 
 /** 转成 HTML 写法：`<img src="…" alt="…" />`，alt 为空时省略该属性。 */
-function 转HTML(url: string, 替代: string): string {
+function 转HTML(url: string, substitute: string): string {
   const attr = [`src="${url.replace(/"/g, '&quot;')}"`]
-  if (替代) attr.push(`alt="${替代.replace(/"/g, '&quot;')}"`)
+  if (substitute) attr.push(`alt="${substitute.replace(/"/g, '&quot;')}"`)
   return `<img ${attr.join(' ')} />`
 }
 
@@ -157,11 +157,11 @@ function 转HTML(url: string, 替代: string): string {
  *
  * 只改 `![…](…)` 这一段，不动周围的文字。
  */
-export function 转换图片语法(view: EditorView, image: 图片上下文): boolean {
+export function 转换图片语法(view: EditorView, image: imageContext): boolean {
   const HTML写法 = /^<img\b/i.test(image.url)
   const 新语法 = HTML写法
-    ? `![${image.替代}](${image.url})`
-    : 转HTML(image.url, image.替代)
+    ? `![${image.substitute}](${image.url})`
+    : 转HTML(image.url, image.substitute)
 
   // HTML 写法时 URL 区间取的不对（整段就是一个 HTML 节点），
   // 所以直接整段替换；Markdown 写法时也只换整段——
@@ -188,44 +188,44 @@ export function 转换图片语法(view: EditorView, image: 图片上下文): bo
  */
 export async function 重命名或移动图片(
   view: EditorView,
-  image: 图片上下文,
-  目标目录: string,
+  image: imageContext,
+  targetDir: string,
   新文件名: string
-): Promise<{ success: boolean; error: string | null; 新地址: string | null }> {
+): Promise<{ success: boolean; error: string | null; nextSrc: string | null }> {
   if (!image.localPath) {
-    return { success: false, error: '这是远程图片，没有本地文件可移动。', 新地址: null }
+    return { success: false, error: '这是远程图片，没有本地文件可移动。', nextSrc: null }
   }
 
-  const 新路径 = `${目标目录.replace(/[\\/]+$/, '')}/${新文件名}`
+  const nextPath = `${targetDir.replace(/[\\/]+$/, '')}/${新文件名}`
   try {
-    await window.selfmd.file.move(image.localPath, 新路径)
+    await window.selfmd.file.move(image.localPath, nextPath)
   } catch (error) {
     return {
       success: false,
       error: `移动文件失败：${error instanceof Error ? error.message : String(error)}`,
-      新地址: null
+      nextSrc: null
     }
   }
 
   // 新地址尽量写成相对于文档的路径，这样文档连同图片一起搬家时引用不会断
-  let 新地址 = 新路径
+  let nextSrc = nextPath
   const dir = 当前目录()
   if (dir) {
     try {
-      const 相对 = await window.selfmd.file.relative(dir, 新路径)
-      新地址 = 相对.replace(/\\/g, '/')
+      const relativePath = await window.selfmd.file.relative(dir, nextPath)
+      nextSrc = relativePath.replace(/\\/g, '/')
     } catch {
       // 取不到相对路径就用绝对路径，至少能用
     }
   }
 
   view.dispatch({
-    changes: { from: image.地址from, to: image.地址to, insert: 新地址 },
+    changes: { from: image.地址from, to: image.地址to, insert: nextSrc },
     annotations: isolatedUndo,
     userEvent: 'input.moveImage'
   })
 
-  return { success: true, error: null, 新地址 }
+  return { success: true, error: null, nextSrc }
 }
 
 /**
@@ -235,40 +235,40 @@ export async function 重命名或移动图片(
  */
 export async function 复制图片到(
   view: EditorView,
-  image: 图片上下文,
-  目标目录: string
-): Promise<{ success: boolean; error: string | null; 新地址: string | null }> {
+  image: imageContext,
+  targetDir: string
+): Promise<{ success: boolean; error: string | null; nextSrc: string | null }> {
   if (!image.localPath) {
-    return { success: false, error: '这是远程图片，没有本地文件可复制。', 新地址: null }
+    return { success: false, error: '这是远程图片，没有本地文件可复制。', nextSrc: null }
   }
 
   try {
     // 走主进程的原子复制：重名自动避让，绝不覆盖已有文件
-    const result = await window.selfmd.image.import(image.localPath, 目标目录)
-    if (!result) return { success: false, error: '复制失败。', 新地址: null }
+    const result = await window.selfmd.image.import(image.localPath, targetDir)
+    if (!result) return { success: false, error: '复制失败。', nextSrc: null }
 
-    let 新地址 = result.filePath
+    let nextSrc = result.filePath
     const dir = 当前目录()
     if (dir) {
       try {
-        新地址 = (await window.selfmd.file.relative(dir, result.filePath)).replace(/\\/g, '/')
+        nextSrc = (await window.selfmd.file.relative(dir, result.filePath)).replace(/\\/g, '/')
       } catch {
         // 保留绝对路径
       }
     }
 
     view.dispatch({
-      changes: { from: image.地址from, to: image.地址to, insert: 新地址 },
+      changes: { from: image.地址from, to: image.地址to, insert: nextSrc },
       annotations: isolatedUndo,
       userEvent: 'input.copyImage'
     })
 
-    return { success: true, error: null, 新地址 }
+    return { success: true, error: null, nextSrc }
   } catch (error) {
     return {
       success: false,
       error: `复制失败：${error instanceof Error ? error.message : String(error)}`,
-      新地址: null
+      nextSrc: null
     }
   }
 }
@@ -285,7 +285,7 @@ export async function 复制图片到(
  *
  * 走系统回收站而不是直接删：误删一张图的代价不小，而回收站可以撤销。
  */
-export async function 删除图片文件(image: 图片上下文): Promise<{ success: boolean; error: string | null }> {
+export async function 删除图片文件(image: imageContext): Promise<{ success: boolean; error: string | null }> {
   if (!image.localPath) {
     return { success: false, error: '这是远程图片，没有本地文件可删除。' }
   }
@@ -301,6 +301,6 @@ export async function 删除图片文件(image: 图片上下文): Promise<{ succ
 }
 
 /** 图片文件名，供对话框预填。 */
-export function 建议文件名(image: 图片上下文): string {
-  return image.localPath ? 取文件名(image.localPath) : image.替代 || 'image.png'
+export function 建议文件名(image: imageContext): string {
+  return image.localPath ? takeFileName(image.localPath) : image.substitute || 'image.png'
 }

@@ -18,7 +18,7 @@ export type 侧边栏标签 = 'outline' | 'files' | 'articles'
 /** 文档列表里的一项。 */
 export interface 文档列表项 {
   id: number
-  名字: string
+  nameText: string
   脏: boolean
   current: boolean
 }
@@ -123,13 +123,13 @@ export class sidebar {
 
   // ------------------------------------------------------------- 交互 ----
 
-  private 开始拖拽(按下: MouseEvent): void {
-    按下.preventDefault()
-    const 起点 = 按下.clientX
+  private 开始拖拽(pressed: MouseEvent): void {
+    pressed.preventDefault()
+    const fromPos = pressed.clientX
     const 起始宽 = this.widthPx
 
     const move = (event: MouseEvent): void => {
-      const width = Math.min(最大宽度, Math.max(最小宽度, 起始宽 + (event.clientX - 起点)))
+      const width = Math.min(最大宽度, Math.max(最小宽度, 起始宽 + (event.clientX - fromPos)))
       this.widthPx = width
       this.host.style.width = `${width}px`
     }
@@ -194,13 +194,13 @@ export class sidebar {
    */
   private 上次大纲签名 = ''
 
-  setOutline(headings: 标题项[], 当前下标: number): void {
-    const 签名 = headings.map((t) => `${t.级别}:${t.position}:${t.docText}`).join('|')
+  setOutline(headings: 标题项[], currentIndex: number): void {
+    const 签名 = headings.map((t) => `${t.level}:${t.position}:${t.docText}`).join('|')
     if (签名 !== this.上次大纲签名) {
       this.上次大纲签名 = 签名
       this.重绘大纲(headings)
     }
-    this.高亮大纲(当前下标)
+    this.高亮大纲(currentIndex)
   }
 
   private 重绘大纲(headings: 标题项[]): void {
@@ -212,7 +212,7 @@ export class sidebar {
       return
     }
 
-    const 最浅 = Math.min(...headings.map((t) => t.级别))
+    const 最浅 = Math.min(...headings.map((t) => t.level))
 
     headings.forEach((title, subscript) => {
       const item = document.createElement('div')
@@ -220,17 +220,17 @@ export class sidebar {
       item.dataset.subscript = String(subscript)
       item.dataset.pos = String(title.position)
       // 层级用 CSS 变量给出，主题想改缩进直接覆盖变量即可
-      item.style.setProperty('--outline-level', String(title.级别 - 最浅))
+      item.style.setProperty('--outline-level', String(title.level - 最浅))
 
-      const 折叠 = document.createElement('span')
-      折叠.className = 'outline-expander'
+      const fold = document.createElement('span')
+      fold.className = 'outline-expander'
 
       const label = document.createElement('span')
       label.className = 'outline-label'
       label.textContent = title.docText || '（空标题）'
       label.title = title.docText
 
-      item.append(折叠, label)
+      item.append(fold, label)
       item.addEventListener('click', () => this.deps.跳转到(title.position))
       this.大纲面板.append(item)
     })
@@ -287,11 +287,11 @@ export class sidebar {
 
     this.文件树根 = root
 
-    const 头 = document.createElement('div')
-    头.className = 'file-tree-root'
-    头.textContent = root.split(/[\\/]/).pop() || root
-    头.title = root
-    parts.append(头)
+    const headEl = document.createElement('div')
+    headEl.className = 'file-tree-root'
+    headEl.textContent = root.split(/[\\/]/).pop() || root
+    headEl.title = root
+    parts.append(headEl)
 
     const list = document.createElement('div')
     parts.append(list)
@@ -336,11 +336,11 @@ export class sidebar {
       // 数据属性而不是闭包变量：重绘后仍然能通过点击事件反查是哪一个，
       // 不必为每一行重新绑一次监听器。
       line.dataset.id = String(item.id)
-      line.title = item.名字
+      line.title = item.nameText
 
       const name = document.createElement('span')
       name.className = 'article-name'
-      name.textContent = item.名字
+      name.textContent = item.nameText
       line.append(name)
 
       // 未保存的标记。只是一个点，但它是"这个文档还有改动没落盘"的唯一提示，
@@ -394,10 +394,10 @@ export class sidebar {
     return hint
   }
 
-  private async 展开目录(dir: string, container: HTMLElement, 深度: number): Promise<void> {
-    let 项们: DirEntry[] = []
+  private async 展开目录(dir: string, container: HTMLElement, depth: number): Promise<void> {
+    let items: DirEntry[] = []
     try {
-      项们 = await window.selfmd.file.listDir(dir)
+      items = await window.selfmd.file.listDir(dir)
     } catch {
       const failure = document.createElement('div')
       failure.className = 'sidebar-empty'
@@ -414,15 +414,15 @@ export class sidebar {
           ? -1
           : 1
 
-    for (const item of [...项们].sort(sort)) {
+    for (const item of [...items].sort(sort)) {
       // 隐藏文件默认不显示：Markdown 目录里通常没有需要编辑的隐藏文件
       if (item.name.startsWith('.')) continue
 
       const line = document.createElement('div')
       line.className = 'file-list-item'
       line.dataset.path = item.path
-      line.dataset.depth = String(深度)
-      line.style.setProperty('--tree-depth', String(深度))
+      line.dataset.depth = String(depth)
+      line.style.setProperty('--tree-depth', String(depth))
       if (item.isDirectory) line.classList.add('file-list-dir')
 
       const 展开箭头 = document.createElement('span')
@@ -450,7 +450,7 @@ export class sidebar {
         container.append(子容器)
 
         if (this.已展开.has(item.path)) {
-          await this.展开目录(item.path, 子容器, 深度 + 1)
+          await this.展开目录(item.path, 子容器, depth + 1)
         }
 
         line.addEventListener('click', async () => {
@@ -462,7 +462,7 @@ export class sidebar {
             this.已展开.add(item.path)
             展开箭头.textContent = '▾'
             子容器.textContent = ''
-            await this.展开目录(item.path, 子容器, 深度 + 1)
+            await this.展开目录(item.path, 子容器, depth + 1)
           }
         })
       } else {

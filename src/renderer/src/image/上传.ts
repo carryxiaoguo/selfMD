@@ -130,17 +130,17 @@ export async function 上传并回填(
     return { 改写数: 0, failCount: 0, 失败摘要: '文档里没有本地图片，无需上传。' }
   }
 
-  const 回应 = await window.selfmd.image.upload(可传.map((img) => img.localPath as string))
+  const reply = await window.selfmd.image.upload(可传.map((img) => img.localPath as string))
 
-  if (回应.success.length === 0) {
-    const 原因 = 回应.failure[0]?.原因 ?? '上传失败，且没有返回原因。'
-    return { 改写数: 0, failCount: 可传.length, 失败摘要: 原因 }
+  if (reply.success.length === 0) {
+    const reason = reply.failure[0]?.reason ?? '上传失败，且没有返回原因。'
+    return { 改写数: 0, failCount: 可传.length, 失败摘要: reason }
   }
 
   // 原路径 → 远程地址。用绝对路径做键，因为同一张图可能在文档里
   // 被引用多次（相对路径写法还可能不同），但磁盘上是同一个文件。
   const map = new Map<string, string>()
-  for (const item of 回应.success) map.set(item.rawPath.replace(/\\/g, '/'), item.url)
+  for (const item of reply.success) map.set(item.rawPath.replace(/\\/g, '/'), item.url)
 
   const 改动: { from: number; to: number; insert: string }[] = []
   for (const img of 可传) {
@@ -173,8 +173,8 @@ export async function 上传并回填(
 
   return {
     改写数: 改动.length,
-    failCount: 回应.failure.length,
-    失败摘要: 回应.failure.map((item) => item.原因).join('；')
+    failCount: reply.failure.length,
+    失败摘要: reply.failure.map((item) => item.reason).join('；')
   }
 }
 

@@ -4,7 +4,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { basename, dirname, extname, isAbsolute, join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { 提取大纲, 渲染Markdown为HTML } from '@shared/markdown-html'
-import { 生效主题 } from '@shared/types'
+import { activeTheme } from '@shared/types'
 import { getAppPaths } from '../util/paths'
 import { getSettings } from '../services/settings'
 import { themePath, 主题自定义样式路径, 全局自定义样式路径 } from '../services/themes'
@@ -32,9 +32,9 @@ export interface 导出选项 {
   /** 当前文档路径，用于解析相对图片地址。没有则为 null。 */
   docPath: string | null
   /** 是否在导出结果里附带侧边目录（大纲）。 */
-  附大纲?: boolean
+  withOutline?: boolean
   /** 是否把本地图片内嵌成 base64（自包含单文件）。 */
-  内嵌图片?: boolean
+  embeddedImage?: boolean
   /** 导出格式。 */
   format: 导出格式
 }
@@ -143,10 +143,10 @@ body.selfmd-export * { -webkit-print-color-adjust: exact; print-color-adjust: ex
 function 构建目录(source: string): string {
   const headings = 提取大纲(source)
   if (headings.length === 0) return ''
-  const 最浅 = Math.min(...headings.map((t) => t.级别))
+  const 最浅 = Math.min(...headings.map((t) => t.level))
   const line = headings
     .map((title) => {
-      const indent = (title.级别 - 最浅) * 14
+      const indent = (title.level - 最浅) * 14
       const docText = title.docText || '（空标题）'
       const 转义 = docText.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
       // 锚点用位置偏移生成，与正文标题的 id 对应
@@ -184,7 +184,7 @@ const 图片MIME: Record<string, string> = {
  * 文档里，本来就不指望它离线可见。
  */
 function 内嵌本地图片(html: string, docPath: string | null): string {
-  return html.replace(/(<img[^>]+src=")([^"]+)(")/gi, (整体, before: string, url: string, 后: string) => {
+  return html.replace(/(<img[^>]+src=")([^"]+)(")/gi, (整体, before: string, url: string, after: string) => {
     if (/^(https?:|data:)/i.test(url)) return 整体
     // 还原百分号编码，中文路径才找得到文件
     let filePath = url
@@ -193,14 +193,14 @@ function 内嵌本地图片(html: string, docPath: string | null): string {
     } catch {
       // 编码损坏就按原样找
     }
-    const 基准 = docPath ? dirname(docPath) : getAppPaths().userImages
-    const 全 = isAbsolute(filePath) ? filePath : resolve(基准, filePath)
-    if (!existsSync(全)) return 整体
-    const kind = 图片MIME[extname(全).toLowerCase()]
+    const baseline = docPath ? dirname(docPath) : getAppPaths().userImages
+    const whole = isAbsolute(filePath) ? filePath : resolve(baseline, filePath)
+    if (!existsSync(whole)) return 整体
+    const kind = 图片MIME[extname(whole).toLowerCase()]
     if (!kind) return 整体
     try {
-      const data = readFileSync(全).toString('base64')
-      return `${before}data:${kind};base64,${data}${后}`
+      const data = readFileSync(whole).toString('base64')
+      return `${before}data:${kind};base64,${data}${after}`
     } catch {
       return 整体
     }
@@ -226,7 +226,7 @@ function tempDir(): string {
 /** 取当前主题的完整样式（三层级联），并做导出处理。 */
 async function 收集样式(): Promise<string> {
   const settings = getSettings()
-  const id = 生效主题(settings)
+  const id = activeTheme(settings)
   const 部件: string[] = []
 
   // 基础样式：带上设计变量与排版规则，否则导出的 HTML 无样式可依。
@@ -238,7 +238,7 @@ async function 收集样式(): Promise<string> {
   if (theme && existsSync(theme)) {
     部件.push(
       await 处理样式表(readFileSync(theme, 'utf8'), {
-        基准目录: getAppPaths().themes,
+        baseDir: getAppPaths().themes,
         导出模式: true
       })
     )
@@ -249,7 +249,7 @@ async function 收集样式(): Promise<string> {
       // 用户自定义样式同样要处理：里面可能有 @import
       部件.push(
         await 处理样式表(readFileSync(自定义, 'utf8'), {
-          基准目录: getAppPaths().themes,
+          baseDir: getAppPaths().themes,
           导出模式: true
         })
       )
@@ -278,8 +278,8 @@ function 读基础样式(): string | null {
 }
 
 export async function 构建导出HTML(options: 导出选项): Promise<string> {
-  const 附大纲 = options.附大纲 ?? true
-  const 内嵌 = options.内嵌图片 ?? true
+  const withOutline = options.withOutline ?? true
+  const 内嵌 = options.embeddedImage ?? true
 
   let body = 渲染Markdown为HTML(options.source)
   if (内嵌) body = 内嵌本地图片(body, options.docPath)
@@ -301,8 +301,8 @@ ${body}</div>
   }
 
   const style = await 收集样式()
-  const 类 = `selfmd-export${附大纲 ? ' selfmd-export-show-outline' : ''}`
-  const dir = 附大纲 ? 构建目录(options.source) : ''
+  const 类 = `selfmd-export${withOutline ? ' selfmd-export-show-outline' : ''}`
+  const dir = withOutline ? 构建目录(options.source) : ''
 
   return `<!doctype html>
 <html lang="zh-Hans">
@@ -393,19 +393,19 @@ export async function 检测Pandoc(): Promise<string | null> {
 
   const candidate = getSettings().pandocPath || 'pandoc'
   缓存的Pandoc路径 = await new Promise<string | null>((done) => {
-    let 子进程: ReturnType<typeof spawn>
+    let childProc: ReturnType<typeof spawn>
     try {
-      子进程 = spawn(candidate, ['--version'], { windowsHide: true })
+      childProc = spawn(candidate, ['--version'], { windowsHide: true })
     } catch {
       done(null)
       return
     }
     let output = ''
-    子进程.stdout?.on('data', (block) => {
+    childProc.stdout?.on('data', (block) => {
       output += String(block)
     })
-    子进程.on('error', () => done(null))
-    子进程.on('close', (码) => {
+    childProc.on('error', () => done(null))
+    childProc.on('close', (码) => {
       if (码 !== 0) {
         done(null)
         return
@@ -424,13 +424,13 @@ export async function 取Pandoc版本(): Promise<string | null> {
   const filePath = await 检测Pandoc()
   if (!filePath) return null
   return new Promise((done) => {
-    const 子进程 = spawn(filePath, ['--version'], { windowsHide: true })
+    const childProc = spawn(filePath, ['--version'], { windowsHide: true })
     let output = ''
-    子进程.stdout?.on('data', (block) => {
+    childProc.stdout?.on('data', (block) => {
       output += String(block)
     })
-    子进程.on('error', () => done(null))
-    子进程.on('close', () => {
+    childProc.on('error', () => done(null))
+    childProc.on('close', () => {
       done((/[\d.]+/.exec(output.split(/\r?\n/)[0] ?? '') ?? [])[0] ?? null)
     })
   })
@@ -446,8 +446,8 @@ const PANDOC格式: Record<string, string> = {
 }
 
 async function 导出经Pandoc(options: 导出选项): Promise<导出结果> {
-  const 程序 = await 检测Pandoc()
-  if (!程序) {
+  const program = await 检测Pandoc()
+  if (!program) {
     return {
       success: false,
       filePath: null,
@@ -469,7 +469,7 @@ async function 导出经Pandoc(options: 导出选项): Promise<导出结果> {
   const 中间文件 = join(中间目录, `导出-${Date.now()}.html`)
   writeFileSync(
     中间文件,
-    await 构建导出HTML({ ...options, format: 'html', 附大纲: false, 内嵌图片: true }),
+    await 构建导出HTML({ ...options, format: 'html', withOutline: false, embeddedImage: true }),
     'utf8'
   )
 
@@ -478,9 +478,9 @@ async function 导出经Pandoc(options: 导出选项): Promise<导出结果> {
   return new Promise<导出结果>((done) => {
     const params = [中间文件, '-f', 'html', '-t', 目标格式, '-o', options.target, '--standalone']
     let 错误输出 = ''
-    let 子进程: ReturnType<typeof spawn>
+    let childProc: ReturnType<typeof spawn>
     try {
-      子进程 = spawn(程序, params, {
+      childProc = spawn(program, params, {
         windowsHide: true,
         // 以文档所在目录为工作目录，相对资源才能被 Pandoc 找到
         cwd: options.docPath ? dirname(options.docPath) : 中间目录
@@ -494,13 +494,13 @@ async function 导出经Pandoc(options: 导出选项): Promise<导出结果> {
       return
     }
 
-    子进程.stderr?.on('data', (block) => {
+    childProc.stderr?.on('data', (block) => {
       错误输出 += String(block)
     })
-    子进程.on('error', (error) => {
+    childProc.on('error', (error) => {
       done({ success: false, filePath: null, error: `Pandoc 执行失败：${error.message}` })
     })
-    子进程.on('close', (码) => {
+    childProc.on('close', (码) => {
       if (码 === 0) done({ success: true, filePath: options.target, error: null })
       else {
         done({
@@ -519,16 +519,16 @@ async function 导出经Pandoc(options: 导出选项): Promise<导出结果> {
 
 /** 各格式是否可用（供菜单决定是否置灰）。 */
 export async function 可用格式(): Promise<Record<导出格式, boolean>> {
-  const 有Pandoc = (await 检测Pandoc()) !== null
+  const hasPandoc = (await 检测Pandoc()) !== null
   return {
     html: true,
     'html-plain': true,
     pdf: true,
-    docx: 有Pandoc,
-    latex: 有Pandoc,
-    epub: 有Pandoc,
-    rtf: 有Pandoc,
-    odt: 有Pandoc
+    docx: hasPandoc,
+    latex: hasPandoc,
+    epub: hasPandoc,
+    rtf: hasPandoc,
+    odt: hasPandoc
   }
 }
 
@@ -560,7 +560,7 @@ export async function 试渲染(source: string, format: 导出格式 = 'html'): 
     target: '',
     docPath: null,
     format,
-    附大纲: true,
-    内嵌图片: false
+    withOutline: true,
+    embeddedImage: false
   })
 }

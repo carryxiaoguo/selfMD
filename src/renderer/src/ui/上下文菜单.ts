@@ -16,8 +16,8 @@ export interface menuItem {
   /** 点击后的动作。省略即为不可点（配合 `禁用` 或纯标题）。 */
   action?: () => void
   /** 插入一条分隔线；其余字段忽略。 */
-  分隔?: boolean
-  禁用?: boolean
+  separator?: boolean
+  disabled?: boolean
   /** 右侧显示的快捷键提示，纯展示。 */
   hint?: string
   /** 在文字前显示一个勾。 */
@@ -30,7 +30,7 @@ export interface menuItem {
    * 与主流 Markdown 编辑器一致：段落类型、格式这类"一族"的操作收进子菜单，
    * 否则一次要列出二十多项，找一项得扫半屏。
    */
-  子项?: menuItem[]
+  children?: menuItem[]
 }
 
 let 当前菜单: HTMLElement | null = null
@@ -64,13 +64,13 @@ function 收起子菜单(): void {
  *
  * @param 是子菜单 子菜单不注册全局收尾，它的生死由父菜单管
  */
-function 建立菜单(项们: menuItem[], 是子菜单 = false): HTMLElement {
+function 建立菜单(items: menuItem[], 是子菜单 = false): HTMLElement {
   const menu = document.createElement('div')
   menu.className = 是子菜单 ? 'selfmd-menu selfmd-submenu' : 'selfmd-menu'
   menu.setAttribute('role', 'menu')
 
-  for (const item of 项们) {
-    if (item.分隔) {
+  for (const item of items) {
+    if (item.separator) {
       const 线 = document.createElement('div')
       线.className = 'selfmd-menu-sep'
       menu.append(线)
@@ -82,10 +82,10 @@ function 建立菜单(项们: menuItem[], 是子菜单 = false): HTMLElement {
     line.type = 'button'
     line.setAttribute('role', 'menuitem')
 
-    const 有子项 = Boolean(item.子项 && item.子项.length > 0) && !item.禁用
+    const 有子项 = Boolean(item.children && item.children.length > 0) && !item.disabled
     // 没有动作的一律当标题处理，视觉上也区分开。
     // 有子项的行不执行动作，但它**是可点的**——置灰会让人以为整族都不可用。
-    const 可点 = (Boolean(item.action) || 有子项) && !item.禁用
+    const 可点 = (Boolean(item.action) || 有子项) && !item.disabled
     if (!可点) line.classList.add('disabled')
     if (item.危险) line.classList.add('danger')
     line.disabled = !可点
@@ -116,7 +116,7 @@ function 建立菜单(项们: menuItem[], 是子菜单 = false): HTMLElement {
 
       // 用 hover 展开而不是 click：菜单的惯例是"指过去就开"，
       // 要多点一次会让人以为这一项是禁用的。
-      line.addEventListener('mouseenter', () => 展开子菜单(line, item.子项 ?? []))
+      line.addEventListener('mouseenter', () => 展开子菜单(line, item.children ?? []))
       // 离开时收起，但要把"指针正移向子菜单"的情况排除掉——
       // 否则指针一离开行、还没进子菜单，子菜单就没了，永远点不到。
       line.addEventListener('mouseleave', (event) => {
@@ -149,10 +149,10 @@ function 建立菜单(项们: menuItem[], 是子菜单 = false): HTMLElement {
 }
 
 /** 在某一行右侧展开子菜单；右边放不下就翻到左侧。 */
-function 展开子菜单(宿主行: HTMLElement, 项们: menuItem[]): void {
+function 展开子菜单(宿主行: HTMLElement, items: menuItem[]): void {
   收起子菜单()
 
-  const child = 建立菜单(项们, true)
+  const child = 建立菜单(items, true)
   document.body.append(child)
 
   const 行框 = 宿主行.getBoundingClientRect()
@@ -179,10 +179,10 @@ function 展开子菜单(宿主行: HTMLElement, 项们: menuItem[]): void {
  *
  * @param 位置 视口坐标（通常取自 `MouseEvent.clientX/clientY`）
  */
-export function popupMenu(position: { x: number; y: number }, 项们: menuItem[]): void {
+export function popupMenu(position: { x: number; y: number }, items: menuItem[]): void {
   closeMenu()
 
-  const menu = 建立菜单(项们)
+  const menu = 建立菜单(items)
 
   // 先挂到 DOM 才能量尺寸，量完再定位，避免先闪一下再跳到正确位置
   document.body.append(menu)

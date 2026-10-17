@@ -28,7 +28,7 @@ export interface 关联状态 {
   有新建菜单: boolean
 }
 
-const 扩展 = '.md'
+const extension = '.md'
 const 本程序ProgId = 'selfMD.md'
 
 /** 读一个注册表值；不存在或读不到时返回空串。 */
@@ -76,14 +76,14 @@ function 键存在(key: string): boolean {
  * `Classes\.md` 可能还指着 selfMD。
  */
 export function 取关联状态(): 关联状态 {
-  const 用户选择 = 读注册表(`HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\FileExts\\${扩展}\\UserChoice`, 'ProgId')
-  const 类默认 = 读注册表(`HKCU\\Software\\Classes\\${扩展}`, '(默认)')
+  const 用户选择 = 读注册表(`HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\FileExts\\${extension}\\UserChoice`, 'ProgId')
+  const 类默认 = 读注册表(`HKCU\\Software\\Classes\\${extension}`, '(默认)')
   const current = 用户选择 || 类默认
 
   return {
     current,
     是默认: current === 本程序ProgId,
-    有新建菜单: 键存在(`HKCU\\Software\\Classes\\${扩展}\\ShellNew`)
+    有新建菜单: 键存在(`HKCU\\Software\\Classes\\${extension}\\ShellNew`)
   }
 }
 

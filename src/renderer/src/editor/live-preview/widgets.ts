@@ -118,13 +118,13 @@ export class 代码块头部 extends WidgetType {
     box.setAttribute('aria-label', '代码块设置')
 
     // --- 折叠 -----------------------------------------------------------
-    const 折叠 = document.createElement('button')
-    折叠.type = 'button'
-    折叠.className = 'cm-w-codehead-btn cm-w-codehead-fold'
-    折叠.textContent = '▾'
-    折叠.title = '折叠代码块'
-    折叠.setAttribute('aria-label', '折叠代码块')
-    折叠.addEventListener('click', (event) => {
+    const fold = document.createElement('button')
+    fold.type = 'button'
+    fold.className = 'cm-w-codehead-btn cm-w-codehead-fold'
+    fold.textContent = '▾'
+    fold.title = '折叠代码块'
+    fold.setAttribute('aria-label', '折叠代码块')
+    fold.addEventListener('click', (event) => {
       event.preventDefault()
       // 先把光标放到围栏首行，折叠才会作用在这个块上——
       // 否则折的是光标当前所在的那个块，用户会觉得"点错了"。
@@ -195,7 +195,7 @@ export class 代码块头部 extends WidgetType {
       )
     })
 
-    box.append(折叠, displayName, language, font, style, copy)
+    box.append(fold, displayName, language, font, style, copy)
     return box
   }
 
@@ -545,8 +545,8 @@ let mermaid模块: Promise<typeof import('mermaid').default> | null = null
 
 async function 取Mermaid(): Promise<typeof import('mermaid').default> {
   mermaid模块 ??= import('mermaid').then((模) => {
-    const 取 = 模 as unknown as { default?: unknown }
-    return (取.default ?? 模) as unknown as typeof import('mermaid').default
+    const take = 模 as unknown as { default?: unknown }
+    return (take.default ?? 模) as unknown as typeof import('mermaid').default
   })
   const mermaid = await mermaid模块
   return mermaid
@@ -677,8 +677,8 @@ let katex模块: Promise<{ render: typeof import('katex').default.render }> | nu
 async function 取KaTeX(): Promise<{ render: typeof import('katex').default.render }> {
   katex模块 ??= import('katex').then((模) => {
     // Vite 对 CommonJS 的默认导出处理：有的形态挂在 `.default` 上
-    const 取 = 模 as unknown as { default?: { render: unknown }; render?: unknown }
-    return (取.default ?? 模) as unknown as { render: typeof import('katex').default.render }
+    const take = 模 as unknown as { default?: { render: unknown }; render?: unknown }
+    return (take.default ?? 模) as unknown as { render: typeof import('katex').default.render }
   })
   return katex模块
 }
@@ -697,18 +697,18 @@ async function 取KaTeX(): Promise<{ render: typeof import('katex').default.rend
 export class 数学公式 extends WidgetType {
   constructor(
     readonly formula: string,
-    readonly 块级: boolean
+    readonly blockLevel: boolean
   ) {
     super()
   }
 
   override eq(other: 数学公式): boolean {
-    return other.formula === this.formula && other.块级 === this.块级
+    return other.formula === this.formula && other.blockLevel === this.blockLevel
   }
 
   override toDOM(): HTMLElement {
-    const box = document.createElement(this.块级 ? 'div' : 'span')
-    box.className = this.块级
+    const box = document.createElement(this.blockLevel ? 'div' : 'span')
+    box.className = this.blockLevel
       ? 'cm-w-math cm-w-math-block md-math-block'
       : 'cm-w-math cm-w-math-inline md-inline-math'
     box.setAttribute('data-math', this.formula)
@@ -720,7 +720,7 @@ export class 数学公式 extends WidgetType {
       try {
         const katex = await 取KaTeX()
         katex.render(this.formula, box, {
-          displayMode: this.块级,
+          displayMode: this.blockLevel,
           throwOnError: false,
           // 出错时的颜色；正常渲染的颜色由 CSS 接管
           errorColor: '#cc0000',

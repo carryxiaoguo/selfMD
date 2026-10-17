@@ -1,5 +1,5 @@
 import type { EditorState } from '@codemirror/state'
-import { takeDocDir, parseImageUrl } from '../../image/显示地址'
+import { takeDocDir, parseImageUrl } from '../../image/display-src'
 import { blockLineStyles, hidden, inlineStyles, replaceWith } from './decorations'
 import { addLineDeco } from './types'
 import { image } from './widgets'

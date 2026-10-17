@@ -10,7 +10,7 @@ import {
   样式顺序,
   parseFenceFirstLine,
   type FenceInfo
-} from '@shared/代码块信息'
+} from '@shared/code-block-info'
 
 /**
  * 内联 widget 集合。

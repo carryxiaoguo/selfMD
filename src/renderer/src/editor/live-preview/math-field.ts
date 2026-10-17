@@ -1,6 +1,6 @@
 import { RangeSet, StateField, type EditorState } from '@codemirror/state'
 import { Decoration, EditorView, type DecorationSet } from '@codemirror/view'
-import { findBlockMath } from '@shared/数学'
+import { findBlockMath } from '@shared/math'
 import { 检测数学块 } from './block'
 import { 数学公式 } from './widgets'
 

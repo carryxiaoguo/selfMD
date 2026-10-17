@@ -3,13 +3,13 @@ import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { EV } from '@shared/ipc'
-import { iconPath } from './util/资源路径'
+import { iconPath } from './util/resource-path'
 import { registerIpc } from './ipc'
 import { whenDocumentOpened, whenRendererReady } from './ipc/app'
 import { registerPrivilegedSchemes, registerProtocolHandlers } from './protocol'
 import { rebuildMenu, 菜单摘要, 设置Pandoc可用 } from './menu'
 import { detectPandoc, runExport } from './export'
-import { getAssocStatus } from './services/文件关联'
+import { getAssocStatus } from './services/file-association'
 import {
   writeDraft,
   listDrafts,

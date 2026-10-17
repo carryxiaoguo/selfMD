@@ -3,7 +3,7 @@ import { EditorSelection, EditorState } from '@codemirror/state'
 import type { EditorView } from '@codemirror/view'
 import { renderMarkdownToHtml } from '@shared/markdown-html'
 import { PrefsSchema, 全部设置项, validateSchema } from '@shared/settings-schema'
-import { findBlockMath, scanInlineMath } from '@shared/数学'
+import { findBlockMath, scanInlineMath } from '@shared/math'
 import { DEFAULT_SETTINGS, type uploaderType } from '@shared/types'
 import { buildUploadCmd, parseUploadResult } from '@shared/upload-parse'
 import { extractHeadings, locateHeading } from '../ui/outline'
@@ -18,7 +18,7 @@ import {
   setHeadingLevel
 } from './commands'
 import { 换引号, 换破折号, scanPunct } from './smart-punctuation'
-import { fuzzyScore, 模糊筛选, pathTail } from '@shared/模糊匹配'
+import { fuzzyScore, 模糊筛选, pathTail } from '@shared/fuzzy'
 import { sentenceRange, 词区间 } from './selection'
 import { readFrontMatter, setAttr, removeAttr } from '@shared/front-matter'
 import {

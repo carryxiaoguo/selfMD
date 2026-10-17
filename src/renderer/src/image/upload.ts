@@ -1,8 +1,8 @@
 import { syntaxTree } from '@codemirror/language'
 import { EditorSelection, type EditorState } from '@codemirror/state'
 import type { EditorView } from '@codemirror/view'
-import { isolatedUndo } from '../editor/独立撤销'
-import { takeDocDir, 是本地图片地址 } from './显示地址'
+import { isolatedUndo } from '../editor/isolated-undo'
+import { takeDocDir, 是本地图片地址 } from './display-src'
 import { 转义图片地址 } from './reference'
 
 /**

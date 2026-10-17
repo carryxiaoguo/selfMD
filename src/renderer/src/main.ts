@@ -5,10 +5,10 @@ import { Compartment, EditorSelection, EditorState, type Extension } from '@code
 import { EditorView } from '@codemirror/view'
 import { removeAttr, readFrontMatter, setAttr } from '@shared/front-matter'
 import { renderMarkdownToHtml } from '@shared/markdown-html'
-import { 标签管理器, type label } from './services/标签'
-import { 打开快速打开面板 } from './ui/快速打开'
+import { 标签管理器, type label } from './services/tabs'
+import { 打开快速打开面板 } from './ui/quick-open'
 import { sidebarShown, 侧边栏被锁定, activeTheme, type DraftInfo } from '@shared/types'
-import { 解析围栏信息 } from '@shared/代码块信息'
+import { 解析围栏信息 } from '@shared/code-block-info'
 import type { MenuCommandPayload } from '@shared/ipc'
 import type { ImageStoragePolicy, Settings } from '@shared/types'
 import {
@@ -38,7 +38,7 @@ import {
   表格删列,
   表格删行,
   tableAlign
-} from './editor/表格'
+} from './editor/table'
 import { 运行大纲自测, 运行导出自测, 运行上传自测, 运行数学自测, 运行渲染标点自测, 运行模糊匹配自测, 运行偏好设置自测, 运行图片管线自测, 运行纯函数自测, 运行命令自测 } from './editor/selftest'
 import {
   删除当前行或句,
@@ -53,8 +53,8 @@ import {
 import { 专注模式扩展, 居中光标行 } from './editor/focus'
 import { setInlineMathEnabled, setPunctuationRenderingEnabled } from './editor/live-preview/types'
 import { 设置图片右键处理器 } from './editor/live-preview/widgets'
-import { 收集文档图片, 上传并回填, type 回填结果, type docImages } from './image/上传'
-import { setDocDir, parseImageUrl, takeDocDir } from './image/显示地址'
+import { 收集文档图片, 上传并回填, type 回填结果, type docImages } from './image/upload'
+import { setDocDir, parseImageUrl, takeDocDir } from './image/display-src'
 import {
   取当前图片,
   删除图片文件,
@@ -64,8 +64,8 @@ import {
   转换图片语法,
   重命名或移动图片,
   type imageContext
-} from './image/图片操作'
-import { popupMenu, closeMenu, type menuItem } from './ui/上下文菜单'
+} from './image/image-ops'
+import { popupMenu, closeMenu, type menuItem } from './ui/context-menu'
 import { 图片粘贴与拖放 } from './image/handlers'
 import {
   type InsertRequest,
@@ -100,7 +100,7 @@ const modeCompartment = new Compartment()
  * 让"改写文档结构"这类命令在撤销栈里独占一步。定义在
  * `editor/独立撤销.ts`，上传回填也要用同一份注解。
  */
-import { isolatedUndo } from './editor/独立撤销'
+import { isolatedUndo } from './editor/isolated-undo'
 
 const doc = new DocumentService()
 let settings: Settings

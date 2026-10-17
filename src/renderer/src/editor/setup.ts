@@ -18,7 +18,7 @@ import {
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown'
 import { languages } from '@codemirror/language-data'
 import { highlightSelectionMatches, search, searchKeymap } from '@codemirror/search'
-import { 界面中文化 } from './本地化'
+import { 界面中文化 } from './localization'
 import { EditorState, type Extension } from '@codemirror/state'
 import {
   EditorView,
@@ -37,7 +37,7 @@ import type { Settings } from '@shared/types'
 import { livePreview } from './live-preview'
 import { 按设置构建智能标点 } from './smart-punctuation'
 import { continueCodeFence, continueQuote, exitCodeBlock } from './commands'
-import { moveToAdjacentCell } from './表格'
+import { moveToAdjacentCell } from './table'
 
 /**
  * CodeMirror 6 装配。

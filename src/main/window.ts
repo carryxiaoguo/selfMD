@@ -2,7 +2,7 @@ import { BrowserWindow, session, shell } from 'electron'
 import { join } from 'node:path'
 import { EV } from '@shared/ipc'
 import type { Settings } from '@shared/types'
-import { iconPath } from './util/资源路径'
+import { iconPath } from './util/resource-path'
 import { rebuildMenu } from './menu'
 import { getSettings } from './services/settings'
 

@@ -1,5 +1,5 @@
 import type { EditorState } from '@codemirror/state'
-import { scanInlineMath } from '@shared/数学'
+import { scanInlineMath } from '@shared/math'
 import { scanPunct } from '../smart-punctuation'
 import {
   blockLineStyles,
@@ -23,7 +23,7 @@ import {
   calloutHint,
   计算层级
 } from './widgets'
-import { BUILTIN_FONTS, infoRoundTrips, parseFenceFirstLine } from '@shared/代码块信息'
+import { BUILTIN_FONTS, infoRoundTrips, parseFenceFirstLine } from '@shared/code-block-info'
 
 /**
  * 块级装饰。

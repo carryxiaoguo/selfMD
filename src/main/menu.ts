@@ -5,7 +5,7 @@ import { activeTheme } from '@shared/types'
 import { listRecent } from './services/recent'
 import { listThemes } from './services/themes'
 import { getSettings } from './services/settings'
-import { iconPath } from './util/资源路径'
+import { iconPath } from './util/resource-path'
 
 /**
  * 原生应用菜单。

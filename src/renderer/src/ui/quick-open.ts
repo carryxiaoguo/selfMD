@@ -9,7 +9,7 @@
  * 为什么建一次索引而不是每次敲键都查盘：查盘是毫秒级的，但目录一大
  * 就会让每次按键都卡一下，而"快速打开"的全部意义就在于快。
  */
-import { 模糊筛选, pathTail } from '@shared/模糊匹配'
+import { 模糊筛选, pathTail } from '@shared/fuzzy'
 
 interface fileRow {
   filePath: string

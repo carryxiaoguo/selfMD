@@ -10,8 +10,8 @@ import {
 } from '@codemirror/view'
 import { 扫描手工块, 处理块级 } from './block'
 import { 处理行内 } from './inline'
-import { 数学字段 } from './数学字段'
-import { 建立图表字段 } from './图表字段'
+import { 数学字段 } from './math-field'
+import { 建立图表字段 } from './diagram-field'
 import type { BuildContext, 装饰条目, SyntaxNode } from './types'
 
 /**

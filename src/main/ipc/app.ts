@@ -5,7 +5,7 @@ import type { AppInfo, AppPaths, TaskProgress } from '@shared/ipc'
 import { CH, EV } from '@shared/ipc'
 import { activeTheme, type Settings } from '@shared/types'
 import { 可用格式, runExport, 取Pandoc版本 } from '../export'
-import { 复制为图片 } from '../export/图片'
+import { 复制为图片 } from '../export/image'
 import {
   writeDraft,
   listDrafts,
@@ -42,7 +42,7 @@ import {
 import { getAppPaths } from '../util/paths'
 import { closeWindow, createWindow, takePendingPath } from '../window'
 import { rebuildMenu } from '../menu'
-import { 打开默认应用设置, 本程序路径, getAssocStatus } from '../services/文件关联'
+import { 打开默认应用设置, 本程序路径, getAssocStatus } from '../services/file-association'
 
 /** 向所有渲染进程广播事件。 */
 export function broadcast(channel: string, payload: unknown): void {

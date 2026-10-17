@@ -1,7 +1,7 @@
 import { syntaxTree } from '@codemirror/language'
 import { EditorSelection, type EditorState } from '@codemirror/state'
 import type { EditorView } from '@codemirror/view'
-import { isolatedUndo } from '../editor/独立撤销'
+import { isolatedUndo } from '../editor/isolated-undo'
 import { takeFileName } from '@shared/image-path'
 
 /**

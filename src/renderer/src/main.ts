@@ -1107,49 +1107,69 @@ async function 运行右键菜单自测(): Promise<string> {
 async function 运行表格自测(): Promise<string> {
   const 原表 = ['| 甲 | 乙 | 丙 |', '| --- | --- | --- |', '| 1 | 2 | 3 |'].join('\n')
   const 备份 = view.state
-  view.setState(EditorState.create({ doc: 原表, extensions: 编辑器扩展() }))
-  设置文档目录(null)
-  await new Promise((完成) => setTimeout(完成, 80))
-
   const 结果: string[] = []
+
+  /**
+   * 每一项都从**全新的文档**开始。
+   *
+   * 第一版是连着改同一份文档的：增列留下的结构变化把后面「对齐」的判断
+   * 带偏了，失败信息里根本看不出是哪一步坏的。独立之后每个结论只对应
+   * 一个动作，坏了就能直接定位。
+   */
+  const 重来 = async (): Promise<void> => {
+    view.setState(EditorState.create({ doc: 原表, extensions: 编辑器扩展() }))
+    设置文档目录(null)
+    await new Promise((完成) => setTimeout(完成, 60))
+  }
   const 第 = (n: number): string => view.state.doc.line(n).text
+  const 竖线数 = (): number => (第(1).match(/\|/g) ?? []).length
 
   // --- Tab 跳到下一格 -------------------------------------------------
-  // 光标放在第一格「甲」里
+  await 重来()
   view.dispatch({ selection: { anchor: 2 } })
   跳到相邻单元格(view, 1)
-  const 跳后 = view.state.selection.main.head
-  // 第二格「乙」在 `| 甲 | 乙 |` 里的位置大约 7
-  结果.push(`Tab跳格=${/乙/.test(view.state.doc.lineAt(跳后).text.slice(跳后 - view.state.doc.lineAt(跳后).from)) ? '对' : '错'}`)
+  const 落点 = view.state.selection.main.head
+  结果.push('Tab跳格=' + (view.state.sliceDoc(落点, 落点 + 1) === '乙' ? '对' : '错'))
 
   // --- 末格再 Tab 自动补一行 -------------------------------------------
+  await 重来()
   view.dispatch({ selection: { anchor: 第(3).length + view.state.doc.line(3).from - 1 } })
   跳到相邻单元格(view, 1)
-  结果.push(`末格补行=${view.state.doc.lines === 4 ? '对' : `错(${view.state.doc.lines}行)`}`)
+  结果.push('末格补行=' + (view.state.doc.lines === 4 ? '对' : '错(' + view.state.doc.lines + '行)'))
 
   // --- 增行 / 删行 -----------------------------------------------------
+  await 重来()
   view.dispatch({ selection: { anchor: 2 } })
   表格增行(view)
   const 增后 = view.state.doc.lines
+  await 重来()
+  view.dispatch({ selection: { anchor: 第(3).length + view.state.doc.line(3).from - 1 } })
   表格删行(view)
-  结果.push(`增删行=${增后 === 5 && view.state.doc.lines === 4 ? '对' : `错(${增后}/${view.state.doc.lines})`}`)
+  const 删后 = view.state.doc.lines
+  结果.push('增行=' + (增后 === 4 ? '对' : '错(' + 增后 + ')') + ' 删行=' + (删后 === 2 ? '对' : '错(' + 删后 + ')'))
 
   // --- 增列 / 删列 -----------------------------------------------------
+  await 重来()
   view.dispatch({ selection: { anchor: 2 } })
   表格增列(view)
-  const 列数增 = (第(1).match(/\|/g) ?? []).length
+  const 增列 = 竖线数()
+  await 重来()
+  view.dispatch({ selection: { anchor: 2 } })
   表格删列(view)
-  const 列数删 = (第(1).match(/\|/g) ?? []).length
-  // 三个格子 = 4 条竖线；加一列变 5，删回 4
-  结果.push(`增删列=${列数增 === 5 && 列数删 === 4 ? '对' : `错(${列数增}/${列数删})`}`)
+  const 删列 = 竖线数()
+  // 三个格子 = 4 条竖线；加一列 5 条，删一列 3 条
+  结果.push('增删列=' + (增列 === 5 && 删列 === 3 ? '对' : '错(' + 增列 + '/' + 删列 + ')'))
 
   // --- 对齐 -----------------------------------------------------------
+  await 重来()
   view.dispatch({ selection: { anchor: 2 } })
   表格对齐(view, 'center')
-  结果.push(`对齐=${/:---:/.test(第(2)) ? '对' : `错(${第(2)})`}`)
-
-  // 对齐行必须还是对齐行——插列时若把它写成空格，整张表就不成表了
-  结果.push(`对齐行有效=${是对齐行(第(2)) ? '对' : '错'}`)
+  // 对齐必须改**第二行**（对齐定义行），且改完还得是合法的对齐行
+  const 二 = 第(2)
+  结果.push(
+    '对齐=' + (/:---:/.test(二) ? '对' : '错(' + 二 + ')') +
+      ' 对齐行有效=' + (是对齐行(二) ? '对' : '错')
+  )
 
   view.setState(备份)
   await new Promise((完成) => setTimeout(完成, 60))
@@ -3244,19 +3264,31 @@ async function openPath(path: string): Promise<void> {
         const 引用 = Array.from(document.querySelectorAll('.cm-lp-quote'))
         if (引用.length > 0) {
           const 原文档 = view.state.doc.toString()
-          const 末 = view.state.doc.line(view.state.doc.lines)
-          view.dispatch({ selection: { anchor: 末.to } })
-          const 成功 = 继续引用块(view)
-          const 新末行 = view.state.doc.line(view.state.doc.lines).text
+          // **不能取"最后一行"**：夹具末尾有个换行，最后一行是空行，
+          // 它不以 `>` 开头，命令自然不触发——测出来的"否"是假阴性。
+          // 要取最后一个真正的引用行。
+          let 目标行号 = -1
+          for (let n = view.state.doc.lines; n >= 1; n--) {
+            if (/^\s*>/.test(view.state.doc.line(n).text)) {
+              目标行号 = n
+              break
+            }
+          }
+          let 触发 = '否'
+          let 仍是 = '否'
+          if (目标行号 > 0) {
+            const 目标行 = view.state.doc.line(目标行号)
+            view.dispatch({ selection: { anchor: 目标行.to } })
+            触发 = 继续引用块(view) ? '是' : '否'
+            // 新行紧跟在**目标行**后面（不是文档末尾——夹具末尾还有一个空行）
+            仍是 = /^\s*>/.test(view.state.doc.line(目标行号 + 1).text) ? '是' : '否'
+          }
           // 复原，别把后面的用例带偏
           view.dispatch({
             changes: { from: 0, to: view.state.doc.length, insert: 原文档 },
             selection: { anchor: 0 }
           })
-          console.log(
-            `[selfMD] 回车续引用：触发=${成功 ? '是' : '否'} ` +
-              `新行仍是引用=${/^\s*>/.test(新末行) ? '是' : `否(${JSON.stringify(新末行)})`}`
-          )
+          console.log(`[selfMD] 回车续引用：触发=${触发} 新行仍是引用=${仍是}`)
         }
       }
 

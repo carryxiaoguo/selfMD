@@ -25,13 +25,13 @@ export { takeFileName, 取目录, uniqueFileName, timestampImageName } from '@sh
 // 解析
 // ---------------------------------------------------------------------------
 
-export interface 目标解析输入 {
+export interface ResolveTargetInput {
   /** 当前文档所在目录的绝对路径；未保存的文档为 null。 */
   docDir: string | null
   /** 当前文档的文件名（含扩展名）；未保存的文档为 null。 */
   docName: string | null
   /** TextBundle / TextPack：图片一律进包的 `assets/`。 */
-  是文本包: boolean
+  isTextBundle: boolean
   /** 文档内 `image-folder` 的值；没有则为 null。 */
   docSettings: string | null
   /** 全局的图片存储策略。 */
@@ -72,20 +72,20 @@ function 替换文件名占位符(template: string, docName: string | null): str
  *   2. 文档级设置（YAML 前置元数据）
  *   3. 全局策略
  */
-export function resolveTargetDir(input: 目标解析输入): 目标结果 {
+export function resolveTargetDir(input: ResolveTargetInput): 目标结果 {
   // --- 1. 文本包：图片是包的内部资源，用户没有选择余地 -------------------
-  if (input.是文本包) {
+  if (input.isTextBundle) {
     if (!input.docDir) return { kind: '需要保存' }
     return { kind: '目录', filePath: concat(input.docDir, 'assets'), origin: '文本包' }
   }
 
   // --- 2. 文档级设置优先于全局 ------------------------------------------
-  const 文档级 = input.docSettings?.trim()
-  if (文档级 && 文档级.length > 0) {
-    if ((input.autoUploadAllowed || input.强制上传) && 是上传标记(文档级)) {
+  const docLevel = input.docSettings?.trim()
+  if (docLevel && docLevel.length > 0) {
+    if ((input.autoUploadAllowed || input.强制上传) && 是上传标记(docLevel)) {
       return { kind: '上传', origin: '文档级设置' }
     }
-    const expand = 替换文件名占位符(文档级, input.docName)
+    const expand = 替换文件名占位符(docLevel, input.docName)
     if (isAbsolute(expand)) return { kind: '目录', filePath: normalizePath(expand), origin: '文档级设置' }
     if (!input.docDir) return { kind: '需要保存' }
     return { kind: '目录', filePath: concat(input.docDir, expand), origin: '文档级设置' }
@@ -144,7 +144,7 @@ export function 是数据地址(source: string): boolean {
   return /^\s*data:/i.test(source)
 }
 
-export interface 搬运判定输入 {
+export interface MoveDecisionInput {
   /** 图片的原始 src。 */
   source: string
   /** 解析出的目标目录绝对路径（`上传` 与 `不动` 不参与本判定）。 */
@@ -163,7 +163,7 @@ export interface 搬运判定输入 {
  *   - `data:` 内联图片没有实体文件可搬
  *   - 用户关掉了对应来源的自动搬运
  */
-export function 应当搬运(input: 搬运判定输入): boolean {
+export function 应当搬运(input: MoveDecisionInput): boolean {
   const { source, targetDir } = input
   if (!source || !targetDir) return false
   // 已经在目标目录内：路径前缀匹配，且后面确实还有一层，不是目录本身。

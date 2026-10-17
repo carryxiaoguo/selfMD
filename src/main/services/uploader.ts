@@ -52,7 +52,7 @@ export interface uploadResult {
 }
 
 /** PicGo / PicList 的本地端点。 */
-const 本地端点 = 'http://127.0.0.1:36677/upload'
+const localEndpoint = 'http://127.0.0.1:36677/upload'
 
 /** 走 HTTP 的两种上传器。 */
 function 是应用模式(uploader: uploaderType): boolean {
@@ -62,7 +62,7 @@ function 是应用模式(uploader: uploaderType): boolean {
 /** 一次 HTTP 上传尝试。连不上时返回 null 而不是抛异常。 */
 async function 试HTTP上传(paths: string[]): Promise<string | null> {
   try {
-    const response = await net.fetch(本地端点, {
+    const response = await net.fetch(localEndpoint, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ list: paths })
@@ -106,7 +106,7 @@ async function 应用模式上传(paths: string[]): Promise<{ url: string[]; err
     return {
       url: [],
       error:
-        `无法连接 ${name} 的本地服务（${本地端点}）。` +
+        `无法连接 ${name} 的本地服务（${localEndpoint}）。` +
         `请先启动 ${name}，或在「偏好设置 → 图片」里填写它的可执行文件路径，` +
         `以便自动启动。`
     }
@@ -123,7 +123,7 @@ async function 应用模式上传(paths: string[]): Promise<{ url: string[]; err
   if (retryCount === null) {
     return {
       url: [],
-      error: `已尝试启动 ${program}，但等待 ${启动等待 / 1000} 秒后仍未连上 ${本地端点}。`
+      error: `已尝试启动 ${program}，但等待 ${启动等待 / 1000} 秒后仍未连上 ${localEndpoint}。`
     }
   }
   return parseUploadResult(retryCount, settings.imageUploader, paths.length)
@@ -142,7 +142,7 @@ async function 命令行上传(
   for (const filePath of paths) {
     const command = buildUploadCmd(uploader, filePath, {
       customCommand: settings.customImageUploader,
-      用户数据目录: getAppPaths().userData.replace(/\\/g, '/'),
+      userDataDir: getAppPaths().userData.replace(/\\/g, '/'),
       platform: process.platform === 'win32' ? 'win32' : process.platform === 'darwin' ? 'darwin' : 'linux'
     })
 
@@ -158,9 +158,9 @@ async function 命令行上传(
 
     try {
       const { stdout } = await run(command, { maxBuffer: 输出上限, windowsHide: true })
-      const 单个 = parseUploadResult(stdout, uploader, 1)
-      if (单个.error) return { url: [], error: 单个.error }
-      url.push(...单个.url)
+      const singleOne = parseUploadResult(stdout, uploader, 1)
+      if (singleOne.error) return { url: [], error: singleOne.error }
+      url.push(...singleOne.url)
     } catch (error) {
       const docText = error instanceof Error ? error.message : String(error)
       return { url: [], error: `执行上传命令失败：${docText.slice(0, 300)}` }

@@ -22,7 +22,7 @@ import { join, relative, resolve } from 'node:path'
 const 根 = resolve(process.argv[2] ?? process.cwd())
 
 /** 本脚本自身必须豁免：它的词表是拼出来的，注释里也会解释这些词指什么。 */
-const 工具脚本 = new Set([resolve(根, 'scripts', '检查品牌痕迹.mjs')])
+const 工具脚本 = new Set([resolve(根, 'scripts', 'check-branding.mjs')])
 
 const 跳过目录 = ['node_modules', 'out', 'release', '.git']
 const 处理扩展 = ['.ts', '.md', '.css', '.mjs', '.py', '.json', '.html']

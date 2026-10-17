@@ -81,16 +81,16 @@ export function scanInlineMath(docText: string, baseline: number, enable = true)
       continue
     }
 
-    const 公式起 = position + 1
+    const mathStart = position + 1
     // 规则 1：开头 `$` 后面不能紧跟空白
-    if (公式起 >= docText.length || /\s/.test(docText[公式起])) {
+    if (mathStart >= docText.length || /\s/.test(docText[mathStart])) {
       i = position + 1
       continue
     }
 
     // 找配对的收尾 `$`
     let endAt = -1
-    for (let j = 公式起; j < docText.length; j++) {
+    for (let j = mathStart; j < docText.length; j++) {
       if (docText[j] !== '$') continue
       if (被转义(docText, j)) continue
       // 规则 2：结尾 `$` 前面不能是空白
@@ -104,7 +104,7 @@ export function scanInlineMath(docText: string, baseline: number, enable = true)
       continue
     }
 
-    const formula = docText.slice(公式起, endAt)
+    const formula = docText.slice(mathStart, endAt)
     // 规则 3：内容不能为空
     if (formula.length === 0) {
       i = position + 1

@@ -11,8 +11,8 @@
  * 目录里的 `selfMD.exe` 可以直接双击运行，**不需要安装**。
  *
  * 用法：
- *   node scripts/预览.mjs           只构建
- *   node scripts/预览.mjs --启动     构建完顺手把程序拉起来
+ *   node scripts/preview.mjs           只构建
+ *   node scripts/preview.mjs --启动     构建完顺手把程序拉起来
  *
  * 之后每次改完代码跑一次，程序窗口关掉重开就是最新的。
  */

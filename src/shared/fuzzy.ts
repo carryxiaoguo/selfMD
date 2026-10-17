@@ -34,23 +34,23 @@ export function fuzzyScore(query: string, docText: string): number | null {
 
   // 退化到子序列匹配
   let score = 0
-  let 文本位置 = 0
+  let textPos = 0
   let 上次匹配 = -1
 
   for (const ch of 低查询) {
-    const found = 低文本.indexOf(ch, 文本位置)
+    const found = 低文本.indexOf(ch, textPos)
     if (found < 0) return null
 
     if (found === 上次匹配 + 1) score += 8 // 连续
     if (是词首(docText, found)) score += 6
-    score -= Math.min(found - 文本位置, 4) // 跳过的字符越多扣得越多，但有上限
+    score -= Math.min(found - textPos, 4) // 跳过的字符越多扣得越多，但有上限
 
     上次匹配 = found
-    文本位置 = found + 1
+    textPos = found + 1
   }
 
   // 匹配跨度越短越好
-  score -= Math.floor((上次匹配 - (文本位置 - query.length)) / 4)
+  score -= Math.floor((上次匹配 - (textPos - query.length)) / 4)
   return score
 }
 
@@ -82,7 +82,7 @@ export interface candidate<T> {
  * @param 取末段 从候选文本里取"用户实际在找的那一段"（通常是文件名）。
  *              末段命中要额外加分——用户记的是文件名，不是目录。
  */
-export function 模糊筛选<T>(
+export function fuzzyFilter<T>(
   query: string,
   候选们: candidate<T>[],
   取末段: (docText: string) => string,

@@ -361,7 +361,7 @@ export interface DraftInfo {
   /** 原文件最后修改时间；文件不存在时为 null。 */
   originalMtime: number | null
   /** 原文件的字符数；读不到时为 null。 */
-  原文件字符数: number | null
+  originalCharCount: number | null
   /** 草稿内容的字符数。 */
   draftChars: number
 }

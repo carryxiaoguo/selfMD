@@ -159,7 +159,7 @@ export function moveToAdjacentCell(view: EditorView, direction: 1 | -1): boolean
 }
 
 /** 在当前行之后插入一行空单元格。 */
-export function 表格增行(view: EditorView): boolean {
+export function tableAddRow(view: EditorView): boolean {
   const state = view.state
   const line = state.doc.lineAt(state.selection.main.head)
   if (!isTableRow(line.text)) return false
@@ -262,10 +262,10 @@ export function tableAlign(view: EditorView, alignKind: 'left' | 'center' | 'rig
   // 对齐定义行是表头下面那一行
   const 定义行号 = tbl.head + 1
   if (定义行号 > tbl.tail) return false
-  const 定义行 = state.doc.line(定义行号)
-  if (!isAlignRow(定义行.text)) return false
+  const delimRow = state.doc.line(定义行号)
+  if (!isAlignRow(delimRow.text)) return false
 
-  const ranges = cellRanges(定义行.text)
+  const ranges = cellRanges(delimRow.text)
   const col = Math.max(0, currentCellIndex(line.text, state.selection.main.head - line.from))
   const target = ranges[Math.min(col, ranges.length - 1)]
   if (!target) return false
@@ -275,7 +275,7 @@ export function tableAlign(view: EditorView, alignKind: 'left' | 'center' | 'rig
   const width = Math.max(3, target.end - target.start)
   const content = mark.padEnd(width, '-')
   view.dispatch({
-    changes: { from: 定义行.from + target.start, to: 定义行.from + target.end, insert: content },
+    changes: { from: delimRow.from + target.start, to: delimRow.from + target.end, insert: content },
     userEvent: 'input.align'
   })
   return true

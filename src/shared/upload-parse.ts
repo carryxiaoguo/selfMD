@@ -142,7 +142,7 @@ export function buildUploadCmd(
   文件路径: string,
   config: {
     customCommand: string
-    用户数据目录: string
+    userDataDir: string
     platform: 'win32' | 'darwin' | 'linux'
   }
 ): string | null {
@@ -163,7 +163,7 @@ export function buildUploadCmd(
       const subDir =
         config.platform === 'win32' ? 'win64' : config.platform === 'darwin' ? 'mac' : 'linux'
       const extension = config.platform === 'win32' ? '.exe' : ''
-      const program = `${config.用户数据目录}/picgo/${subDir}/picgo${extension}`
+      const program = `${config.userDataDir}/picgo/${subDir}/picgo${extension}`
       return `${prefixText}${quoteChar(program)} u ${quoteChar(filePath)}`
     }
     case 'custom': {

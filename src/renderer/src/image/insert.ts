@@ -5,7 +5,7 @@ import type { Settings } from '@shared/types'
 import { readFrontMatter } from '@shared/front-matter'
 import { takeFileName, timestampImageName, isImageFile } from '@shared/image-path'
 import { resolveTargetDir } from './resolve-target'
-import { buildImageSyntax, 生成引用地址, 生成替代文本, type 图片语法 } from './reference'
+import { buildImageSyntax, buildRefUrl, 生成替代文本, type 图片语法 } from './reference'
 
 /**
  * 图片插入编排。
@@ -55,12 +55,12 @@ function docDir(docPath: string | null): string | null {
 }
 
 /** 由当前上下文构造解析输入。 */
-function 构造输入(request: InsertRequest): Parameters<typeof resolveTargetDir>[0] {
+function buildInput(request: InsertRequest): Parameters<typeof resolveTargetDir>[0] {
   const meta = readFrontMatter(request.文档文本)
   return {
     docDir: docDir(request.docPath),
     docName: request.docPath ? takeFileName(request.docPath) : null,
-    是文本包: /\.(textbundle|textpack)$/i.test(request.docPath ?? ''),
+    isTextBundle: /\.(textbundle|textpack)$/i.test(request.docPath ?? ''),
     docSettings: meta.attr['image-folder'] ?? null,
     globalPolicy: request.settings.imageStoragePolicy,
     customDir: request.settings.customImageSaveLocation,
@@ -73,13 +73,13 @@ function 语法(settings: Settings): 图片语法 {
 }
 
 /** 由图片绝对路径生成要写进文档的引用文本。 */
-function quoteText(图片路径: string, request: InsertRequest): string {
-  const url = 生成引用地址(图片路径, docDir(request.docPath), {
+function quoteText(imagePath: string, request: InsertRequest): string {
+  const url = buildRefUrl(imagePath, docDir(request.docPath), {
     useRelativePath: request.settings.useRelativePathForImg,
     addDotPrefix: request.settings.relativePathWithDot,
     escapeUrl: request.settings.autoEscapeImageURL
   })
-  return buildImageSyntax(url, 生成替代文本(图片路径), 语法(request.settings))
+  return buildImageSyntax(url, 生成替代文本(imagePath), 语法(request.settings))
 }
 
 /**
@@ -90,13 +90,13 @@ function quoteText(图片路径: string, request: InsertRequest): string {
  * 下的 `images/`（该目录在本机确实存在 5 个 `image-2025*.png`），
  * 这里沿用同一行为。
  */
-let 缓存的默认图片目录: string | null = null
+let cachedDefaultImageDir: string | null = null
 
 async function 取默认图片目录(): Promise<string> {
-  if (缓存的默认图片目录) return 缓存的默认图片目录
+  if (cachedDefaultImageDir) return cachedDefaultImageDir
   const filePath = await window.selfmd.app.getPaths()
-  缓存的默认图片目录 = filePath.userImages
-  return 缓存的默认图片目录
+  cachedDefaultImageDir = filePath.userImages
+  return cachedDefaultImageDir
 }
 
 // ---------------------------------------------------------------------------
@@ -114,7 +114,7 @@ async function 取默认图片目录(): Promise<string> {
  * 立刻失效——文档级图片目录、根路径这些设置全丢。这个 bug 是靠端到端测试里
  * 打印出文档内容才发现的：`![样本](...)---` 明显不对。
  */
-function 写入引用(view: EditorView, quote: string): void {
+function writeRef(view: EditorView, quote: string): void {
   const state = view.state
   const main = state.selection.main
   const 插入点 = 避开前置元数据(state, main.from)
@@ -173,7 +173,7 @@ export async function 从剪贴板插入(request: InsertRequest): Promise<插入
   if (content.kind === '文件') return insertFromFile(request, content.filePath)
 
   // --- 位图 -------------------------------------------------------------
-  const target = resolveTargetDir(构造输入(request))
+  const target = resolveTargetDir(buildInput(request))
   if (target.kind === '需要保存' || target.kind === '上传') {
     return { okCount: 0, error: 失败说明(target.kind) }
   }
@@ -183,7 +183,7 @@ export async function 从剪贴板插入(request: InsertRequest): Promise<插入
   const writeBack = await window.selfmd.image.saveBytes(dir, name, content.data)
   if (!writeBack) return { okCount: 0, error: '写入图片失败。' }
 
-  写入引用(request.view, quoteText(writeBack.filePath, request))
+  writeRef(request.view, quoteText(writeBack.filePath, request))
   return { okCount: 1, error: null }
 }
 
@@ -192,7 +192,7 @@ export async function insertFromFile(request: InsertRequest, paths: string[]): P
   const images = paths.filter(isImageFile)
   if (images.length === 0) return { okCount: 0, error: '没有可插入的图片文件。' }
 
-  const target = resolveTargetDir(构造输入(request))
+  const target = resolveTargetDir(buildInput(request))
   if (target.kind === '需要保存' || target.kind === '上传') {
     return { okCount: 0, error: 失败说明(target.kind) }
   }
@@ -213,7 +213,7 @@ export async function insertFromFile(request: InsertRequest, paths: string[]): P
 
   if (quoteList.length === 0) return { okCount: 0, error }
   // 多张图之间用空格分隔；整批仍是一个撤销单元。
-  写入引用(request.view, quoteList.join(' '))
+  writeRef(request.view, quoteList.join(' '))
   return { okCount: quoteList.length, error }
 }
 
@@ -224,8 +224,8 @@ export async function insertFromFile(request: InsertRequest, paths: string[]): P
  * 正常流程，而落盘需要先知道目录。"不动"策略在这里退回用户数据目录下的
  * 图片仓库——位图没有原路径可留，见 `取默认图片目录` 的说明。
  */
-export async function 本次目标目录(request: InsertRequest): Promise<string | null> {
-  const target = resolveTargetDir(构造输入(request))
+export async function thisTargetDir(request: InsertRequest): Promise<string | null> {
+  const target = resolveTargetDir(buildInput(request))
   if (target.kind === '目录') return target.filePath
   if (target.kind === '不动') return 取默认图片目录()
   return null
@@ -237,15 +237,15 @@ export async function 本次目标目录(request: InsertRequest): Promise<string
  * 与本地文件的差别只有一处：需要先把图下下来。若解析结果是"不动"，
  * 就直接把原始 URL 写进文档——那正是"不做特殊处理"的含义。
  */
-export async function 从地址插入(request: InsertRequest, url: string): Promise<插入结果> {
-  const 清理后 = url.trim()
-  if (!/^https?:\/\//i.test(清理后)) {
+export async function insertFromUrl(request: InsertRequest, url: string): Promise<插入结果> {
+  const afterCleanup = url.trim()
+  if (!/^https?:\/\//i.test(afterCleanup)) {
     return { okCount: 0, error: '请输入以 http:// 或 https:// 开头的图片地址。' }
   }
 
-  const target = resolveTargetDir(构造输入(request))
+  const target = resolveTargetDir(buildInput(request))
   if (target.kind === '不动') {
-    写入引用(request.view, quoteText(清理后, request))
+    writeRef(request.view, quoteText(afterCleanup, request))
     return { okCount: 1, error: null }
   }
   // 必须写成 if 语句而不是三元表达式：只有语句形式才能让 TypeScript
@@ -254,11 +254,11 @@ export async function 从地址插入(request: InsertRequest, url: string): Prom
     return { okCount: 0, error: 失败说明(target.kind) }
   }
 
-  const 下载 = await window.selfmd.image.download(清理后, target.filePath, takeFileName(清理后) || '图片')
-  if (!下载.success || !下载.filePath) {
-    return { okCount: 0, error: 下载.error ?? '下载失败。' }
+  const download = await window.selfmd.image.download(afterCleanup, target.filePath, takeFileName(afterCleanup) || '图片')
+  if (!download.success || !download.filePath) {
+    return { okCount: 0, error: download.error ?? '下载失败。' }
   }
 
-  写入引用(request.view, quoteText(下载.filePath, request))
+  writeRef(request.view, quoteText(download.filePath, request))
   return { okCount: 1, error: null }
 }

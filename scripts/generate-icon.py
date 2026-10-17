@@ -20,7 +20,7 @@
 
 ## 用法
 
-    python scripts/生成图标.py [阈值]
+    python scripts/generate-icon.py [阈值]
 
 不传阈值时用默认值。想对比效果可以跑几次不同阈值，
 生成结果会覆盖，但 `源图.png` 永远不会被改动。

@@ -463,7 +463,7 @@ export interface SelfMdApi {
     current: string
     isDefaultFlag: boolean
     hasShellNew: boolean
-    程序路径: string
+    exePath: string
   }>
   /**
    * 打开系统的「默认应用」设置页。

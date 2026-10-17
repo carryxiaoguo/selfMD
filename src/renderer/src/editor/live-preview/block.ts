@@ -4,7 +4,7 @@ import { scanPunct } from '../smart-punctuation'
 import {
   blockLineStyles,
   代码块行装饰,
-  标题行装饰,
+  headingLineDeco,
   hidden,
   insert,
   replaceWith,
@@ -16,8 +16,8 @@ import {
   列表圆点,
   水平线,
   数学公式,
-  表格分隔,
-  任务框,
+  tableSeparatorDeco,
+  taskBox,
   语言标签,
   代码块头部,
   calloutHint,
@@ -88,7 +88,7 @@ function 收集行内代码区间(node: SyntaxNode): { from: number; to: number 
 }
 
 /** `$$` 独占一行开始，到下一个含 `$$` 的行结束；`$$x$$` 单行闭合也算。 */
-export function 检测数学块(state: EditorState): manualBlock[] {
+export function detectMathBlock(state: EditorState): manualBlock[] {
   const result: manualBlock[] = []
   for (let no = 1; no <= state.doc.lines; no++) {
     const line = state.doc.line(no)
@@ -132,7 +132,7 @@ export interface 手工扫描结果 {
 /** 第一遍：处理语法树里不存在的两类块，并把它们占用的行登记好。 */
 export function 扫描手工块(state: EditorState, context: BuildContext): 手工扫描结果 {
   const frontMatter = 检测前置元数据(state)
-  const mathBlock = 检测数学块(state)
+  const mathBlock = detectMathBlock(state)
 
   const allBlocks: manualBlock[] = []
   if (frontMatter) allBlocks.push(frontMatter)
@@ -163,10 +163,10 @@ export function 处理块级(
   node: SyntaxNode,
   state: EditorState,
   context: BuildContext,
-  手工: 手工扫描结果
+  manualScan: 手工扫描结果
 ): boolean {
   // 落在手工块内部的节点交给手工扫描处理（主要是别把 `---` 画成水平线）。
-  if (落在手工块内(node.from, 手工.allBlocks)) return true
+  if (落在手工块内(node.from, manualScan.allBlocks)) return true
 
   const lineNo = state.doc.lineAt(node.from).number
   const onActiveLine = context.activeLines.has(lineNo)
@@ -222,14 +222,14 @@ export function 处理块级(
     case 'ATXHeading5':
     case 'ATXHeading6': {
       const levelNo = Number(node.name.slice(-1))
-      addLineDeco(context, state.doc.lineAt(node.from).from, 标题行装饰(levelNo))
+      addLineDeco(context, state.doc.lineAt(node.from).from, headingLineDeco(levelNo))
       return false // 继续下沉，让 HeaderMark 被行内逻辑折叠
     }
 
     case 'SetextHeading1':
     case 'SetextHeading2': {
       const levelNo = Number(node.name.slice(-1))
-      addLineDeco(context, state.doc.lineAt(node.from).from, 标题行装饰(levelNo))
+      addLineDeco(context, state.doc.lineAt(node.from).from, headingLineDeco(levelNo))
       return false
     }
 
@@ -431,8 +431,8 @@ export function 处理块级(
       if (!parent) return true
       if (context.headerReplaced.has(state.doc.lineAt(parent.from).from)) return true
 
-      const 语言节点 = 找子节点(parent, 'CodeInfo')
-      const language = 语言节点 ? state.sliceDoc(语言节点.from, 语言节点.to).trim() : ''
+      const langNode = 找子节点(parent, 'CodeInfo')
+      const language = langNode ? state.sliceDoc(langNode.from, langNode.to).trim() : ''
       const lineEnd = state.doc.lineAt(parent.from).to
       context.entry.push({
         from: lineEnd,
@@ -483,7 +483,7 @@ export function 处理块级(
           context.entry.push({
             from: node.from,
             to: node.to,
-            deco: replaceWith(new 表格分隔('│')),
+            deco: replaceWith(new tableSeparatorDeco('│')),
             rank: 1
           })
         }
@@ -503,7 +503,7 @@ export function 处理块级(
       context.entry.push({
         from: node.from,
         to: node.to,
-        deco: replaceWith(new 任务框(checkedFlag, node.from)),
+        deco: replaceWith(new taskBox(checkedFlag, node.from)),
         rank: 1
       })
       return true

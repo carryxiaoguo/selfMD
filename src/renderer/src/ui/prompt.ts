@@ -17,7 +17,7 @@ export interface 询问选项 {
   /** 标题下方的一段说明文字。 */
   description?: string
   /** 确定按钮文字。 */
-  确定文字?: string
+  confirmText?: string
 }
 
 /** 打开一个输入框；用户取消时返回 null。 */
@@ -54,9 +54,9 @@ export function promptText(options: 询问选项): Promise<string | null> {
     cancel.className = 'selfmd-btn'
     cancel.textContent = '取消'
 
-    const 确定 = document.createElement('button')
-    确定.className = 'selfmd-btn selfmd-btn-primary'
-    确定.textContent = options.确定文字 ?? '确定'
+    const confirmIt = document.createElement('button')
+    confirmIt.className = 'selfmd-btn selfmd-btn-primary'
+    confirmIt.textContent = options.confirmText ?? '确定'
 
     /** 收尾：移除 DOM、解绑键盘、回传结果。所有出口都必须走这里。 */
     let closed = false
@@ -82,13 +82,13 @@ export function promptText(options: 询问选项): Promise<string | null> {
     }
 
     cancel.addEventListener('click', () => finalize(null))
-    确定.addEventListener('click', () => finalize(input.value.trim()))
+    confirmIt.addEventListener('click', () => finalize(input.value.trim()))
     // 点击遮罩空白处等同取消，但不影响点击盒子内部。
     overlay.addEventListener('mousedown', (event) => {
       if (event.target === overlay) finalize(null)
     })
 
-    按钮行.append(cancel, 确定)
+    按钮行.append(cancel, confirmIt)
     // 标题与说明已在上面按需 append，这里只补剩余部分
     if (!options.description) boxEl.append(title)
     boxEl.append(input, 按钮行)

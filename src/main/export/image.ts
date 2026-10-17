@@ -112,10 +112,10 @@ export async function 复制为图片(
       ).then(() => new Promise((完成) => requestAnimationFrame(() => requestAnimationFrame(完成))))
     `)
 
-    const 量得高度 = await win.webContents.executeJavaScript(
+    const measuredHeight = await win.webContents.executeJavaScript(
       'Math.max(document.body.scrollHeight, document.documentElement.scrollHeight)'
     )
-    const 内容高 = typeof 量得高度 === 'number' && 量得高度 > 0 ? Math.ceil(量得高度) : 1200
+    const 内容高 = typeof measuredHeight === 'number' && measuredHeight > 0 ? Math.ceil(measuredHeight) : 1200
     const 目标高 = Math.min(内容高, 最大高度)
 
     win.setContentSize(width, 目标高)

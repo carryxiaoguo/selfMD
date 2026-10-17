@@ -1,7 +1,7 @@
 import { RangeSet, StateField, type EditorState } from '@codemirror/state'
 import { Decoration, EditorView, type DecorationSet } from '@codemirror/view'
 import { findBlockMath } from '@shared/math'
-import { 检测数学块 } from './block'
+import { detectMathBlock } from './block'
 import { 数学公式 } from './widgets'
 
 /**
@@ -32,7 +32,7 @@ function 构建公式(state: EditorState): DecorationSet {
   const range: ReturnType<Decoration['range']>[] = []
   const cursor = state.selection.main
 
-  for (const block of 检测数学块(state)) {
+  for (const block of detectMathBlock(state)) {
     // 光标落在块内时露出源码——正在改公式的人需要看到 `\frac`，
     // 而不是排版结果。
     //
@@ -61,10 +61,10 @@ function 构建公式(state: EditorState): DecorationSet {
 
 export const 数学字段 = StateField.define<DecorationSet>({
   create: (state) => 构建公式(state),
-  update: (prevValue, 事务) => {
+  update: (prevValue, txn) => {
     // 文档变了要重扫；光标挪出/挪进公式也要重算（决定显示源码还是排版结果）。
-    if (!事务.docChanged && !事务.selection) return prevValue
-    return 构建公式(事务.state)
+    if (!txn.docChanged && !txn.selection) return prevValue
+    return 构建公式(txn.state)
   },
-  provide: (字段) => EditorView.decorations.from(字段)
+  provide: (fieldName) => EditorView.decorations.from(fieldName)
 })

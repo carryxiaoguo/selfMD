@@ -426,7 +426,7 @@ export class image extends WidgetType {
 }
 
 
-export class 任务框 extends WidgetType {
+export class taskBox extends WidgetType {
   constructor(
     readonly checkedFlag: boolean,
     /** 标记 `[ ]` 在文档中的起始位置，用于回写。 */
@@ -435,7 +435,7 @@ export class 任务框 extends WidgetType {
     super()
   }
 
-  override eq(other: 任务框): boolean {
+  override eq(other: taskBox): boolean {
     return other.checkedFlag === this.checkedFlag && other.position === this.position
   }
 
@@ -510,12 +510,12 @@ export class 水平线 extends WidgetType {
 // 表格管线符（保留位置但淡化为视觉分隔）
 // ---------------------------------------------------------------------------
 
-export class 表格分隔 extends WidgetType {
+export class tableSeparatorDeco extends WidgetType {
   constructor(readonly ch: string) {
     super()
   }
 
-  override eq(other: 表格分隔): boolean {
+  override eq(other: tableSeparatorDeco): boolean {
     return other.ch === this.ch
   }
 
@@ -587,7 +587,7 @@ async function 确保初始化(theme: 'default' | 'dark'): Promise<typeof import
 export class 图表 extends WidgetType {
   constructor(
     readonly sourceCode: string,
-    readonly 暗色: boolean,
+    readonly darkMode: boolean,
     /** 渲染成功后回调，让上层扣掉"正在渲染"的状态。 */
     readonly done?: () => void
   ) {
@@ -595,7 +595,7 @@ export class 图表 extends WidgetType {
   }
 
   override eq(other: 图表): boolean {
-    return other.sourceCode === this.sourceCode && other.暗色 === this.暗色
+    return other.sourceCode === this.sourceCode && other.darkMode === this.darkMode
   }
 
   override toDOM(): HTMLElement {
@@ -617,7 +617,7 @@ export class 图表 extends WidgetType {
 
     void (async () => {
       try {
-        const mermaid = await 确保初始化(this.暗色 ? 'dark' : 'default')
+        const mermaid = await 确保初始化(this.darkMode ? 'dark' : 'default')
         // 每次渲染都要一个唯一 id：Mermaid 会在文档里放一个同名的临时
         // 容器来量尺寸，id 重复会让两张图互相覆盖。
         const id = `selfmd-图表-${Math.random().toString(36).slice(2, 10)}`

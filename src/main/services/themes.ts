@@ -92,14 +92,14 @@ export function seedBuiltinThemes(): void {
   try {
     mkdirSync(dir, { recursive: true })
 
-    let 新写 = 0
+    let freshlyWritten = 0
     for (const theme of BUILTIN_THEMES) {
       const target = join(dir, `${theme.id}.css`)
       if (existsSync(target)) continue
       writeFileSync(target, theme.css, 'utf8')
-      新写 += 1
+      freshlyWritten += 1
     }
-    if (新写 > 0) console.log(`[themes] 已补齐 ${新写} 款内置主题`)
+    if (freshlyWritten > 0) console.log(`[themes] 已补齐 ${freshlyWritten} 款内置主题`)
   } catch (err) {
     console.error('[themes] seeding failed:', err)
   }

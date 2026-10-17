@@ -59,7 +59,7 @@ function wholeLineChange(
 // 标题
 // ---------------------------------------------------------------------------
 
-const 标题正则 = /^(#{1,6})(\s+)/
+const headingRegex = /^(#{1,6})(\s+)/
 
 /**
  * 设为指定级别的标题。
@@ -74,7 +74,7 @@ export function setHeadingLevel(view: EditorView, level: number): boolean {
   // 判断当前是否全都是目标级别，用于决定是"设置"还是"取消"。
   let allAreTarget = true
   for (let no = head; no <= tail; no++) {
-    const match = 标题正则.exec(state.doc.line(no).text)
+    const match = headingRegex.exec(state.doc.line(no).text)
     if (!match || match[1].length !== level) {
       allAreTarget = false
       break
@@ -83,7 +83,7 @@ export function setHeadingLevel(view: EditorView, level: number): boolean {
   const target = allAreTarget ? 0 : level
 
   const changes = wholeLineChange(state, (docText) => {
-    const 去标题 = docText.replace(标题正则, '')
+    const 去标题 = docText.replace(headingRegex, '')
     return target === 0 ? 去标题 : '#'.repeat(target) + ' ' + 去标题
   })
   if (changes.length === 0) return false
@@ -92,10 +92,10 @@ export function setHeadingLevel(view: EditorView, level: number): boolean {
 }
 
 /** 提升/降低标题级别；普通段落执行"提升"会变成一级标题。 */
-export function 调整标题级别(view: EditorView, direction: 1 | -1): boolean {
+export function adjustHeadingLevel(view: EditorView, direction: 1 | -1): boolean {
   const state = view.state
   const { head } = affectedLines(state)
-  const match = 标题正则.exec(state.doc.line(head).text)
+  const match = headingRegex.exec(state.doc.line(head).text)
   const current = match ? match[1].length : 0
   const 下级 = Math.min(6, Math.max(0, current + direction))
   if (下级 === current) return false
@@ -254,14 +254,14 @@ export function 插入水平线(view: EditorView): boolean {
 
 /** 插入一个 3 列 3 行的表格骨架（含表头与对齐定义行）。 */
 export function insertTable(view: EditorView): boolean {
-  const 骨架 = [
+  const skeleton = [
     '| 列一 | 列二 | 列三 |',
     '| ---- | ---- | ---- |',
     '|      |      |      |',
     ''
   ].join('\n')
   // 光标落在第一格内容处，方便直接开始输入。
-  return insertBlock(view, 骨架, 2)
+  return insertBlock(view, skeleton, 2)
 }
 
 export function 插入前置元数据(view: EditorView): boolean {
@@ -270,9 +270,9 @@ export function 插入前置元数据(view: EditorView): boolean {
     // 前置元数据只能位于文档最开头。
     return false
   }
-  const 骨架 = '---\ntitle: \n---\n'
+  const skeleton = '---\ntitle: \n---\n'
   view.dispatch({
-    changes: { from: 0, to: 0, insert: 骨架 },
+    changes: { from: 0, to: 0, insert: skeleton },
     selection: EditorSelection.cursor(11),
     userEvent: 'input.frontMatter',
     annotations: isolatedUndo

@@ -143,9 +143,9 @@ function 处理(node: any, context: context): void {
     case 'FencedCode':
     case 'IndentedCode': {
       const language = name === 'FencedCode' ? 取语言(node, context) : ''
-      const 类 = language ? ` class="${escapeAttr((options.语言类前缀 ?? 'language-') + language)}"` : ''
+      const cls = language ? ` class="${escapeAttr((options.语言类前缀 ?? 'language-') + language)}"` : ''
       // CodeText 是正文，逐段取；围栏符号本身是 CodeMark，已被跳过
-      output.push(`<pre><code${类}>`)
+      output.push(`<pre><code${cls}>`)
       收集代码文本(node, context)
       output.push('</code></pre>\n')
       return
@@ -376,11 +376,11 @@ function 取图片替代文本(node: any, context: context): string {
   return collect.join('')
 }
 
-function 渲染表格行(行节点: any, context: context, 单元格标签: string): void {
-  const 对齐们 = 取对齐(行节点, context)
+function 渲染表格行(lineNode: any, context: context, 单元格标签: string): void {
+  const 对齐们 = 取对齐(lineNode, context)
   context.output.push('<tr>\n')
   let index = 0
-  for (let child = 行节点.firstChild; child; child = child.nextSibling) {
+  for (let child = lineNode.firstChild; child; child = child.nextSibling) {
     if (child.name !== 'TableCell') continue
     const alignKind = 对齐们[index]
     context.output.push(`<${单元格标签}${alignKind ? ` style="text-align:${alignKind}"` : ''}>`)
@@ -401,8 +401,8 @@ const 对齐缓存 = new WeakMap<object, (string | null)[]>()
  * （打印解析树才发现：`TableDelimiter 68..85 = |:---|:---:|---:|`）。
  * 所以只能拿它的原始文本自己按 `|` 切。
  */
-function 取对齐(行节点: any, context: context): (string | null)[] {
-  const tbl = 行节点.parent
+function 取对齐(lineNode: any, context: context): (string | null)[] {
+  const tbl = lineNode.parent
   if (!tbl) return []
   const 已有 = 对齐缓存.get(tbl)
   if (已有) return 已有

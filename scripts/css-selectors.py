@@ -4,7 +4,7 @@
 把这些选择器统计出来，就知道一份主题"必须知道的类名与 id"有哪些，
 也就知道了要复刻主题系统必须提供哪些 DOM 锚点。
 
-用法：python scripts/CSS选择器.py <文件或目录> [...]
+用法：python scripts/css-selectors.py <文件或目录> [...]
 """
 import re
 import sys

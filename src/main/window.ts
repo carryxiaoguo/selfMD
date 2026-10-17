@@ -25,19 +25,19 @@ import { getSettings } from './services/settings'
  *      传一个它不认识的值会整个调用失败，连原本能用的语言也一起丢掉。
  *      所以先与 `availableSpellCheckerLanguages` 取交集。
  */
-export function 应用拼写词典(settings: Settings): void {
+export function applySpellDict(settings: Settings): void {
   try {
-    const 会话 = session.defaultSession
+    const browserSession = session.defaultSession
     if (!settings.spellCheck) {
       // 关闭时清空语言列表，等价于停用检查
-      会话.setSpellCheckerLanguages([])
+      browserSession.setSpellCheckerLanguages([])
       return
     }
-    const available = new Set(会话.availableSpellCheckerLanguages)
-    const request = settings.spellCheckLanguages.filter((语) => available.has(语))
+    const available = new Set(browserSession.availableSpellCheckerLanguages)
+    const request = settings.spellCheckLanguages.filter((langCode) => available.has(langCode))
     // 一个都不匹配时回退到英语：有检查总比静默失效好，而且这是最常见的用法。
-    const 最终 = request.length > 0 ? request : ['en-US'].filter((语) => available.has(语))
-    if (最终.length > 0) 会话.setSpellCheckerLanguages(最终)
+    const 最终 = request.length > 0 ? request : ['en-US'].filter((langCode) => available.has(langCode))
+    if (最终.length > 0) browserSession.setSpellCheckerLanguages(最终)
   } catch (error) {
     // 拿不到会话时静默跳过：拼写检查是锦上添花，不该影响启动。
     console.error('[拼写检查] 设置词典失败：', error)
@@ -110,7 +110,7 @@ export function createWindow(options: WindowOptions = {}): BrowserWindow {
 
   // 词典语言要在会话上设置，且**必须在窗口加载内容之前**。
   // 窗口建好之后再改，已经渲染的文本不会重新检查。
-  应用拼写词典(settings)
+  applySpellDict(settings)
 
   win.once('ready-to-show', () => {
     // 冒烟测试同样要显示窗口：Chromium 在窗口不可见时会挂起渲染，

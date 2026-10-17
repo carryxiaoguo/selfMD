@@ -10,7 +10,7 @@ import {
   extByKind,
   normalizePath,
   isImageFile,
-  类型由扩展名
+  kindByExt
 } from '@shared/image-path'
 /**
  * 图片相关的原生能力。
@@ -38,10 +38,10 @@ const 下载上限字节 = 50 * 1024 * 1024
  */
 function 读剪贴板(): ClipboardContent {
   try {
-    const 文件名缓冲 = clipboard.readBuffer('FileNameW')
-    if (文件名缓冲 && 文件名缓冲.length > 0) {
+    const fileNameBuffer = clipboard.readBuffer('FileNameW')
+    if (fileNameBuffer && fileNameBuffer.length > 0) {
       // FileNameW 是 UTF-16LE，多个路径以空字符分隔，末尾再补一个空字符。
-      const paths = 文件名缓冲
+      const paths = fileNameBuffer
         .toString('ucs2')
         .split('\0')
         .map((s) => s.trim())
@@ -70,7 +70,7 @@ function 读剪贴板(): ClipboardContent {
 // ---------------------------------------------------------------------------
 
 /** 在目录内挑一个不冲突的名字。 */
-function 安排路径(dir: string, expectedName: string): string {
+function arrangePath(dir: string, expectedName: string): string {
   mkdirSync(dir, { recursive: true })
   const 最终名 = uniqueFileName(expectedName, (candidate) => existsSync(join(dir, candidate)))
   return join(dir, 最终名)
@@ -85,7 +85,7 @@ function 安排路径(dir: string, expectedName: string): string {
 function 校正扩展名(displayName: string, kind: string | null): string {
   const shouldByKind = extByKind(kind)
   if (!shouldByKind) return displayName
-  const existing = 类型由扩展名(displayName)
+  const existing = kindByExt(displayName)
   if (!existing) return displayName + shouldByKind
   return existing === shouldByKind ? displayName : stripExt(displayName) + shouldByKind
 }
@@ -97,7 +97,7 @@ export function registerImageIpc(): void {
     CH.imageSaveBytes,
     (_e, dir: string, displayName: string, data: string): { filePath: string } | null => {
       try {
-        const filePath = 安排路径(dir, displayName)
+        const filePath = arrangePath(dir, displayName)
         writeFileSync(filePath, Buffer.from(data, 'base64'))
         return { filePath: normalizePath(filePath) }
       } catch (error) {
@@ -113,7 +113,7 @@ export function registerImageIpc(): void {
       try {
         if (!existsSync(origin)) return null
         const expectedName = displayName && displayName.length > 0 ? displayName : takeFileName(origin)
-        const filePath = 安排路径(dir, expectedName)
+        const filePath = arrangePath(dir, expectedName)
         // 源与目标相同时不复制，直接返回——否则会自己覆盖自己。
         if (normalizePath(origin) === normalizePath(filePath)) return { filePath: normalizePath(filePath) }
         copyFileSync(origin, filePath)
@@ -160,7 +160,7 @@ export function registerImageIpc(): void {
         if (buffer.length === 0) return failure('下载内容为空')
         if (buffer.length > 下载上限字节) return failure('图片过大')
 
-        const filePath = 安排路径(dir, 校正扩展名(displayName, kind))
+        const filePath = arrangePath(dir, 校正扩展名(displayName, kind))
         writeFileSync(filePath, buffer)
         return { success: true, filePath: normalizePath(filePath), kind, error: null }      } catch (error) {
         return failure(error instanceof Error ? error.message : String(error))

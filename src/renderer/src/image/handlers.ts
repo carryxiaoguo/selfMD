@@ -3,8 +3,8 @@ import { EditorView } from '@codemirror/view'
 import { extByKind, timestampImageName, isImageFile } from '@shared/image-path'
 import {
   type InsertRequest,
-  本次目标目录,
-  从地址插入,
+  thisTargetDir,
+  insertFromUrl,
   从剪贴板插入,
   insertFromFile
 } from './insert'
@@ -23,7 +23,7 @@ import {
 
 export interface 图片处理依赖 {
   /** 构造插入请求；编辑器尚未就绪时返回 null。 */
-  构造请求: () => InsertRequest | null
+  buildRequest: () => InsertRequest | null
   /** 用户可见的提示。 */
   hint: (消息: string) => void
 }
@@ -63,7 +63,7 @@ function 找图片文件(list: FileList | null | undefined): File | null {
 export function 图片粘贴与拖放(deps: 图片处理依赖): Extension {
   /** 处理"有图片文件"的公共路径。 */
   const 处理文件 = async (file: File): Promise<void> => {
-    const request = deps.构造请求()
+    const request = deps.buildRequest()
     if (!request) return
 
     const filePath = 取磁盘路径(file)
@@ -83,7 +83,7 @@ export function 图片粘贴与拖放(deps: 图片处理依赖): Extension {
       }
       const extension = extByKind(file.type) ?? '.png'
       const name = `${timestampImageName(new Date())}${extension}`
-      const dir = await 本次目标目录(request)
+      const dir = await thisTargetDir(request)
       if (!dir) return
       const writeBack = await window.selfmd.image.saveBytes(dir, name, data)
       if (!writeBack) {
@@ -124,7 +124,7 @@ export function 图片粘贴与拖放(deps: 图片处理依赖): Extension {
       //    真实判定交给主进程（它能读系统剪贴板），失败时不影响用户。
       event.preventDefault()
       void (async () => {
-        const request = deps.构造请求()
+        const request = deps.buildRequest()
         if (!request) return
         const result = await 从剪贴板插入(request)
         if (result.okCount === 0 && result.error && result.error !== '剪贴板里没有图片。') {
@@ -150,9 +150,9 @@ export function 图片粘贴与拖放(deps: 图片处理依赖): Extension {
       if (url && /^https?:\/\//i.test(url.trim())) {
         event.preventDefault()
         void (async () => {
-          const request = deps.构造请求()
+          const request = deps.buildRequest()
           if (!request) return
-          const result = await 从地址插入(request, url.trim())
+          const result = await insertFromUrl(request, url.trim())
           if (result.error) deps.hint(result.error)
         })()
         return true

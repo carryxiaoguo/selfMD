@@ -74,7 +74,7 @@ const 开引号前导 = /[\s([{<（【《「『〔〈“‘’”‘’—–-]/
  * @param 字符 用户刚敲下的字符，`"` 或 `'`
  * @param 前文 光标之前的本行文本
  */
-export function 换引号(ch: '"' | "'", preamble: string): string {
+export function swapQuotes(ch: '"' | "'", preamble: string): string {
   const previousOne = preamble.slice(-1)
   const 是开头 = preamble.length === 0 || 开引号前导.test(previousOne)
 
@@ -146,7 +146,7 @@ export function scanPunct(docText: string, baseline: number): 渲染标点段[] 
     // --- 引号 ---
     if (ch === '"' || ch === "'") {
       // 用扫描到当前位置为止的文本作为"前文"，与输入时的判断依据一致
-      const show = 换引号(ch, docText.slice(0, i))
+      const show = swapQuotes(ch, docText.slice(0, i))
       if (show !== ch) {
         result.push({ from: baseline + i, to: baseline + i + 1, show, originalText: ch })
       }
@@ -242,7 +242,7 @@ export function 智能标点(options: 智能标点选项): Extension {
     let plan: { fallback: number; insert: string } | null = null
 
     if (options.quoteChar && (input === '"' || input === "'")) {
-      plan = { fallback: 0, insert: 换引号(input, preamble) }
+      plan = { fallback: 0, insert: swapQuotes(input, preamble) }
     } else if (options.破折号 && input === '-') {
       plan = 换破折号(preamble)
     }

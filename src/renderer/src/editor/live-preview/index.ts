@@ -12,7 +12,7 @@ import { 扫描手工块, 处理块级 } from './block'
 import { 处理行内 } from './inline'
 import { 数学字段 } from './math-field'
 import { 建立图表字段 } from './diagram-field'
-import type { BuildContext, 装饰条目, SyntaxNode } from './types'
+import type { BuildContext, DecoEntry, SyntaxNode } from './types'
 
 /**
  * 实时预览装饰层——对应渲染层里那套"brush / styler"。
@@ -37,16 +37,16 @@ import type { BuildContext, 装饰条目, SyntaxNode } from './types'
  * 只读状态直接返回空集：只读时没有光标，全部按渲染态显示。
  */
 function 计算活动行(state: EditorState): Set<number> {
-  const 行集合 = new Set<number>()
-  if (state.readOnly) return 行集合
+  const lineSetBox = new Set<number>()
+  if (state.readOnly) return lineSetBox
   for (const selection of state.selection.ranges) {
     const firstLine = state.doc.lineAt(selection.from).number
     const lastLine = state.doc.lineAt(selection.to).number
     // 选区可能跨越成千上万行，设一个上限避免全量展开。
     const 跨度 = Math.min(lastLine - firstLine, 200)
-    for (let n = firstLine; n <= firstLine + 跨度; n++) 行集合.add(n)
+    for (let n = firstLine; n <= firstLine + 跨度; n++) lineSetBox.add(n)
   }
-  return 行集合
+  return lineSetBox
 }
 
 // ---------------------------------------------------------------------------
@@ -59,11 +59,11 @@ function 构建装饰(view: EditorView): DecorationSet {
     activeLines: 计算活动行(state),
     行装饰已用: new Set<number>(),
     headerReplaced: new Set<number>(),
-    entry: [] as 装饰条目[]
+    entry: [] as DecoEntry[]
   }
 
   // 第一遍：语法树里不存在的块（YAML 前置元数据、`$$` 数学块）。
-  const 手工 = 扫描手工块(state, context)
+  const manualScan = 扫描手工块(state, context)
 
   // 第二遍：按语法树分派。只遍历可视范围——CodeMirror 会虚拟化长文档，
   // 视口外的内容根本没有 DOM，为其构建装饰纯属浪费。
@@ -74,7 +74,7 @@ function 构建装饰(view: EditorView): DecorationSet {
       to: rangeBounds.to,
       enter: (quote) => {
         const node = quote.node as unknown as SyntaxNode
-        处理块级(node, state, context, 手工)
+        处理块级(node, state, context, manualScan)
         处理行内(node, state, context)
         // 始终返回 true：需要继续下沉到子节点，否则标记折叠不会生效。
         return true
@@ -152,10 +152,10 @@ const 实时预览插件 = ViewPlugin.fromClass(实时预览, {
  *             ——即 "源码模式"。
  * @param 是暗色 当前配色是否为深色，供 Mermaid 选择主题。
  */
-export function livePreview(enable: boolean, 是暗色: () => boolean = () => false): Extension {
+export function livePreview(enable: boolean, isDarkFlag: () => boolean = () => false): Extension {
   if (!enable) return []
   // 块级替换（数学公式、Mermaid 图表）来自 StateField——插件不能提供块级装饰；
   // 其余装饰来自插件，因为那里能拿到 view.visibleRanges 做视口虚拟化。
   // 两类都通过 EditorView.decorations 汇入，CodeMirror 会把它们合并。
-  return [实时预览插件, 数学字段, 建立图表字段({ 是暗色 })]
+  return [实时预览插件, 数学字段, 建立图表字段({ isDarkFlag })]
 }

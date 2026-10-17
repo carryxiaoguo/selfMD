@@ -16,7 +16,7 @@
  * **不在仓库里存任何明文令牌**——那样仓库里就会躺着一把钥匙。
  *
  * 用法：
- *   node --use-system-ca scripts/发布.mjs --仓库 carryxiaoguo/selfMD --标签 v0.1.0 \
+ *   node --use-system-ca scripts/publish.mjs --仓库 carryxiaoguo/selfMD --标签 v0.1.0 \
  *     --标题 "selfMD 0.1.0" --说明 release/发布说明.md \
  *     --附件 release/selfMD-0.1.0-setup.exe release/selfMD-0.1.0-portable.zip
  *
@@ -53,7 +53,7 @@ const 说明文件 = 取值('说明')
 const 附件 = 取值('附件', true)
 
 if (!仓库 || !标签) {
-  console.error('用法：node scripts/发布.mjs --仓库 <owner/repo> --标签 <tag> [--标题 <标题>] [--说明 <文件>] [--附件 <文件...>]')
+  console.error('用法：node scripts/publish.mjs --仓库 <owner/repo> --标签 <tag> [--标题 <标题>] [--说明 <文件>] [--附件 <文件...>]')
   process.exit(2)
 }
 

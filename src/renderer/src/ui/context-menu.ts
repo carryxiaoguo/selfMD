@@ -23,7 +23,7 @@ export interface menuItem {
   /** 在文字前显示一个勾。 */
   勾选?: boolean
   /** 危险操作（删除类），文字用警示色。 */
-  危险?: boolean
+  dangerFlag?: boolean
   /**
    * 子菜单。
    *
@@ -33,7 +33,7 @@ export interface menuItem {
   children?: menuItem[]
 }
 
-let 当前菜单: HTMLElement | null = null
+let currentMenu: HTMLElement | null = null
 let activeSubmenu: HTMLElement | null = null
 let 清理函数: (() => void) | null = null
 
@@ -42,13 +42,13 @@ export function closeMenu(): void {
   closeSubmenu()
   清理函数?.()
   清理函数 = null
-  当前菜单?.remove()
-  当前菜单 = null
+  currentMenu?.remove()
+  currentMenu = null
 }
 
 /** 菜单当前是否打开。 */
 export function isMenuOpen(): boolean {
-  return 当前菜单 !== null
+  return currentMenu !== null
 }
 
 function closeSubmenu(): void {
@@ -87,7 +87,7 @@ function 建立菜单(items: menuItem[], 是子菜单 = false): HTMLElement {
     // 有子项的行不执行动作，但它**是可点的**——置灰会让人以为整族都不可用。
     const 可点 = (Boolean(item.action) || 有子项) && !item.disabled
     if (!可点) line.classList.add('disabled')
-    if (item.危险) line.classList.add('danger')
+    if (item.dangerFlag) line.classList.add('danger')
     line.disabled = !可点
 
     const 勾 = document.createElement('span')
@@ -194,7 +194,7 @@ export function popupMenu(position: { x: number; y: number }, items: menuItem[])
   menu.style.left = `${Math.max(6, x)}px`
   menu.style.top = `${Math.max(6, y)}px`
 
-  当前菜单 = menu
+  currentMenu = menu
 
   // --- 收尾：任何一个来源触发都关掉 ---
   const 按下别处 = (event: MouseEvent): void => {

@@ -5,12 +5,12 @@ const path = require('path')
 const ts = require('typescript')
 
 const 表 = {}
-for (const f of fs.readdirSync('scripts').filter((n) => /^改名表.*\.json$/.test(n))) {
+for (const f of fs.readdirSync('scripts').filter((n) => /^rename-map.*\.json$/.test(n))) {
   Object.assign(表, JSON.parse(fs.readFileSync(path.join('scripts', f), 'utf8')))
 }
 const 排除 = {}
 try {
-  Object.assign(排除, JSON.parse(fs.readFileSync('scripts/改名排除.json', 'utf8')))
+  Object.assign(排除, JSON.parse(fs.readFileSync('scripts/rename-exclude.json', 'utf8')))
 } catch {
   /* 没有排除清单 */
 }

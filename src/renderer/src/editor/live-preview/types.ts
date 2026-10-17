@@ -12,7 +12,7 @@ import type { SyntaxNode } from '../syntax-node'
 /** 语法节点类型定义在 ../syntax-node.ts，这里转出，方便装饰层内部统一从本文件取。 */
 export type { SyntaxNode }
 
-export interface 装饰条目 {
+export interface DecoEntry {
   from: number
   to: number
   deco: Decoration
@@ -39,7 +39,7 @@ export interface BuildContext {
    * 抛异常，被渲染层的降级逻辑吞掉后，界面上只表现为"这个块没渲染出来"。
    */
   headerReplaced: Set<number>
-  entry: 装饰条目[]
+  entry: DecoEntry[]
 }
 
 /** 把一条行装饰加入收集器；同一位置只保留第一条。 */

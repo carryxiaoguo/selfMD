@@ -95,7 +95,7 @@ export function listDrafts(): DraftInfo[] {
         rawPath,
         savedAt: meta.savedAt ?? 0,
         originalMtime,
-        原文件字符数: 取原文件字符数(rawPath),
+        originalCharCount: 取原文件字符数(rawPath),
         draftChars
       })
     } catch {
@@ -150,7 +150,7 @@ export function recoverableDraft(): DraftInfo[] {
     if (!draft.rawPath) return draft.draftChars > 0
     if (!existsSync(draft.rawPath)) return draft.draftChars > 0
     // 内容没变就不提示——纯粹是时间戳造成的差异不值得打扰用户
-    if (draft.原文件字符数 !== null && draft.原文件字符数 === draft.draftChars) return false
+    if (draft.originalCharCount !== null && draft.originalCharCount === draft.draftChars) return false
     return draft.savedAt > (draft.originalMtime ?? 0)
   })
 }

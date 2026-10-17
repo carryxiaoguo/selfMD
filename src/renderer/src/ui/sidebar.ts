@@ -35,7 +35,7 @@ export interface 侧边栏依赖 {
   /** 点击文档列表项的关闭按钮。 */
   关闭文档: (id: number) => void
   /** 折叠 / 展开大纲某一段（当前不做折叠，保留接口）。 */
-  保存状态: (state: { visibleNow: boolean; label: sidebarTabName; widthPx: number }) => void
+  saveState: (state: { visibleNow: boolean; label: sidebarTabName; widthPx: number }) => void
 }
 
 const 最小宽度 = 160
@@ -51,7 +51,7 @@ export class sidebar {
   private filesPanel!: HTMLElement
   private docsPanel!: HTMLElement
   /** 已打开的文档列表。由外层在多文档变化时推送。 */
-  private 文档列表: 文档列表项[] = []
+  private docList: 文档列表项[] = []
   private 标签按钮 = new Map<sidebarTabName, HTMLButtonElement>()
   private 当前高亮下标 = -1
   /** 已展开的目录路径。文件树每次重绘都读它，折叠状态才不会丢。 */
@@ -138,7 +138,7 @@ export class sidebar {
       document.removeEventListener('mouseup', 松开)
       // 拖拽期间给 body 加类，避免选中文本、并把光标保持为左右拉伸
       document.body.classList.remove('resizing-sidebar')
-      this.deps.保存状态({ visibleNow: this.visibleNow, label: this.label, widthPx: this.widthPx })
+      this.deps.saveState({ visibleNow: this.visibleNow, label: this.label, widthPx: this.widthPx })
     }
 
     document.body.classList.add('resizing-sidebar')
@@ -156,7 +156,7 @@ export class sidebar {
     this.visibleNow = visibleNow
     this.host.hidden = !visibleNow
     if (visibleNow && this.label === 'files') void this.refreshFileTree()
-    this.deps.保存状态({ visibleNow, label: this.label, widthPx: this.widthPx })
+    this.deps.saveState({ visibleNow, label: this.label, widthPx: this.widthPx })
   }
 
   /** 在显示 / 隐藏之间切换，返回切换后的可见状态。 */
@@ -176,7 +176,7 @@ export class sidebar {
   setTab(label: sidebarTabName): void {
     this.label = label
     this.应用标签()
-    this.deps.保存状态({ visibleNow: this.visibleNow, label, widthPx: this.widthPx })
+    this.deps.saveState({ visibleNow: this.visibleNow, label, widthPx: this.widthPx })
   }
 
   setWidth(width: number): void {
@@ -208,11 +208,11 @@ export class sidebar {
     this.当前高亮下标 = -1
 
     if (headings.length === 0) {
-      this.outlinePanel.append(this.建提示('本文档没有标题'))
+      this.outlinePanel.append(this.makeHint('本文档没有标题'))
       return
     }
 
-    const 最浅 = Math.min(...headings.map((t) => t.level))
+    const shallowest = Math.min(...headings.map((t) => t.level))
 
     headings.forEach((title, subscript) => {
       const item = document.createElement('div')
@@ -220,7 +220,7 @@ export class sidebar {
       item.dataset.subscript = String(subscript)
       item.dataset.pos = String(title.position)
       // 层级用 CSS 变量给出，主题想改缩进直接覆盖变量即可
-      item.style.setProperty('--outline-level', String(title.level - 最浅))
+      item.style.setProperty('--outline-level', String(title.level - shallowest))
 
       const fold = document.createElement('span')
       fold.className = 'outline-expander'
@@ -240,10 +240,10 @@ export class sidebar {
     if (subscript === this.当前高亮下标) return
     this.当前高亮下标 = subscript
     for (const item of Array.from(this.outlinePanel.querySelectorAll('.outline-item'))) {
-      const 是当前 = Number((item as HTMLElement).dataset.subscript) === subscript
-      item.classList.toggle('active', 是当前)
+      const isCurrentFlag = Number((item as HTMLElement).dataset.subscript) === subscript
+      item.classList.toggle('active', isCurrentFlag)
       // 滚动到可见：文档很长时当前标题可能在视野外
-      if (是当前) (item as HTMLElement).scrollIntoView({ block: 'nearest' })
+      if (isCurrentFlag) (item as HTMLElement).scrollIntoView({ block: 'nearest' })
     }
   }
 
@@ -252,15 +252,15 @@ export class sidebar {
   /** 文件树以"当前文档所在目录"为根。没有文档时显示提示。 */
   private 文件树根: string | null = null
   /** 用户显式打开的根目录；非 null 时覆盖"跟随文档"的行为。 */
-  private 手动根目录: string | null = null
-  private 刷新序号 = 0
+  private manualRoot: string | null = null
+  private refreshSeq = 0
 
   async refreshFileTree(): Promise<void> {
     // 刷新会被多个来源触发（打开文档、切换标签、显示侧边栏），而读取目录是
     // 异步的。两次刷新交错时，后者会先清空面板、前者再把内容写回去，
     // 结果是条目重复或内容对不上当前文档。用序号做"最后一次生效"的保证，
     // 并且把 DOM 写入推迟到全部读完之后的**一次**提交。
-    const index = ++this.刷新序号
+    const index = ++this.refreshSeq
     const parts = document.createDocumentFragment()
 
     // 用户显式打开过文件夹时以它为准；否则跟随当前文档所在目录。
@@ -268,18 +268,18 @@ export class sidebar {
     // 而显式打开一个文件夹之后，切到别处的文档不该把树根也带走。
     const docModel = this.deps.取文档路径()
     let root: string | null
-    if (this.手动根目录) {
-      root = this.手动根目录
+    if (this.manualRoot) {
+      root = this.manualRoot
     } else if (!docModel) {
       this.文件树根 = null
-      parts.append(this.建提示('尚未保存的文档没有所在目录'))
+      parts.append(this.makeHint('尚未保存的文档没有所在目录'))
       this.提交文件树(parts, index)
       return
     } else {
       root = await window.selfmdExtra.path.dirname(docModel)
-      if (index !== this.刷新序号) return
+      if (index !== this.refreshSeq) return
       if (!root) {
-        parts.append(this.建提示('无法定位所在目录'))
+        parts.append(this.makeHint('无法定位所在目录'))
         this.提交文件树(parts, index)
         return
       }
@@ -296,13 +296,13 @@ export class sidebar {
     const list = document.createElement('div')
     parts.append(list)
     await this.展开目录(root, list, 0)
-    if (index !== this.刷新序号) return
+    if (index !== this.refreshSeq) return
 
     this.提交文件树(parts, index)
   }
 
   private 提交文件树(parts: DocumentFragment, index: number): void {
-    if (index !== this.刷新序号) return
+    if (index !== this.refreshSeq) return
     this.filesPanel.textContent = ''
     this.filesPanel.append(parts)
   }
@@ -317,19 +317,19 @@ export class sidebar {
 
   /** 推送已打开的文档列表并重绘。 */
   设置文档列表(list: 文档列表项[]): void {
-    this.文档列表 = list
+    this.docList = list
     if (this.label === 'articles') this.重绘文档列表()
   }
 
   private 重绘文档列表(): void {
     this.docsPanel.textContent = ''
 
-    if (this.文档列表.length === 0) {
-      this.docsPanel.append(this.建提示('没有打开的文档'))
+    if (this.docList.length === 0) {
+      this.docsPanel.append(this.makeHint('没有打开的文档'))
       return
     }
 
-    for (const item of this.文档列表) {
+    for (const item of this.docList) {
       const line = document.createElement('div')
       line.className = 'article-list-item'
       if (item.current) line.classList.add('is-active')
@@ -354,7 +354,7 @@ export class sidebar {
       }
 
       // 只有一个文档时不给关闭按钮：关掉就没有编辑器了
-      if (this.文档列表.length > 1) {
+      if (this.docList.length > 1) {
         const off = document.createElement('button')
         off.className = 'article-close'
         off.type = 'button'
@@ -379,15 +379,15 @@ export class sidebar {
    * 用户要的是浏览那个文件夹，切文档不该把树根也带走。
    */
   设根目录(filePath: string): void {
-    this.手动根目录 = filePath
+    this.manualRoot = filePath
   }
 
   /** 清除显式根，回到跟随当前文档的模式。 */
   清除根目录(): void {
-    this.手动根目录 = null
+    this.manualRoot = null
   }
 
-  private 建提示(text: string): HTMLElement {
+  private makeHint(text: string): HTMLElement {
     const hint = document.createElement('div')
     hint.className = 'sidebar-empty'
     hint.textContent = text
@@ -476,8 +476,8 @@ export class sidebar {
   /** 高亮文件树里对应当前文档的那一项。 */
   高亮当前文件(filePath: string | null): void {
     for (const line of Array.from(this.filesPanel.querySelectorAll('.file-list-item'))) {
-      const 是当前 = filePath !== null && (line as HTMLElement).dataset.path === filePath
-      line.classList.toggle('active', 是当前)
+      const isCurrentFlag = filePath !== null && (line as HTMLElement).dataset.path === filePath
+      line.classList.toggle('active', isCurrentFlag)
     }
   }
 }

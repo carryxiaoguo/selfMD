@@ -23,17 +23,17 @@ import { pathToFileURL } from 'node:url'
  *   /^\s*@import\s+(url)?([('"]+)([^\)"']+)([)'"]+)/im
  */
 
-const 导出包含正则 = /^\s*@include-when-export\s+(url)?\s*([('"]+)([^)"']+)([)'"]+)/gim
+const exportIncludeRegex = /^\s*@include-when-export\s+(url)?\s*([('"]+)([^)"']+)([)'"]+)/gim
 const 导入正则 = /^\s*@import\s+(url)?\s*([('"]+)([^)"']+)([)'"]+)/gim
 
 /** 递归深度上限。CSS 里的 @import 环路会让内联永不终止。 */
-const 最大深度 = 8
+const maxDepth = 8
 
 export interface 样式处理选项 {
   /** 相对路径的解析基准（通常是主题目录）。 */
   baseDir: string;
   /** 是否内联 `@include-when-export` 指定的地址。屏幕预览时传 false。 */
-  导出模式?: boolean
+  exportMode?: boolean
 }
 
 /** 解析一个地址：远程走网络，本地读文件。取不到时返回 null，不抛。 */
@@ -65,27 +65,27 @@ async function 取资源(
 }
 
 /** 把内联进来的内容再递归处理一遍（它自己可能还有 @import）。 */
-async function 内联(
+async function inlineFlag(
   docText: string,
   baseDir: string,
   depth: number,
   options: 样式处理选项
 ): Promise<string> {
-  if (depth >= 最大深度) return docText
+  if (depth >= maxDepth) return docText
 
   let result = docText
 
-  if (options.导出模式) {
+  if (options.exportMode) {
     // --- @include-when-export ---
     const 待替换: { originalText: string; url: string }[] = []
-    for (const match of result.matchAll(导出包含正则)) {
+    for (const match of result.matchAll(exportIncludeRegex)) {
       待替换.push({ originalText: match[0], url: match[3] })
     }
     for (const { originalText, url } of 待替换) {
       const resource = await 取资源(url, baseDir)
       // 取不到就**删掉这一行**而不是留着：这不是浏览器认识的规则，
       // 留着只会变成一条无效样式，还容易让人以为它生效了。
-      const replace = resource ? await 内联(resource.content, resource.baseline, depth + 1, options) : ''
+      const replace = resource ? await inlineFlag(resource.content, resource.baseline, depth + 1, options) : ''
       result = result.replace(originalText, () => replace)
     }
   }
@@ -100,7 +100,7 @@ async function 内联(
   for (const { originalText, url } of 导入项) {
     const resource = await 取资源(url, baseDir)
     if (!resource) continue
-    const replace = await 内联(resource.content, resource.baseline, depth + 1, options)
+    const replace = await inlineFlag(resource.content, resource.baseline, depth + 1, options)
     result = result.replace(originalText, () => replace)
   }
 
@@ -113,11 +113,11 @@ async function 内联(
  * 屏幕预览时 `导出模式` 传 false，只做 `@import` 内联；
  * 导出时传 true，两者都做。
  */
-export async function 处理样式表(
+export async function processStyleSheet(
   docText: string,
   options: 样式处理选项
 ): Promise<string> {
-  return 内联(docText, options.baseDir, 0, options)
+  return inlineFlag(docText, options.baseDir, 0, options)
 }
 
 /**
@@ -142,6 +142,6 @@ export function 子样式基准(当前基准: string, url: string): string {
 
 /** 判断一段样式里是否还有导出时才需要处理的指令。 */
 export function 含导出指令(docText: string): boolean {
-  导出包含正则.lastIndex = 0
-  return 导出包含正则.test(docText)
+  exportIncludeRegex.lastIndex = 0
+  return exportIncludeRegex.test(docText)
 }

@@ -22,7 +22,7 @@ export interface 偏好设置依赖 {
 export class 偏好设置面板 {
   private deps: 偏好设置依赖
   private overlay: HTMLElement | null = null
-  private 当前分区 = 0
+  private currentSection = 0
   private searchTerm = ''
 
   constructor(deps: 偏好设置依赖) {
@@ -55,7 +55,7 @@ export class 偏好设置面板 {
     // 免得名字写错时直接把用户丢回第一页却毫无提示。
     if (定位分区) {
       const subscript = PrefsSchema.findIndex((score) => score.title === 定位分区)
-      if (subscript >= 0) this.当前分区 = subscript
+      if (subscript >= 0) this.currentSection = subscript
       else console.warn(`[偏好设置] 没有名为「${定位分区}」的分区`)
     }
 
@@ -79,7 +79,7 @@ export class 偏好设置面板 {
       label.dataset.section = String(subscript)
       label.textContent = section.title
       label.addEventListener('click', () => {
-        this.当前分区 = subscript
+        this.currentSection = subscript
         this.searchTerm = ''
         const input = panel.querySelector('.prefs-search') as HTMLInputElement | null
         if (input) input.value = ''
@@ -164,7 +164,7 @@ export class 偏好设置面板 {
     // 左栏高亮：搜索时所有分区都不选中——结果已经跨分区平铺了
     for (const button of Array.from(this.左栏区?.querySelectorAll('.prefs-tab') ?? [])) {
       const subscript = Number((button as HTMLElement).dataset.section)
-      button.classList.toggle('active', this.searchTerm === '' && subscript === this.当前分区)
+      button.classList.toggle('active', this.searchTerm === '' && subscript === this.currentSection)
     }
 
     content.textContent = ''
@@ -174,7 +174,7 @@ export class 偏好设置面板 {
       return
     }
 
-    const section = PrefsSchema[this.当前分区]
+    const section = PrefsSchema[this.currentSection]
     if (!section) return
 
     for (const subsection of section.subsection) {

@@ -22,7 +22,7 @@ import { ensureAppDirs, getAppPaths } from './util/paths'
 import { loadSettings, onSettingsChanged } from './services/settings'
 import { seedBuiltinThemes } from './services/themes'
 import { loadRecent } from './services/recent'
-import { createWindow, 应用拼写词典 } from './window'
+import { createWindow, applySpellDict } from './window'
 
 /**
  * main 进程入口。
@@ -104,7 +104,7 @@ if (!gotLock) {
       rebuildMenu()
       // 拼写词典要在会话上生效。已经在窗口里渲染过的文本不会重新检查——
       // 用户改完之后需要重新打开文档才能看到效果，这一点写进了设置项的说明里。
-      应用拼写词典(settings)
+      applySpellDict(settings)
     })
 
     // `openPathFromArgv` 总是返回一个对象，所以要判断字段而不是对象本身：
@@ -113,9 +113,9 @@ if (!gotLock) {
     if (fromArgv.path) {
       createWindow(fromArgv)
     } else if (SMOKE_IMAGE) {
-      const 素材 = 准备图片素材()
-      console.log(`[selfMD] 图片测试素材：文档=${素材.docModel} 图片=${素材.image}`)
-      createWindow({ path: 素材.docModel })
+      const fixtureName = 准备图片素材()
+      console.log(`[selfMD] 图片测试素材：文档=${fixtureName.docModel} 图片=${fixtureName.image}`)
+      createWindow({ path: fixtureName.docModel })
     } else {
       createWindow(smokeOpen())
     }
@@ -298,15 +298,15 @@ async function 运行草稿测试(): Promise<boolean> {
   }
 
   // 1) 写一份比原文件新的草稿
-  const 草稿内容 = '磁盘上的旧内容\n\n用户后来敲的新内容\n'
-  record('写入草稿', writeDraft(docModel, 草稿内容))
+  const draftContent = '磁盘上的旧内容\n\n用户后来敲的新内容\n'
+  record('写入草稿', writeDraft(docModel, draftContent))
 
   // 2) 能列出来
-  const 这条 = listDrafts().find((c) => c.rawPath === docModel)
-  record('能列出草稿', 这条 !== undefined)
+  const thisItem = listDrafts().find((c) => c.rawPath === docModel)
+  record('能列出草稿', thisItem !== undefined)
 
   // 3) 能读回同样的内容
-  record('读回内容一致', 这条 !== undefined && readDraft(这条.key) === 草稿内容)
+  record('读回内容一致', thisItem !== undefined && readDraft(thisItem.key) === draftContent)
 
   // 4) 需要恢复：草稿比原文件新，且内容长度不同
   record(
@@ -319,7 +319,7 @@ async function 运行草稿测试(): Promise<boolean> {
   record('内容不一致时保留草稿', listDrafts().some((c) => c.rawPath === docModel))
 
   // 6) 内容一致时才清掉
-  clearDocDraft(docModel, 草稿内容)
+  clearDocDraft(docModel, draftContent)
   record('内容一致时清除草稿', !listDrafts().some((c) => c.rawPath === docModel))
 
   // 7) 未命名文档（原路径为 null）也要能存与恢复
@@ -333,13 +333,13 @@ async function 运行草稿测试(): Promise<boolean> {
   record('未命名草稿可删除', !listDrafts().some((c) => c.rawPath === null))
 
   // 8) 原文件已被删除时也要提示恢复——草稿是唯一副本
-  const 幽灵 = join(dir, '已经不存在了.md')
-  writeDraft(幽灵, '文件被删了但草稿还在')
+  const ghost = join(dir, '已经不存在了.md')
+  writeDraft(ghost, '文件被删了但草稿还在')
   record(
     '原文件缺失时提示恢复',
-    recoverableDraft().some((c) => c.rawPath === 幽灵)
+    recoverableDraft().some((c) => c.rawPath === ghost)
   )
-  const 幽灵条目 = listDrafts().find((c) => c.rawPath === 幽灵)
+  const 幽灵条目 = listDrafts().find((c) => c.rawPath === ghost)
   if (幽灵条目) deleteDraft(幽灵条目.key)
 
   const failure = check.filter(([, okFlag]) => !okFlag)
@@ -466,16 +466,16 @@ async function runSmokeTest(): Promise<void> {  const target = smokeOpenPath()
 
   if (SMOKE_EXPORT) {
     // 计时器还没建，失败就直接退出——app.exit 会终止进程，不需要清理。
-    const 通过 = await 运行导出测试()
-    if (!通过) {
+    const passed = await 运行导出测试()
+    if (!passed) {
       app.exit(1)
       return
     }
   }
 
   if (SMOKE_DRAFTS) {
-    const 通过 = await 运行草稿测试()
-    if (!通过) {
+    const passed = await 运行草稿测试()
+    if (!passed) {
       app.exit(1)
       return
     }

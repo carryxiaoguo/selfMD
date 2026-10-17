@@ -168,7 +168,7 @@ export class DocumentService {
    * 换行符一起换掉——切换文档时这些都要跟着走，否则会出现
    * "切过去了但标题还写着上一个文件名""编码显示成上一个文档的"这类错位。
    */
-  采用状态(state: DocState): void {
+  adoptStatus(state: DocState): void {
     this.state = { ...state }
     void window.selfmd.doc.setDirty(this.state.dirty)
     this.emit()

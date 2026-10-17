@@ -9,7 +9,7 @@
  * 为什么建一次索引而不是每次敲键都查盘：查盘是毫秒级的，但目录一大
  * 就会让每次按键都卡一下，而"快速打开"的全部意义就在于快。
  */
-import { 模糊筛选, pathTail } from '@shared/fuzzy'
+import { fuzzyFilter, pathTail } from '@shared/fuzzy'
 
 interface fileRow {
   filePath: string
@@ -109,7 +109,7 @@ export async function 打开快速打开面板(options: 快速打开选项): Pro
   const filterBy = (): void => {
     const query = input.value
     // 文件越小越新，越可能是用户想找的；把它作为同分时的第二排序键
-    hit = 模糊筛选(
+    hit = fuzzyFilter(
       query,
       all.map((f) => ({ entry: f, docText: f.filePath })),
       pathTail

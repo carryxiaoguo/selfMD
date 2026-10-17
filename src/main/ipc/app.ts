@@ -318,7 +318,7 @@ export function registerAppIpc(): void {
   // 与其给一个注定失败的按钮，不如把当前状态如实报出来，再把人送过去。
   ipcMain.handle(CH.appFileAssoc, () => ({
     ...getAssocStatus(),
-    程序路径: 本程序路径()
+    exePath: 本程序路径()
   }))
 
   ipcMain.handle(CH.appOpenDefaultApps, async () => {

@@ -75,9 +75,9 @@ export function uniqueFileName(
 ): string {
   if (!已存在(expectedName)) return expectedName
 
-  const 扩展名位置 = expectedName.lastIndexOf('.')
-  const 主干 = 扩展名位置 > 0 ? expectedName.slice(0, 扩展名位置) : expectedName
-  const ext = 扩展名位置 > 0 ? expectedName.slice(扩展名位置) : ''
+  const extPos = expectedName.lastIndexOf('.')
+  const 主干 = extPos > 0 ? expectedName.slice(0, extPos) : expectedName
+  const ext = extPos > 0 ? expectedName.slice(extPos) : ''
 
   for (let i = 1; i < 1000; i++) {
     const candidate = `${主干}-${i}${ext}`
@@ -120,7 +120,7 @@ export function extByKind(kind: string | null | undefined): string | null {
 }
 
 /** 由文件名推断 MIME 类型；无法识别时返回 null。 */
-export function 类型由扩展名(fileName: string): string | null {
+export function kindByExt(fileName: string): string | null {
   const extension = fileName.toLowerCase().match(/\.[a-z0-9]+$/)?.[0]
   if (!extension) return null
   const tbl: Record<string, string> = {
@@ -140,5 +140,5 @@ export function 类型由扩展名(fileName: string): string | null {
 
 /** 判断一个扩展名是否属于受支持的图片类型。 */
 export function isImageFile(filePath: string): boolean {
-  return 类型由扩展名(filePath) !== null
+  return kindByExt(filePath) !== null
 }

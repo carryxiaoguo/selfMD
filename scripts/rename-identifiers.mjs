@@ -18,8 +18,8 @@
  *   消费端也是同名解构，两边一起改才对。
  *
  * 用法：
- *   node scripts/改英文标识符.mjs           只看统计（dry run）
- *   node scripts/改英文标识符.mjs --应用     真的改
+ *   node scripts/rename-identifiers.mjs           只看统计（dry run）
+ *   node scripts/rename-identifiers.mjs --应用     真的改
  */
 import {
   readFileSync,
@@ -37,13 +37,13 @@ const 中文 = /[\u4e00-\u9fff]/
 
 /** 读出对照表。键是中文标识符，值是英文。
  *
- * 支持**多个表文件**（`scripts/改名表*.json`），后加载的同名键覆盖前面的。
+ * 支持**多个表文件**（`scripts/rename-map*.json`），后加载的同名键覆盖前面的。
  * 这样做是为了能一批一批往里加词，而不必每次重写整张表——
  * 1448 个标识符一趟改不完，分批是这个活唯一可行的推进方式。
  */
 const 表目录 = join(根, 'scripts')
 const 表文件们 = readdirSync(表目录)
-  .filter((名) => /^改名表.*\.json$/.test(名))
+  .filter((名) => /^rename-map.*\.json$/.test(名))
   .sort()
 const 合并表 = {}
 for (const 名 of 表文件们) {
@@ -65,7 +65,7 @@ const 对照 = Object.fromEntries(
  */
 let 排除 = {}
 try {
-  const 原 = JSON.parse(readFileSync(join(表目录, '改名排除.json'), 'utf8'))
+  const 原 = JSON.parse(readFileSync(join(表目录, 'rename-exclude.json'), 'utf8'))
   // 注意是 `Object.entries`，不是 `Object.keys`：
   // 喂 keys 数组给 fromEntries 会被当成"字符串可迭代"，
   // 结果每个字符变成一个键，排除清单形同不存在——而且不报错。

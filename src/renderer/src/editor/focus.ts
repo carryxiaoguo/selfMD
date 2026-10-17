@@ -110,7 +110,7 @@ export function 专注模式扩展(): Extension {
 }
 
 /** 把某一行滚到视口垂直中央。 */
-export function 居中光标行(view: EditorView): void {
+export function centerCursorLine(view: EditorView): void {
   const position = view.state.selection.main.head
   view.dispatch({
     effects: EditorView.scrollIntoView(position, { y: 'center', yMargin: 0 })

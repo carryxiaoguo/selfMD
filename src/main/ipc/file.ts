@@ -185,7 +185,7 @@ export function registerFileIpc(): void {
    */
   ipcMain.handle(CH.fileWalk, (_e, root: string, options?: { limit?: number; depth?: number }) => {
     const limit = Math.min(options?.limit ?? 4000, 20000)
-    const 最大深度 = Math.min(options?.depth ?? 8, 16)
+    const maxDepth = Math.min(options?.depth ?? 8, 16)
     const 跳过 = new Set([
       'node_modules',
       '.git',
@@ -205,7 +205,7 @@ export function registerFileIpc(): void {
     let truncated = false
 
     const 走 = (dir: string, depth: number): void => {
-      if (truncated || depth > 最大深度) return
+      if (truncated || depth > maxDepth) return
       let entry
       try {
         entry = readdirSync(dir, { withFileTypes: true })
@@ -217,9 +217,9 @@ export function registerFileIpc(): void {
         if (truncated) return
         if (item.name.startsWith('.')) continue
         if (item.isDirectory() && 跳过.has(item.name)) continue
-        const 全路径 = join(dir, item.name)
+        const fullPathArg = join(dir, item.name)
         if (item.isDirectory()) {
-          走(全路径, depth + 1)
+          走(fullPathArg, depth + 1)
           continue
         }
         if (!item.isFile()) continue
@@ -229,12 +229,12 @@ export function registerFileIpc(): void {
         }
         let info
         try {
-          info = statSync(全路径)
+          info = statSync(fullPathArg)
         } catch {
           continue
         }
         result.push({
-          filePath: 全路径,
+          filePath: fullPathArg,
           nameText: item.name,
           mtime: info.mtimeMs,
           sizeBytes: info.size

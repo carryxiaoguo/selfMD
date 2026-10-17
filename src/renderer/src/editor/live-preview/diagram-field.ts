@@ -52,7 +52,7 @@ function 去掉围栏行(lines: string[]): string[] {
 
 export interface 图表字段选项 {
   /** 当前是否深色模式；决定 Mermaid 用哪套配色。 */
-  是暗色: () => boolean
+  isDarkFlag: () => boolean
 }
 
 /**
@@ -65,7 +65,7 @@ export function 建立图表字段(options: 图表字段选项): Extension {
   function build(state: EditorState): DecorationSet {
     const range: ReturnType<Decoration['range']>[] = []
     const cursor = state.selection.main
-    const 暗色 = options.是暗色()
+    const darkMode = options.isDarkFlag()
 
     树遍历(state, (node) => {
       if (node.name !== 'FencedCode') return
@@ -80,7 +80,7 @@ export function 建立图表字段(options: 图表字段选项): Extension {
 
       range.push(
         Decoration.replace({
-          widget: new 图表(sourceCode, 暗色),
+          widget: new 图表(sourceCode, darkMode),
           block: true
         }).range(node.from, node.to)
       )
@@ -91,22 +91,22 @@ export function 建立图表字段(options: 图表字段选项): Extension {
 
   return StateField.define<DecorationSet>({
     create: (state) => build(state),
-    update: (prevValue, 事务) => {
-      if (!事务.docChanged && !事务.selection) return prevValue
-      return build(事务.state)
+    update: (prevValue, txn) => {
+      if (!txn.docChanged && !txn.selection) return prevValue
+      return build(txn.state)
     },
-    provide: (字段) => EditorView.decorations.from(字段)
+    provide: (fieldName) => EditorView.decorations.from(fieldName)
   })
 }
 
 /** 遍历语法树找围栏。抽出来只是为了让上面的逻辑读起来清楚些。 */
 function 树遍历(
   state: EditorState,
-  回调: (node: { name: string; from: number; to: number; firstChild: unknown }) => void
+  callback: (node: { name: string; from: number; to: number; firstChild: unknown }) => void
 ): void {
   syntaxTree(state).iterate({
     enter: (quote) => {
-      回调(quote.node as unknown as {
+      callback(quote.node as unknown as {
         name: string
         from: number
         to: number

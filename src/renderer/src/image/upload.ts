@@ -86,7 +86,7 @@ export function 收集文档图片(state: EditorState, 只本地 = false): docIm
 /** 遍历语法树。抽出来只是为了让上面的逻辑读起来不被 iterate 的回调淹掉。 */
 function 语法Tree遍历(
   state: EditorState,
-  回调: (node: {
+  callback: (node: {
     name: string
     from: number
     to: number
@@ -95,7 +95,7 @@ function 语法Tree遍历(
 ): void {
   syntaxTree(state).iterate({
     enter: (quote) => {
-      回调(quote.node as unknown as {
+      callback(quote.node as unknown as {
         name: string
         from: number
         to: number
@@ -125,16 +125,16 @@ export async function 上传并回填(
   view: EditorView,
   images: docImages[]
 ): Promise<回填结果> {
-  const 可传 = images.filter((img) => img.localPath !== null)
-  if (可传.length === 0) {
+  const uploadable = images.filter((img) => img.localPath !== null)
+  if (uploadable.length === 0) {
     return { changedCount: 0, failCount: 0, failureSummary: '文档里没有本地图片，无需上传。' }
   }
 
-  const reply = await window.selfmd.image.upload(可传.map((img) => img.localPath as string))
+  const reply = await window.selfmd.image.upload(uploadable.map((img) => img.localPath as string))
 
   if (reply.success.length === 0) {
     const reason = reply.failure[0]?.reason ?? '上传失败，且没有返回原因。'
-    return { changedCount: 0, failCount: 可传.length, failureSummary: reason }
+    return { changedCount: 0, failCount: uploadable.length, failureSummary: reason }
   }
 
   // 原路径 → 远程地址。用绝对路径做键，因为同一张图可能在文档里
@@ -143,7 +143,7 @@ export async function 上传并回填(
   for (const item of reply.success) map.set(item.rawPath.replace(/\\/g, '/'), item.url)
 
   const diffCount: { from: number; to: number; insert: string }[] = []
-  for (const img of 可传) {
+  for (const img of uploadable) {
     const url = map.get((img.localPath as string).replace(/\\/g, '/'))
     if (!url) continue
     // 只替换 URL 那一段，保留 `![替代文字](` 与 `)`。

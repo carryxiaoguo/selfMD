@@ -271,7 +271,7 @@ function smartPunctuationSubmenu(): MenuItemConstructorOptions[] {
   // "何时转换"是**三选一**：输入时 / 渲染时 / 关闭。
   // 这三者互斥，所以用 radio 而不是 checkbox——用 checkbox 会让人以为
   // 可以同时开两个，而实际只有后设的那个生效。
-  const 模式项 = (
+  const modeItem = (
     id: string,
     value: 'input' | 'rendering' | 'none'
   ): MenuItemConstructorOptions => ({
@@ -282,9 +282,9 @@ function smartPunctuationSubmenu(): MenuItemConstructorOptions[] {
   })
 
   return [
-    模式项('edit.smartPunctuationInput', 'input'),
-    模式项('edit.smartPunctuationRendering', 'rendering'),
-    模式项('edit.smartPunctuationOff', 'none'),
+    modeItem('edit.smartPunctuationInput', 'input'),
+    modeItem('edit.smartPunctuationRendering', 'rendering'),
+    modeItem('edit.smartPunctuationOff', 'none'),
     { type: 'separator' },
     // 下面两个是"转换什么"，与上面的"何时转换"正交——
     // 只勾引号不勾破折号是完全合理的用法，所以用 checkbox。
@@ -592,12 +592,12 @@ export function 菜单摘要(): string[] {
     const label = item.label || item.role || '(无标题)'
     const key = item.accelerator ? `  [${item.accelerator}]` : ''
     const 是命令 = Boolean(item.id)
-    let 态 = ''
+    let phase = ''
     if (是命令) {
-      if (!isImplemented(item.id)) 态 = '  ← 未实现'
-      else if (!item.enabled) 态 = '  ← 暂不可用'
+      if (!isImplemented(item.id)) phase = '  ← 未实现'
+      else if (!item.enabled) phase = '  ← 暂不可用'
     }
-    line.push(`${' '.repeat(6 + (层 - 1) * 4)}${label}${key}${态}`)
+    line.push(`${' '.repeat(6 + (层 - 1) * 4)}${label}${key}${phase}`)
     if (item.submenu) {
       for (const child of item.submenu.items) {
         if (child.type !== 'separator') expand(child, 层 + 1)
@@ -605,13 +605,13 @@ export function 菜单摘要(): string[] {
     }
   }
 
-  for (const 顶层 of menu.items) {
-    const children = 顶层.submenu?.items ?? []
-    const 非分隔 = children.filter((i) => i.type !== 'separator')
-    const 已启用 = 非分隔.filter((i) => i.enabled).length
-    line.push(`${顶层.label || 顶层.role || '(无标题)'}（${已启用}/${非分隔.length} 可用）`)
+  for (const topLevel of menu.items) {
+    const children = topLevel.submenu?.items ?? []
+    const notSeparator = children.filter((i) => i.type !== 'separator')
+    const 已启用 = notSeparator.filter((i) => i.enabled).length
+    line.push(`${topLevel.label || topLevel.role || '(无标题)'}（${已启用}/${notSeparator.length} 可用）`)
 
-    for (const child of 非分隔) expand(child, 1)
+    for (const child of notSeparator) expand(child, 1)
   }
   return line
 }

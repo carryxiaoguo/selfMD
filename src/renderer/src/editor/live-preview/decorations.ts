@@ -94,7 +94,7 @@ const 标题行 = [1, 2, 3, 4, 5, 6].map((levelNo) =>
   Decoration.line({ class: `cm-lp-heading cm-lp-h${levelNo}` })
 )
 
-export function 标题行装饰(levelNo: number): Decoration {
+export function headingLineDeco(levelNo: number): Decoration {
   return 标题行[Math.min(6, Math.max(1, levelNo)) - 1]
 }
 
@@ -158,7 +158,7 @@ export const blockLineStyles = {
 const 代码块行缓存 = new Map<string, Decoration>()
 
 export function 代码块行装饰(
-  配色: string,
+  colorScheme: string,
   position: '首' | '中' | '末',
   lineNo: number | null,
   fontStack: string
@@ -166,7 +166,7 @@ export function 代码块行装饰(
   const className = ['cm-lp-code', 'md-fences']
   if (position === '首') className.push('cm-lp-code-first')
   if (position === '末') className.push('cm-lp-code-last')
-  if (配色 !== 'follow') className.push(`cm-code-${配色}`)
+  if (colorScheme !== 'follow') className.push(`cm-code-${colorScheme}`)
 
   const attr: Record<string, string> = {}
   if (lineNo !== null) attr['data-lineNo'] = String(lineNo)
@@ -177,7 +177,7 @@ export function 代码块行装饰(
   // 带行号的装饰每行都不同，缓存没有意义；围栏行（无行号）才缓存
   if (lineNo !== null) return Decoration.line({ class: className.join(' '), attributes: attr })
 
-  const key = `${配色}|${fontStack}|${position}`
+  const key = `${colorScheme}|${fontStack}|${position}`
   let deco = 代码块行缓存.get(key)
   if (!deco) {
     deco = Decoration.line({ class: className.join(' '), attributes: attr })

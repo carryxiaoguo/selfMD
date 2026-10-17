@@ -8,7 +8,7 @@ import { activeTheme } from '@shared/types'
 import { getAppPaths } from '../util/paths'
 import { getSettings } from '../services/settings'
 import { themePath, themeUserCssPath, baseUserCssPath } from '../services/themes'
-import { 处理样式表 } from './css'
+import { processStyleSheet } from './css'
 
 /**
  * 导出。
@@ -22,7 +22,7 @@ import { 处理样式表 } from './css'
  *   - **其余格式委托 Pandoc**：检测不到就明确告知，而不是静默失败。
  */
 
-export type 导出格式 = 'html' | 'html-plain' | 'pdf' | 'docx' | 'latex' | 'epub' | 'rtf' | 'odt'
+export type exportFormat = 'html' | 'html-plain' | 'pdf' | 'docx' | 'latex' | 'epub' | 'rtf' | 'odt'
 
 export interface ExportOptions {
   /** 导出后的目标文件路径。 */
@@ -36,7 +36,7 @@ export interface ExportOptions {
   /** 是否把本地图片内嵌成 base64（自包含单文件）。 */
   embeddedImage?: boolean
   /** 导出格式。 */
-  format: 导出格式
+  format: exportFormat
 }
 
 export interface exportResult {
@@ -143,14 +143,14 @@ body.selfmd-export * { -webkit-print-color-adjust: exact; print-color-adjust: ex
 function 构建目录(source: string): string {
   const headings = 提取大纲(source)
   if (headings.length === 0) return ''
-  const 最浅 = Math.min(...headings.map((t) => t.level))
+  const shallowest = Math.min(...headings.map((t) => t.level))
   const line = headings
     .map((title) => {
-      const indent = (title.level - 最浅) * 14
+      const indent = (title.level - shallowest) * 14
       const docText = title.docText || '（空标题）'
-      const 转义 = docText.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      const escaped = docText.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
       // 锚点用位置偏移生成，与正文标题的 id 对应
-      return `      <div class="outline-item" style="padding-left:${indent}px"><a class="outline-label" href="#t${title.position}">${转义}</a></div>`
+      return `      <div class="outline-item" style="padding-left:${indent}px"><a class="outline-label" href="#t${title.position}">${escaped}</a></div>`
     })
     .join('\n')
 
@@ -237,20 +237,20 @@ async function 收集样式(): Promise<string> {
   const theme = themePath(id)
   if (theme && existsSync(theme)) {
     partEl.push(
-      await 处理样式表(readFileSync(theme, 'utf8'), {
+      await processStyleSheet(readFileSync(theme, 'utf8'), {
         baseDir: getAppPaths().themes,
-        导出模式: true
+        exportMode: true
       })
     )
   }
 
-  for (const 自定义 of [baseUserCssPath(), themeUserCssPath(id)]) {
-    if (自定义 && existsSync(自定义)) {
+  for (const customValue of [baseUserCssPath(), themeUserCssPath(id)]) {
+    if (customValue && existsSync(customValue)) {
       // 用户自定义样式同样要处理：里面可能有 @import
       partEl.push(
-        await 处理样式表(readFileSync(自定义, 'utf8'), {
+        await processStyleSheet(readFileSync(customValue, 'utf8'), {
           baseDir: getAppPaths().themes,
-          导出模式: true
+          exportMode: true
         })
       )
     }
@@ -301,7 +301,7 @@ ${body}</div>
   }
 
   const style = await 收集样式()
-  const 类 = `selfmd-export${withOutline ? ' selfmd-export-show-outline' : ''}`
+  const cls = `selfmd-export${withOutline ? ' selfmd-export-show-outline' : ''}`
   const dir = withOutline ? 构建目录(options.source) : ''
 
   return `<!doctype html>
@@ -316,7 +316,7 @@ ${导出基础样式}
 ${style}
 </style>
 </head>
-<body class="${类}">
+<body class="${cls}">
   <div class="selfmd-export-content">
 ${dir}    <div id="write">
 ${body}</div>
@@ -518,7 +518,7 @@ async function 导出经Pandoc(options: ExportOptions): Promise<exportResult> {
 // ---------------------------------------------------------------------------
 
 /** 各格式是否可用（供菜单决定是否置灰）。 */
-export async function 可用格式(): Promise<Record<导出格式, boolean>> {
+export async function 可用格式(): Promise<Record<exportFormat, boolean>> {
   const hasPandoc = (await detectPandoc()) !== null
   return {
     html: true,
@@ -554,7 +554,7 @@ export async function runExport(options: ExportOptions): Promise<exportResult> {
 }
 
 /** 供自测使用：直接拿一段 Markdown 生成 HTML，不落盘。 */
-export async function 试渲染(source: string, format: 导出格式 = 'html'): Promise<string> {
+export async function 试渲染(source: string, format: exportFormat = 'html'): Promise<string> {
   return buildExportHtml({
     source,
     target: '',

@@ -17,19 +17,19 @@ import {
   adjustIndent,
   setHeadingLevel
 } from './commands'
-import { 换引号, 换破折号, scanPunct } from './smart-punctuation'
-import { fuzzyScore, 模糊筛选, pathTail } from '@shared/fuzzy'
+import { swapQuotes, 换破折号, scanPunct } from './smart-punctuation'
+import { fuzzyScore, fuzzyFilter, pathTail } from '@shared/fuzzy'
 import { sentenceRange, 词区间 } from './selection'
 import { readFrontMatter, setAttr, removeAttr } from '@shared/front-matter'
 import {
   uniqueFileName,
   应当搬运,
   resolveTargetDir,
-  type 目标解析输入,
+  type ResolveTargetInput,
   type 目标结果,
-  type 搬运判定输入
+  type MoveDecisionInput
 } from '../image/resolve-target'
-import { buildImageSyntax, 生成引用地址, type 引用选项 } from '../image/reference'
+import { buildImageSyntax, buildRefUrl, type 引用选项 } from '../image/reference'
 
 /**
  * 编辑命令自测。
@@ -194,7 +194,7 @@ export function 运行纯函数自测(): Record<string, string> {
     ['中文后单引号（撇号）', "'", '他']
   ]
   for (const [name, ch, preamble] of 引号用例) {
-    result[`引号·${name}`] = 换引号(ch, preamble)
+    result[`引号·${name}`] = swapQuotes(ch, preamble)
   }
 
   // --- 破折号 -----------------------------------------------------------
@@ -262,16 +262,16 @@ export function 运行图片管线自测(): Record<string, string> {
   const result: Record<string, string> = {}
 
   // --- 目标目录解析 -----------------------------------------------------
-  const baseline: 目标解析输入 = {
+  const baseline: ResolveTargetInput = {
     docDir: 'C:/笔记',
     docName: '甲.md',
-    是文本包: false,
+    isTextBundle: false,
     docSettings: null,
     globalPolicy: '',
     customDir: './${filename}',
     autoUploadAllowed: false
   }
-  const 目标用例: [string, Partial<目标解析输入>][] = [
+  const 目标用例: [string, Partial<ResolveTargetInput>][] = [
     ['默认策略（不做特殊处理）', {}],
     ['当前文件夹', { globalPolicy: 'folder' }],
     ['assets 子目录', { globalPolicy: 'assets' }],
@@ -287,7 +287,7 @@ export function 运行图片管线自测(): Record<string, string> {
     ['文档级用 ipic 标记', { docSettings: 'ipic', autoUploadAllowed: true }],
     ['文档级绝对路径', { docSettings: 'D:/图' }],
     ['文档级含文件名占位符', { docSettings: '${filename}.assets' }],
-    ['文本包走包内 assets', { 是文本包: true, globalPolicy: 'assets' }],
+    ['文本包走包内 assets', { isTextBundle: true, globalPolicy: 'assets' }],
     ['未保存文档 + 需要目录的策略', { docDir: null, docName: null, globalPolicy: 'folder' }],
     ['未保存文档 + 不动策略', { docDir: null, docName: null, globalPolicy: '' }],
     ['未保存文档 + 绝对自定义目录', { docDir: null, docName: null, globalPolicy: 'custom', customDir: 'D:/图' }]
@@ -297,13 +297,13 @@ export function 运行图片管线自测(): Record<string, string> {
   }
 
   // --- 是否搬运 ---------------------------------------------------------
-  const 搬运基准: 搬运判定输入 = {
+  const 搬运基准: MoveDecisionInput = {
     source: 'C:/下载/照片.png',
     targetDir: 'C:/笔记/imgs',
     搬运本地: true,
     搬运在线: false
   }
-  const 搬运用例: [string, Partial<搬运判定输入>][] = [
+  const 搬运用例: [string, Partial<MoveDecisionInput>][] = [
     ['本地图片 + 开启本地搬运', {}],
     ['已关闭本地搬运', { 搬运本地: false }],
     ['已在目标目录内', { source: 'C:/笔记/imgs/照片.png' }],
@@ -325,11 +325,11 @@ export function 运行图片管线自测(): Record<string, string> {
 
   // --- 前置元数据读写 ---------------------------------------------------
   const 无元数据 = '# 标题\n\n正文'
-  const 有元数据 = '---\ntitle: 甲\nimage-folder: imgs\n---\n\n正文'
+  const hasMeta = '---\ntitle: 甲\nimage-folder: imgs\n---\n\n正文'
 
   result['元数据·无元数据'] = readFrontMatter(无元数据).exists ? '存在' : '不存在'
 
-  const 读有 = readFrontMatter(有元数据)
+  const 读有 = readFrontMatter(hasMeta)
   result['元数据·读取图片目录'] = 读有.attr['image-folder'] ?? '(缺失)'
   result['元数据·读取标题'] = 读有.attr['title'] ?? '(缺失)'
 
@@ -339,15 +339,15 @@ export function 运行图片管线自测(): Record<string, string> {
     .join('⏎')
 
   result['元数据·更新已有键'] =
-    readFrontMatter(setAttr(有元数据, 'image-folder', '图')).attr[
+    readFrontMatter(setAttr(hasMeta, 'image-folder', '图')).attr[
       'image-folder'
     ] ?? '(缺失)'
 
   result['元数据·新增键'] =
-    readFrontMatter(setAttr(有元数据, 'author', '我')).attr['author'] ?? '(缺失)'
+    readFrontMatter(setAttr(hasMeta, 'author', '我')).attr['author'] ?? '(缺失)'
 
   result['元数据·移除一个键后块仍存在'] = readFrontMatter(
-    removeAttr(有元数据, 'image-folder')
+    removeAttr(hasMeta, 'image-folder')
   ).exists
     ? '存在'
     : '不存在'
@@ -370,7 +370,7 @@ export function 运行图片管线自测(): Record<string, string> {
     ['井号被转义', 'C:/笔记/图/甲#1.png', 'C:/笔记', { useRelativePath: true, addDotPrefix: false, escapeUrl: true }]
   ]
   for (const [name, image, 文档目录值, options] of 引用用例) {
-    result[`引用·${name}`] = 生成引用地址(image, 文档目录值, options)
+    result[`引用·${name}`] = buildRefUrl(image, 文档目录值, options)
   }
 
   result['语法·Markdown'] = buildImageSyntax('图/甲.png', '甲')
@@ -581,7 +581,7 @@ export function 运行上传自测(): Record<string, string> {
   // --- 命令行生成 -----------------------------------------------------
   const config = {
     customCommand: 'my-uploader --file ${filepath} --name ${filename}',
-    用户数据目录: 'C:/Users/甲/AppData/Roaming/selfmd',
+    userDataDir: 'C:/Users/甲/AppData/Roaming/selfmd',
     platform: 'win32' as const
   }
   result['上传·自定义命令占位符'] = buildUploadCmd(
@@ -723,7 +723,7 @@ export function 运行模糊匹配自测(): Record<string, string> {
     'E:/项目/a_b_c.md'
   ]
   const filterOut = (query: string): string =>
-    模糊筛选(
+    fuzzyFilter(
       query,
       名单.map((p) => ({ entry: p, docText: p })),
       pathTail

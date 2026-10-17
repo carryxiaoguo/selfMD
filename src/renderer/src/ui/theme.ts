@@ -49,7 +49,7 @@ function 取链接(id: string): HTMLLinkElement {
   return el
 }
 
-function 设置链接(id: string, href: string): void {
+function setLink(id: string, href: string): void {
   const el = 取链接(id)
   // 同一个 URL 重复赋值不会触发重新加载；主题切换本来就会换 URL，
   // 但"重新加载主题"命令需要绕过这一点，所以由调用方负责改 URL。
@@ -73,15 +73,15 @@ export function 重新加载主题(settings: Settings): void {
   ] as const) {
     // 清空再设：同一个 URL 不会触发重新拉取，必须先断开
     取链接(el).setAttribute('href', '')
-    设置链接(el, href)
+    setLink(el, href)
   }
 }
 
 export function applyTheme(settings: Settings): void {
   const id = activeThemeId(settings)
-  设置链接('theme-css', themeCssUrl(id))
-  设置链接('base-user-css', 全局自定义样式Url())
-  设置链接('theme-user-css', 主题自定义样式Url(id))
+  setLink('theme-css', themeCssUrl(id))
+  setLink('base-user-css', 全局自定义样式Url())
+  setLink('theme-user-css', 主题自定义样式Url(id))
 
   document.body.classList.toggle('dark', settings.isDarkMode)
   document.body.classList.toggle('live-preview', settings.livePreview)
@@ -93,14 +93,14 @@ export function applyTheme(settings: Settings): void {
   // **0 / 空字符串表示"跟随主题"**，此时必须把内联值清掉而不是设成 0：
   // 设成 0 会得到 `0px` 这种无效值，而清掉之后主题与基础样式才有机会生效。
   const root = document.documentElement
-  const 设或清 = (name: string, value: string): void => {
+  const setOrClear = (name: string, value: string): void => {
     if (value) root.style.setProperty(name, value)
     else root.style.removeProperty(name)
   }
-  设或清('--font-size', settings.fontSize > 0 ? `${settings.fontSize}px` : '')
-  设或清('--line-height', settings.lineHeight > 0 ? String(settings.lineHeight) : '')
-  设或清('--font-body', settings.fontFamily || '')
-  设或清('--font-mono', settings.monospaceFontFamily || '')
+  setOrClear('--font-size', settings.fontSize > 0 ? `${settings.fontSize}px` : '')
+  setOrClear('--line-height', settings.lineHeight > 0 ? String(settings.lineHeight) : '')
+  setOrClear('--font-body', settings.fontFamily || '')
+  setOrClear('--font-mono', settings.monospaceFontFamily || '')
 }
 
 /** 用户没有固定模式时，跟随操作系统的配色方案。 */

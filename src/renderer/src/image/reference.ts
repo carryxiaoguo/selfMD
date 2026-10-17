@@ -87,7 +87,7 @@ export function 转义图片地址(filePath: string): string {
  *
  * 判断顺序与通行做法一致：能相对就相对，不能就绝对。
  */
-export function 生成引用地址(
+export function buildRefUrl(
   图片绝对路径: string,
   docDir: string | null,
   options: 引用选项
@@ -108,8 +108,8 @@ export function 生成引用地址(
 }
 
 /** 由图片路径推断 alt 文本：取文件名去掉扩展名。 */
-export function 生成替代文本(图片路径: string): string {
-  return stripExt(takeFileName(图片路径))
+export function 生成替代文本(imagePath: string): string {
+  return stripExt(takeFileName(imagePath))
 }
 
 export type 图片语法 = 'markdown' | 'html'
@@ -126,8 +126,8 @@ export function buildImageSyntax(
   语法: 图片语法 = 'markdown'
 ): string {
   if (语法 === 'html') {
-    const 转义 = 替代文本.replace(/"/g, '&quot;')
-    return `<img src="${url}" alt="${转义}" />`
+    const escaped = 替代文本.replace(/"/g, '&quot;')
+    return `<img src="${url}" alt="${escaped}" />`
   }
   // alt 里的 `]` 会提前闭合方括号，必须转义。
   const 安全替代 = 替代文本.replace(/]/g, '\\]')

@@ -3222,6 +3222,19 @@ async function openPath(path: string): Promise<void> {
         }
       }
 
+      // 引用块里还有没有裸露的 `>`。**不看光标在哪**——用户要的是
+      // 任何情况下都看不到这个字符，所以光标放不放在里面都得数。
+      {
+        const 引用 = Array.from(document.querySelectorAll('.cm-lp-quote'))
+        if (引用.length > 0) {
+          const 带符 = 引用.filter((el) => (el.textContent ?? '').includes('>')).length
+          console.log(
+            `[selfMD] 引用行文本：行数=${引用.length} 带引用符=${带符} ` +
+              `全部=${JSON.stringify(引用.map((el) => (el.textContent ?? '').slice(0, 16)))}`
+          )
+        }
+      }
+
       // 图表是唯一异步渲染的东西。正常情况下计数就够了，但一旦有图表
       // 没走到终态（既非完成也非失败），光看计数无从定位，所以这时才打出明细。
       const 图表们 = Array.from(document.querySelectorAll('.cm-w-diagram'))

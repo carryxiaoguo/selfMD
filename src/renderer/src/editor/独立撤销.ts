@@ -15,4 +15,4 @@ import { isolateHistory } from '@codemirror/commands'
  * 必须走 `annotations` 而不是当成 TransactionSpec 的字段：
  * 写成 `{ isolateHistory: 'full' }` 会被静默忽略，编译也不报错。
  */
-export const 独立撤销 = isolateHistory.of('full')
+export const isolatedUndo = isolateHistory.of('full')

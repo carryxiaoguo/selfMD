@@ -53,61 +53,61 @@ export const 样式顺序: 代码块样式[] = ['follow', 'light', 'dark']
  * 会让缩进完全失去意义。
  */
 export interface 字体项 {
-  值: string
-  名: string
-  族: string
+  value: string
+  name: string
+  family: string
 }
 
 export const 内置字体: 字体项[] = [
-  { 值: 'follow', 名: '跟随主题', 族: '' },
-  { 值: 'consolas', 名: 'Consolas', 族: 'Consolas, "Courier New", monospace' },
+  { value: 'follow', name: '跟随主题', family: '' },
+  { value: 'consolas', name: 'Consolas', family: 'Consolas, "Courier New", monospace' },
   {
-    值: 'cascadia',
-    名: 'Cascadia Mono',
-    族: '"Cascadia Mono", "Cascadia Code", Consolas, monospace'
+    value: 'cascadia',
+    name: 'Cascadia Mono',
+    family: '"Cascadia Mono", "Cascadia Code", Consolas, monospace'
   },
   {
-    值: 'jetbrains',
-    名: 'JetBrains Mono',
-    族: '"JetBrains Mono", "Sarasa Mono SC", Consolas, monospace'
+    value: 'jetbrains',
+    name: 'JetBrains Mono',
+    family: '"JetBrains Mono", "Sarasa Mono SC", Consolas, monospace'
   },
-  { 值: 'fira', 名: 'Fira Code', 族: '"Fira Code", Consolas, monospace' },
+  { value: 'fira', name: 'Fira Code', family: '"Fira Code", Consolas, monospace' },
   {
-    值: 'sourcecode',
-    名: 'Source Code Pro',
-    族: '"Source Code Pro", Consolas, monospace'
+    value: 'sourcecode',
+    name: 'Source Code Pro',
+    family: '"Source Code Pro", Consolas, monospace'
   },
   {
-    值: 'sarasa',
-    名: '更纱黑体',
-    族: '"Sarasa Mono SC", "Sarasa Term SC", "Sarasa Fixed SC", Consolas, monospace'
+    value: 'sarasa',
+    name: '更纱黑体',
+    family: '"Sarasa Mono SC", "Sarasa Term SC", "Sarasa Fixed SC", Consolas, monospace'
   },
-  { 值: 'simsun', 名: '宋体', 族: 'SimSun, "Songti SC", "MS Song", monospace' },
+  { value: 'simsun', name: '宋体', family: 'SimSun, "Songti SC", "MS Song", monospace' },
   {
-    值: 'yahei',
-    名: '微软雅黑',
-    族: '"Microsoft YaHei UI", "Microsoft YaHei", monospace'
+    value: 'yahei',
+    name: '微软雅黑',
+    family: '"Microsoft YaHei UI", "Microsoft YaHei", monospace'
   },
-  { 值: 'courier', 名: 'Courier New', 族: '"Courier New", monospace' }
+  { value: 'courier', name: 'Courier New', family: '"Courier New", monospace' }
 ]
 
-const 字体值表 = new Set(内置字体.map((项) => 项.值))
+const 字体值表 = new Set(内置字体.map((item) => item.value))
 
 export interface 围栏信息 {
-  语言: string
-  名称: string
-  样式: 代码块样式
+  language: string
+  displayName: string
+  style: 代码块样式
   /** 内置字体的标识；`follow` 表示跟随主题。 */
-  字体: string
+  font: string
 }
 
 /** 去掉首尾空白并合并内部连续空白——信息串里多余的空格没有意义。 */
-function 规整(文本: string): string {
-  return 文本.trim().replace(/\s+/g, ' ')
+function 规整(docText: string): string {
+  return docText.trim().replace(/\s+/g, ' ')
 }
 
-function 是样式名(值: string): 值 is 代码块样式 {
-  return 值 === 'follow' || 值 === 'light' || 值 === 'dark'
+function 是样式名(value: string): value is 代码块样式 {
+  return value === 'follow' || value === 'light' || value === 'dark'
 }
 
 /**
@@ -118,26 +118,26 @@ function 是样式名(值: string): 值 is 代码块样式 {
  * "这个块没渲染出来"，很难反查。所以这里不抛，一律给合理默认值。
  */
 export function 解析围栏信息(原始: string): 围栏信息 {
-  const 片段 = 规整(原始).split(' ').filter(Boolean)
-  const 语言 = 片段.shift() ?? ''
+  const parts = 规整(原始).split(' ').filter(Boolean)
+  const language = parts.shift() ?? ''
 
   const 名称片段: string[] = []
-  let 样式: 代码块样式 = 'follow'
-  let 字体 = 'follow'
+  let style: 代码块样式 = 'follow'
+  let font = 'follow'
 
-  for (const 片 of 片段) {
+  for (const 片 of parts) {
     const 等号 = 片.indexOf('=')
     if (等号 > 0) {
-      const 键 = 片.slice(0, 等号).toLowerCase()
-      const 值 = 片.slice(等号 + 1)
-      if (键 === 'style') {
-        if (是样式名(值)) 样式 = 值
+      const key = 片.slice(0, 等号).toLowerCase()
+      const value = 片.slice(等号 + 1)
+      if (key === 'style') {
+        if (是样式名(value)) style = value
         // 认不出的样式值直接忽略，而不是把它当成名称的一部分——
         // 否则名称里会莫名其妙多出一截 `style=xxx`
         continue
       }
-      if (键 === 'font') {
-        if (字体值表.has(值)) 字体 = 值
+      if (key === 'font') {
+        if (字体值表.has(value)) font = value
         // 同上：认不出的字体标识不该混进名称里
         continue
       }
@@ -145,7 +145,7 @@ export function 解析围栏信息(原始: string): 围栏信息 {
     名称片段.push(片)
   }
 
-  return { 语言, 名称: 名称片段.join(' '), 样式, 字体 }
+  return { language, displayName: 名称片段.join(' '), style, font }
 }
 
 /**
@@ -154,13 +154,13 @@ export function 解析围栏信息(原始: string): 围栏信息 {
  * `follow` 不写进文档：它是默认值，写上去只会让每一行围栏都变长，
  * 而且用户看不出"写了 follow"和"什么都没写"有什么区别。
  */
-export function 构建围栏信息(信息: 围栏信息): string {
-  const 片段: string[] = []
-  if (信息.语言) 片段.push(信息.语言)
-  if (信息.名称) 片段.push(信息.名称)
-  if (信息.样式 !== 'follow') 片段.push(`style=${信息.样式}`)
-  if (信息.字体 && 信息.字体 !== 'follow') 片段.push(`font=${信息.字体}`)
-  return 片段.join(' ')
+export function 构建围栏信息(info: 围栏信息): string {
+  const parts: string[] = []
+  if (info.language) parts.push(info.language)
+  if (info.displayName) parts.push(info.displayName)
+  if (info.style !== 'follow') parts.push(`style=${info.style}`)
+  if (info.font && info.font !== 'follow') parts.push(`font=${info.font}`)
+  return parts.join(' ')
 }
 
 /**
@@ -173,11 +173,11 @@ export function 构建围栏信息(信息: 围栏信息): string {
  * @param 首行文本 围栏所在行的完整文本
  * @returns 相对该行行首的偏移区间；不是围栏行时返回 null
  */
-export function 信息串区间(首行文本: string): { 起: number; 终: number } | null {
-  const 匹配 = /^(\s*)(`{3,}|~{3,})([\s\S]*)$/.exec(首行文本)
-  if (!匹配) return null
-  const 起 = 匹配[1].length + 匹配[2].length
-  return { 起, 终: 首行文本.length }
+export function 信息串区间(首行文本: string): { start: number; end: number } | null {
+  const match = /^(\s*)(`{3,}|~{3,})([\s\S]*)$/.exec(首行文本)
+  if (!match) return null
+  const start = match[1].length + match[2].length
+  return { start, end: 首行文本.length }
 }
 
 /**
@@ -193,9 +193,9 @@ export function 信息串区间(首行文本: string): { 起: number; 终: numbe
  * 这个函数把"切出信息串"这一步收在一处，避免每个调用点各切一次。
  */
 export function 解析围栏首行(首行文本: string): 围栏信息 {
-  const 区间 = 信息串区间(首行文本)
-  if (!区间) return { 语言: '', 名称: '', 样式: 'follow', 字体: 'follow' }
-  return 解析围栏信息(首行文本.slice(区间.起, 区间.终))
+  const range = 信息串区间(首行文本)
+  if (!range) return { language: '', displayName: '', style: 'follow', font: 'follow' }
+  return 解析围栏信息(首行文本.slice(range.start, range.end))
 }
 
 /**
@@ -209,8 +209,8 @@ export function 解析围栏首行(首行文本: string): 围栏信息 {
  * 一旦用下拉去改，那一整段就被**悄悄吃掉**了——用户的文档被改了，
  * 而界面上只表现为"我改了一下语言"。所以这类块照旧显示源码，保持可编辑。
  */
-export function 信息串可还原(首行文本: string, 信息: 围栏信息): boolean {
-  const 区间 = 信息串区间(首行文本)
-  if (!区间) return false
-  return 构建围栏信息(信息) === 首行文本.slice(区间.起, 区间.终).trim()
+export function infoRoundTrips(首行文本: string, info: 围栏信息): boolean {
+  const range = 信息串区间(首行文本)
+  if (!range) return false
+  return 构建围栏信息(info) === 首行文本.slice(range.start, range.end).trim()
 }

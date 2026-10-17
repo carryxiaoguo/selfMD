@@ -16,13 +16,13 @@ export type 设置项类型 = '开关' | '下拉' | '数字' | '文本' | '列�
 
 export interface 设置项 {
   /** 必须是 Settings 的键。 */
-  键: keyof Settings
-  类型: 设置项类型
-  标签: string
+  key: keyof Settings
+  kind: 设置项类型
+  label: string
   /** 灰色小字说明。 */
-  说明?: string
+  description?: string
    /** 下拉/列表的可选项。 */
-  选项?: { 值: string; 文字: string }[]
+  options?: { value: string; text: string }[]
   最小?: number
   最大?: number
   步长?: number
@@ -32,94 +32,94 @@ export interface 设置项 {
 
 export interface 设置小节 {
   /** 小节标题；同一分区里连续的小节可以省略标题，靠视觉间距分组。 */
-  标题?: string
-  说明?: string
-  项: 设置项[]
+  title?: string
+  description?: string
+  item: 设置项[]
 }
 
 export interface 设置分区 {
-  标题: string
+  title: string
   小节: 设置小节[]
 }
 
 /** 各分区的中文标题。 */
 export const 偏好设置结构: 设置分区[] = [
   {
-    标题: '通用',
+    title: '通用',
     小节: [
       {
-        项: [
+        item: [
           {
-            键: 'theme',
-            类型: '文本',
-            标签: '当前主题',
-            说明: '在「视图 → 主题」里切换；这里显示当前生效的主题 id。'
+            key: 'theme',
+            kind: '文本',
+            label: '当前主题',
+            description: '在「视图 → 主题」里切换；这里显示当前生效的主题 id。'
           },
           {
-            键: 'useSeparateDarkTheme',
-            类型: '开关',
-            标签: '深色模式使用独立主题'
+            key: 'useSeparateDarkTheme',
+            kind: '开关',
+            label: '深色模式使用独立主题'
           },
           {
-            键: 'outlineHighlightCurrentHeader',
-            类型: '开关',
-            标签: '大纲高亮当前标题'
+            key: 'outlineHighlightCurrentHeader',
+            kind: '开关',
+            label: '大纲高亮当前标题'
           },
           {
-            键: 'outlineCollapsible',
-            类型: '开关',
-            标签: '允许折叠和展开侧边栏的大纲视图'
+            key: 'outlineCollapsible',
+            kind: '开关',
+            label: '允许折叠和展开侧边栏的大纲视图'
           }
         ]
       },
       {
-        标题: '字体',
-        项: [
+        title: '字体',
+        item: [
           {
-            键: 'fontSize',
-            类型: '数字',
-            标签: '字体大小',
+            key: 'fontSize',
+            kind: '数字',
+            label: '字体大小',
             单位: 'px',
             最小: 0,
             最大: 32,
             步长: 1,
-            说明: '填 0 表示跟随主题——主题会按自己的气质定正文字号。'
+            description: '填 0 表示跟随主题——主题会按自己的气质定正文字号。'
           },
           {
-            键: 'lineHeight',
-            类型: '数字',
-            标签: '行高',
+            key: 'lineHeight',
+            kind: '数字',
+            label: '行高',
             最小: 0,
             最大: 3,
             步长: 0.05,
-            说明: '填 0 表示跟随主题。'
+            description: '填 0 表示跟随主题。'
           },
           {
-            键: 'fontFamily',
-            类型: '文本',
-            标签: '正文字体',
-            说明: '留空则跟随主题。可填多个字体名，用逗号分隔。'
+            key: 'fontFamily',
+            kind: '文本',
+            label: '正文字体',
+            description: '留空则跟随主题。可填多个字体名，用逗号分隔。'
           },
           {
-            键: 'monospaceFontFamily',
-            类型: '文本',
-            标签: '等宽字体',
-            说明: '用于代码块与行内代码。留空则跟随主题。'
+            key: 'monospaceFontFamily',
+            kind: '文本',
+            label: '等宽字体',
+            description: '用于代码块与行内代码。留空则跟随主题。'
           }
         ]
       },
       {
-        标题: '其他',
-        项: [
+        title: '其他',
+        item: [
           {
-            键: 'showStatusBar',
-            类型: '开关',
-            标签: '显示状态栏'
+            key: 'showStatusBar',
+            kind: '开关',
+            label: '显示状态栏'
           },
           {
-            键: 'zoomLevel',
-            类型: '数字',
-            标签: '缩放',
+            key: 'zoomLevel',
+            kind: '数字',
+            label: '缩放',
             单位: '%',
             最小: 50,
             最大: 300,
@@ -130,110 +130,110 @@ export const 偏好设置结构: 设置分区[] = [
     ]
   },
   {
-    标题: '编辑器',
+    title: '编辑器',
     小节: [
       {
-        项: [
+        item: [
           {
-            键: 'livePreview',
-            类型: '开关',
-            标签: '即时渲染',
-            说明: '开启后只显示光标所在块的 Markdown 源码，其余部分渲染显示。'
+            key: 'livePreview',
+            kind: '开关',
+            label: '即时渲染',
+            description: '开启后只显示光标所在块的 Markdown 源码，其余部分渲染显示。'
           },
           {
-            键: 'focusMode',
-            类型: '开关',
-            标签: '专注模式',
-            说明: '只让光标所在的块保持清晰，其余淡化。'
+            key: 'focusMode',
+            kind: '开关',
+            label: '专注模式',
+            description: '只让光标所在的块保持清晰，其余淡化。'
           },
           {
-            键: 'typewriterMode',
-            类型: '开关',
-            标签: '打字机模式',
-            说明: '光标行始终停留在屏幕垂直中央。'
+            key: 'typewriterMode',
+            kind: '开关',
+            label: '打字机模式',
+            description: '光标行始终停留在屏幕垂直中央。'
           }
         ]
       },
       {
-        标题: '输入',
-        项: [
+        title: '输入',
+        item: [
           {
-            键: 'tabSize',
-            类型: '数字',
-            标签: 'Tab 宽度',
+            key: 'tabSize',
+            kind: '数字',
+            label: 'Tab 宽度',
             单位: '空格',
             最小: 1,
             最大: 12,
             步长: 1
           },
           {
-            键: 'autoWrapLongLines',
-            类型: '开关',
-            标签: '长行自动折行'
+            key: 'autoWrapLongLines',
+            kind: '开关',
+            label: '长行自动折行'
           },
           {
-            键: 'autoLinks',
-            类型: '开关',
-            标签: '自动识别链接',
-            说明: '输入网址后自动转成链接。'
+            key: 'autoLinks',
+            kind: '开关',
+            label: '自动识别链接',
+            description: '输入网址后自动转成链接。'
           },
           {
-            键: 'smartQuotes',
-            类型: '开关',
-            标签: '智能引号',
-            说明: '把直引号转成中文弯引号。'
+            key: 'smartQuotes',
+            kind: '开关',
+            label: '智能引号',
+            description: '把直引号转成中文弯引号。'
           },
           {
-            键: 'smartDashes',
-            类型: '开关',
-            标签: '智能破折号',
-            说明: '把连续短横转成破折号。'
+            key: 'smartDashes',
+            kind: '开关',
+            label: '智能破折号',
+            description: '把连续短横转成破折号。'
           },
           {
-            键: 'smartPunctuationMode',
-            类型: '下拉',
-            标签: '智能标点触发方式',
-            选项: [
-              { 值: 'none', 文字: '关闭' },
-              { 值: 'input', 文字: '输入时转换' },
-              { 值: 'rendering', 文字: '渲染时转换' }
+            key: 'smartPunctuationMode',
+            kind: '下拉',
+            label: '智能标点触发方式',
+            options: [
+              { value: 'none', text: '关闭' },
+              { value: 'input', text: '输入时转换' },
+              { value: 'rendering', text: '渲染时转换' }
             ]
           }
         ]
       },
       {
-        标题: 'Markdown 语法',
-        项: [
+        title: 'Markdown 语法',
+        item: [
           {
-            键: 'strictMarkdown',
-            类型: '开关',
-            标签: '严格模式',
-            说明: '更严格地遵循 GFM 标准。'
+            key: 'strictMarkdown',
+            kind: '开关',
+            label: '严格模式',
+            description: '更严格地遵循 GFM 标准。'
           },
           {
-            键: 'indentFirstLine',
-            类型: '开关',
-            标签: '段落首行缩进'
+            key: 'indentFirstLine',
+            kind: '开关',
+            label: '段落首行缩进'
           },
           {
-            键: 'preserveSingleLineBreak',
-            类型: '开关',
-            标签: '保留单个换行'
+            key: 'preserveSingleLineBreak',
+            kind: '开关',
+            label: '保留单个换行'
           },
           {
-            键: 'visibleBr',
-            类型: '开关',
-            标签: '显示换行标记'
+            key: 'visibleBr',
+            kind: '开关',
+            label: '显示换行标记'
           },
           {
-            键: 'defaultFileExtension',
-            类型: '下拉',
-            标签: '默认文件扩展名',
-            选项: [
-              { 值: '.md', 文字: '.md' },
-              { 值: '.markdown', 文字: '.markdown' },
-              { 值: '.mdown', 文字: '.mdown' },
-              { 值: '.txt', 文字: '.txt' }
+            key: 'defaultFileExtension',
+            kind: '下拉',
+            label: '默认文件扩展名',
+            options: [
+              { value: '.md', text: '.md' },
+              { value: '.markdown', text: '.markdown' },
+              { value: '.mdown', text: '.mdown' },
+              { value: '.txt', text: '.txt' }
             ]
           }
         ]
@@ -241,93 +241,93 @@ export const 偏好设置结构: 设置分区[] = [
     ]
   },
   {
-    标题: '图片',
+    title: '图片',
     小节: [
       {
-        项: [
+        item: [
           {
-            键: 'imageStoragePolicy',
-            类型: '下拉',
-            标签: '插入图片时的行为',
-            说明: '文档里的 image-folder 会覆盖这一项。',
-            选项: [
-              { 值: '', 文字: '不做特殊处理' },
-              { 值: 'folder', 文字: '复制到当前文件夹' },
-              { 值: 'assets', 文字: '复制到 ./assets' },
-              { 值: 'per-file-assets', 文字: '复制到 ./${filename}.assets' },
-              { 值: 'custom', 文字: '复制到自定义文件夹' },
-              { 值: 'upload', 文字: '上传到图床' }
+            key: 'imageStoragePolicy',
+            kind: '下拉',
+            label: '插入图片时的行为',
+            description: '文档里的 image-folder 会覆盖这一项。',
+            options: [
+              { value: '', text: '不做特殊处理' },
+              { value: 'folder', text: '复制到当前文件夹' },
+              { value: 'assets', text: '复制到 ./assets' },
+              { value: 'per-file-assets', text: '复制到 ./${filename}.assets' },
+              { value: 'custom', text: '复制到自定义文件夹' },
+              { value: 'upload', text: '上传到图床' }
             ]
           },
           {
-            键: 'customImageSaveLocation',
-            类型: '文本',
-            标签: '自定义文件夹',
-            说明: '仅在上一项选「复制到自定义文件夹」时生效。可以是相对路径。'
+            key: 'customImageSaveLocation',
+            kind: '文本',
+            label: '自定义文件夹',
+            description: '仅在上一项选「复制到自定义文件夹」时生效。可以是相对路径。'
           },
           {
-            键: 'useRelativePathForImg',
-            类型: '开关',
-            标签: '优先使用相对路径'
+            key: 'useRelativePathForImg',
+            kind: '开关',
+            label: '优先使用相对路径'
           },
           {
-            键: 'relativePathWithDot',
-            类型: '开关',
-            标签: '相对路径以 ./ 开头'
+            key: 'relativePathWithDot',
+            kind: '开关',
+            label: '相对路径以 ./ 开头'
           },
           {
-            键: 'autoEscapeImageURL',
-            类型: '开关',
-            标签: '自动转义图片地址',
-            说明: '只转义会破坏解析的字符（空白、井号等），中文保持原样可读。'
+            key: 'autoEscapeImageURL',
+            kind: '开关',
+            label: '自动转义图片地址',
+            description: '只转义会破坏解析的字符（空白、井号等），中文保持原样可读。'
           },
           {
-            键: 'preferredImageSyntax',
-            类型: '下拉',
-            标签: '默认图片语法',
-            选项: [
-              { 值: 'markdown', 文字: 'Markdown' },
-              { 值: 'html', 文字: 'HTML' }
+            key: 'preferredImageSyntax',
+            kind: '下拉',
+            label: '默认图片语法',
+            options: [
+              { value: 'markdown', text: 'Markdown' },
+              { value: 'html', text: 'HTML' }
             ]
           },
           {
-            键: 'allowImageUpload',
-            类型: '开关',
-            标签: '允许依据文档设置自动上传'
+            key: 'allowImageUpload',
+            kind: '开关',
+            label: '允许依据文档设置自动上传'
           }
         ]
       },
       {
-        标题: '图床',
-        说明: '上传委托给外部程序。PicGo / PicList 走本地端点，其余走命令行。',
-        项: [
+        title: '图床',
+        description: '上传委托给外部程序。PicGo / PicList 走本地端点，其余走命令行。',
+        item: [
           {
-            键: 'imageUploader',
-            类型: '下拉',
-            标签: '上传器',
-            选项: [
-              { 值: 'none', 文字: '不使用' },
-              { 值: 'picgo-app', 文字: 'PicGo (应用)' },
-              { 值: 'piclist-app', 文字: 'PicList (应用)' },
-              { 值: 'picgo-cli', 文字: 'PicGo (命令行)' },
-              { 值: 'upic', 文字: 'uPic' },
-              { 值: 'picsee', 文字: 'Picsee' },
-              { 值: 'custom', 文字: '自定义命令' }
+            key: 'imageUploader',
+            kind: '下拉',
+            label: '上传器',
+            options: [
+              { value: 'none', text: '不使用' },
+              { value: 'picgo-app', text: 'PicGo (应用)' },
+              { value: 'piclist-app', text: 'PicList (应用)' },
+              { value: 'picgo-cli', text: 'PicGo (命令行)' },
+              { value: 'upic', text: 'uPic' },
+              { value: 'picsee', text: 'Picsee' },
+              { value: 'custom', text: '自定义命令' }
             ]
           },
           {
-            键: 'picgoPath',
-            类型: '文本',
-            标签: 'PicGo / PicList 路径',
-            说明:
+            key: 'picgoPath',
+            kind: '文本',
+            label: 'PicGo / PicList 路径',
+            description:
               '本地端点连不上时用它启动应用，等 5 秒后重试一次。' +
               '若应用已在运行可以留空。'
           },
           {
-            键: 'customImageUploader',
-            类型: '文本',
-            标签: '自定义上传命令',
-            说明:
+            key: 'customImageUploader',
+            kind: '文本',
+            label: '自定义上传命令',
+            description:
               '支持 ${filepath} 与 ${filename} 占位符。' +
               '命令的输出里应当包含图片地址（每行一个）。'
           }
@@ -336,107 +336,107 @@ export const 偏好设置结构: 设置分区[] = [
     ]
   },
   {
-    标题: '保存与恢复',
+    title: '保存与恢复',
     小节: [
       {
-        项: [
+        item: [
           {
-            键: 'autoSave',
-            类型: '开关',
-            标签: '自动保存',
-            说明: '停止输入 3 秒后把内容写入草稿目录。'
+            key: 'autoSave',
+            kind: '开关',
+            label: '自动保存',
+            description: '停止输入 3 秒后把内容写入草稿目录。'
           },
           {
-            键: 'recordRecentFiles',
-            类型: '开关',
-            标签: '记录最近打开的文件'
+            key: 'recordRecentFiles',
+            kind: '开关',
+            label: '记录最近打开的文件'
           },
           {
-            键: 'quitWhenLastWindowClosed',
-            类型: '开关',
-            标签: '关闭最后一个窗口时退出'
+            key: 'quitWhenLastWindowClosed',
+            kind: '开关',
+            label: '关闭最后一个窗口时退出'
           }
         ]
       },
       {
-        标题: '启动行为',
-        项: [
+        title: '启动行为',
+        item: [
           {
-            键: 'onLaunch',
-            类型: '下拉',
-            标签: '启动时',
-            选项: [
-              { 值: 'newFile', 文字: '新建文件' },
-              { 值: 'restoreFolders', 文字: '恢复上次的文件夹' },
-              { 值: 'restoreFilesAndFolders', 文字: '恢复上次的文件与文件夹' },
-              { 值: 'customFolder', 文字: '打开指定文件夹' }
+            key: 'onLaunch',
+            kind: '下拉',
+            label: '启动时',
+            options: [
+              { value: 'newFile', text: '新建文件' },
+              { value: 'restoreFolders', text: '恢复上次的文件夹' },
+              { value: 'restoreFilesAndFolders', text: '恢复上次的文件与文件夹' },
+              { value: 'customFolder', text: '打开指定文件夹' }
             ]
           },
           {
-            键: 'customLaunchFolder',
-            类型: '文本',
-            标签: '指定文件夹',
-            说明: '仅在上一项选「打开指定文件夹」时生效。'
+            key: 'customLaunchFolder',
+            kind: '文本',
+            label: '指定文件夹',
+            description: '仅在上一项选「打开指定文件夹」时生效。'
           }
         ]
       }
     ]
   },
   {
-    标题: '拼写检查',
+    title: '拼写检查',
     小节: [
       {
-        说明:
+        description:
           '由 Chromium 自带的拼写检查器完成，提供红波浪线与右键"建议替换"。' +
           '中文没有可用的拼写词典，所以这项只对西文有意义。' +
           '改完之后需要重新打开文档才会生效。',
-        项: [
+        item: [
           {
-            键: 'spellCheck',
-            类型: '开关',
-            标签: '启用拼写检查'
+            key: 'spellCheck',
+            kind: '开关',
+            label: '启用拼写检查'
           },
           {
-            键: 'spellCheckLanguages',
-            类型: '列表',
-            标签: '词典语言',
-            说明: '可填多个，用逗号分隔（如 en-US, en-GB）。填了系统没有的词典会被忽略。'
+            key: 'spellCheckLanguages',
+            kind: '列表',
+            label: '词典语言',
+            description: '可填多个，用逗号分隔（如 en-US, en-GB）。填了系统没有的词典会被忽略。'
           }
         ]
       }
     ]
   },
   {
-    标题: '侧边栏',
+    title: '侧边栏',
     小节: [
       {
-        说明: '侧边栏占着 260px 宽。写长文时想让它彻底消失、又不想被误按快捷键叫回来，就选「始终隐藏」。',
-        项: [
+        description: '侧边栏占着 260px 宽。写长文时想让它彻底消失、又不想被误按快捷键叫回来，就选「始终隐藏」。',
+        item: [
           {
-            键: 'sidebarMode',
-            类型: '下拉',
-            标签: '显示方式',
-            选项: [
-              { 值: 'toggle', 文字: '可自由切换' },
-              { 值: 'always', 文字: '始终显示' },
-              { 值: 'never', 文字: '始终隐藏' }
+            key: 'sidebarMode',
+            kind: '下拉',
+            label: '显示方式',
+            options: [
+              { value: 'toggle', text: '可自由切换' },
+              { value: 'always', text: '始终显示' },
+              { value: 'never', text: '始终隐藏' }
             ],
-            说明: '选「始终」两档后，快捷键与菜单都改不了它。'
+            description: '选「始终」两档后，快捷键与菜单都改不了它。'
           },
           {
-            键: 'sidebarVisible',
-            类型: '开关',
-            标签: '当前是否显示',
-            说明: '只在「可自由切换」下有效；另外两档由上面的设置决定。'
+            key: 'sidebarVisible',
+            kind: '开关',
+            label: '当前是否显示',
+            description: '只在「可自由切换」下有效；另外两档由上面的设置决定。'
           },
           {
-            键: 'sidebarTab',
-            类型: '下拉',
-            标签: '默认标签页',
-            选项: [
-              { 值: 'outline', 文字: '大纲' },
-              { 值: 'files', 文字: '文件' },
-              { 值: 'articles', 文字: '文档' }
+            key: 'sidebarTab',
+            kind: '下拉',
+            label: '默认标签页',
+            options: [
+              { value: 'outline', text: '大纲' },
+              { value: 'files', text: '文件' },
+              { value: 'articles', text: '文档' }
             ]
           }
         ]
@@ -444,33 +444,33 @@ export const 偏好设置结构: 设置分区[] = [
     ]
   },
   {
-    标题: '导出',
+    title: '导出',
     小节: [
       {
-        说明:
+        description:
           '这些选项对 HTML 与 PDF 生效。Word、LaTeX 等格式由 Pandoc 转换，不受影响。',
-        项: [
+        item: [
           {
-            键: 'exportIncludeOutline',
-            类型: '开关',
-            标签: '附带侧边目录',
-            说明: '在导出的 HTML 左侧生成大纲。长文没有目录很难导航。'
+            key: 'exportIncludeOutline',
+            kind: '开关',
+            label: '附带侧边目录',
+            description: '在导出的 HTML 左侧生成大纲。长文没有目录很难导航。'
           },
           {
-            键: 'exportEmbedImages',
-            类型: '开关',
-            标签: '内嵌图片（单文件）',
-            说明: '把本地图片转成 base64 塞进 HTML，便于发给别人。代价是文件大好几倍。'
+            key: 'exportEmbedImages',
+            kind: '开关',
+            label: '内嵌图片（单文件）',
+            description: '把本地图片转成 base64 塞进 HTML，便于发给别人。代价是文件大好几倍。'
           }
         ]
       },
       {
-        项: [
+        item: [
           {
-            键: 'pandocPath',
-            类型: '文本',
-            标签: 'Pandoc 路径',
-            说明: '留空则从 PATH 中查找 pandoc。HTML 与 PDF 导出不需要它。'
+            key: 'pandocPath',
+            kind: '文本',
+            label: 'Pandoc 路径',
+            description: '留空则从 PATH 中查找 pandoc。HTML 与 PDF 导出不需要它。'
           }
         ]
       }
@@ -480,7 +480,7 @@ export const 偏好设置结构: 设置分区[] = [
 
 /** 扁平化后的全部设置项，供校验与遍历使用。 */
 export function 全部设置项(): 设置项[] {
-  return 偏好设置结构.flatMap((分区) => 分区.小节.flatMap((小节) => 小节.项))
+  return 偏好设置结构.flatMap((section) => section.小节.flatMap((小节) => 小节.item))
 }
 
 /**
@@ -492,6 +492,6 @@ export function 全部设置项(): 设置项[] {
 export function 校验设置表(): string[] {
   const 已知 = new Set(Object.keys(DEFAULT_SETTINGS))
   return 全部设置项()
-    .map((项) => 项.键 as string)
-    .filter((键) => !已知.has(键))
+    .map((item) => item.key as string)
+    .filter((key) => !已知.has(key))
 }

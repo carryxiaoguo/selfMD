@@ -1,7 +1,7 @@
 import { syntaxTree } from '@codemirror/language'
 import { Decoration, EditorView, ViewPlugin, type DecorationSet, type ViewUpdate } from '@codemirror/view'
 import type { EditorState, Extension } from '@codemirror/state'
-import type { 语法节点 } from './syntax-node'
+import type { SyntaxNode } from './syntax-node'
 
 /**
  * 专注模式与打字机模式。
@@ -54,37 +54,37 @@ const 可专注块 = new Set([
 ])
 
 /** 当前光标所在的块。找不到时返回整行。 */
-function 取当前块(状态: EditorState): { from: number; to: number } | null {
-  const 位置 = 状态.selection.main.head
-  const 行 = 状态.doc.lineAt(位置)
+function 取当前块(state: EditorState): { from: number; to: number } | null {
+  const position = state.selection.main.head
+  const line = state.doc.lineAt(position)
 
-  let 节点: 语法节点 | null = syntaxTree(状态).resolveInner(位置, -1) as unknown as 语法节点
-  while (节点) {
-    if (可专注块.has(节点.name)) {
+  let node: SyntaxNode | null = syntaxTree(state).resolveInner(position, -1) as unknown as SyntaxNode
+  while (node) {
+    if (可专注块.has(node.name)) {
       // 空行、或在列表标记上时，节点可能是整个 Item 之外的东西；
       // 用节点区间，但如果它跨了多行而只有一行属于光标，就退回单行。
-      return { from: 节点.from, to: 节点.to }
+      return { from: node.from, to: node.to }
     }
-    节点 = 节点.parent
+    node = node.parent
   }
 
-  return { from: 行.from, to: 行.to }
+  return { from: line.from, to: line.to }
 }
 
 const 专注行 = Decoration.line({ class: 'md-focus' })
 
-function 计算专注(状态: EditorState): DecorationSet {
-  const 块 = 取当前块(状态)
-  if (!块) return Decoration.none
+function 计算专注(state: EditorState): DecorationSet {
+  const block = 取当前块(state)
+  if (!block) return Decoration.none
 
-  const 首行 = 状态.doc.lineAt(块.from).number
-  const 末行 = 状态.doc.lineAt(块.to).number
-  const 区间 = []
-  for (let 号 = 首行; 号 <= 末行; 号++) {
-    const 行 = 状态.doc.line(号)
-    区间.push(专注行.range(行.from))
+  const firstLine = state.doc.lineAt(block.from).number
+  const lastLine = state.doc.lineAt(block.to).number
+  const range = []
+  for (let no = firstLine; no <= lastLine; no++) {
+    const line = state.doc.line(no)
+    range.push(专注行.range(line.from))
   }
-  return Decoration.set(区间, true)
+  return Decoration.set(range, true)
 }
 
 const 专注插件 = ViewPlugin.fromClass(
@@ -110,9 +110,9 @@ export function 专注模式扩展(): Extension {
 }
 
 /** 把某一行滚到视口垂直中央。 */
-export function 居中光标行(视图: EditorView): void {
-  const 位置 = 视图.state.selection.main.head
-  视图.dispatch({
-    effects: EditorView.scrollIntoView(位置, { y: 'center', yMargin: 0 })
+export function 居中光标行(view: EditorView): void {
+  const position = view.state.selection.main.head
+  view.dispatch({
+    effects: EditorView.scrollIntoView(position, { y: 'center', yMargin: 0 })
   })
 }

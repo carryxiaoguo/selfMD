@@ -60,9 +60,9 @@ const readyResolvers = new Set<() => void>()
 
 /** 把计数表格式化成一行，便于在日志里对齐比对。 */
 function 格式化计数(计数: Record<string, number>): string {
-  const 条目 = Object.entries(计数).filter(([, 值]) => 值 > 0)
-  if (条目.length === 0) return '（全部为 0）'
-  return 条目.map(([名, 值]) => `${名}=${值}`).join('  ')
+  const entry = Object.entries(计数).filter(([, value]) => value > 0)
+  if (entry.length === 0) return '（全部为 0）'
+  return entry.map(([name, value]) => `${name}=${value}`).join('  ')
 }
 
 /** 在某个渲染进程上报启动完成后 resolve。 */
@@ -79,8 +79,8 @@ export function whenDocumentOpened(): Promise<void> {
 }
 
 /** 各导出格式对应的文件扩展名。 */
-function 格式扩展名(格式: string): string {
-  switch (格式) {
+function 格式扩展名(format: string): string {
+  switch (format) {
     case 'html':
     case 'html-plain':
       return '.html'
@@ -169,16 +169,16 @@ export function registerAppIpc(): void {
    * 而不是先被告知"请手动在某个目录新建某个名字的文件"。
    * 模板里写清了这个文件的作用域与生效时机，省掉一次查文档。
    */
-  ipcMain.handle(CH.themeOpenCustom, async (_e, 范围: 'base' | 'theme') => {
-    const 设置 = getSettings()
-    const 目标 =
-      范围 === 'base' ? 全局自定义样式路径() : 主题自定义样式路径(生效主题(设置))
-    if (!目标) return { 路径: null }
+  ipcMain.handle(CH.themeOpenCustom, async (_e, rangeBounds: 'base' | 'theme') => {
+    const settings = getSettings()
+    const target =
+      rangeBounds === 'base' ? 全局自定义样式路径() : 主题自定义样式路径(生效主题(settings))
+    if (!target) return { filePath: null }
 
-    if (!existsSync(目标)) {
-      const 主题名 = 生效主题(设置)
-      const 模板 =
-        范围 === 'base'
+    if (!existsSync(target)) {
+      const 主题名 = 生效主题(settings)
+      const template =
+        rangeBounds === 'base'
           ? `/* 全局自定义 CSS —— 对**所有**主题生效。\n` +
             ` *\n` +
             ` * 层叠顺序：主题本体 < 本文件 < <主题名>.user.css\n` +
@@ -208,31 +208,31 @@ export function registerAppIpc(): void {
             ` */\n\n`
       try {
         mkdirSync(getAppPaths().themes, { recursive: true })
-        writeFileSync(目标, 模板, 'utf8')
-      } catch (错误) {
-        console.error('[themes] 创建自定义 CSS 失败：', 错误)
-        return { 路径: null }
+        writeFileSync(target, template, 'utf8')
+      } catch (error) {
+        console.error('[themes] 创建自定义 CSS 失败：', error)
+        return { filePath: null }
       }
     }
 
-    const err = await shell.openPath(目标)
+    const err = await shell.openPath(target)
     if (err) {
       console.error('[themes] 打开自定义 CSS 失败：', err)
-      return { 路径: null }
+      return { filePath: null }
     }
-    return { 路径: 目标 }
+    return { filePath: target }
   })
 
   /** 新建主题文件。名称为空或含非法字符时返回 null。 */
-  ipcMain.handle(CH.themeCreate, (_e, 名: string) => {
-    const id = (名 ?? '').trim().replace(/\.css$/i, '')
+  ipcMain.handle(CH.themeCreate, (_e, name: string) => {
+    const id = (name ?? '').trim().replace(/\.css$/i, '')
     if (!isSafeThemeId(id)) return null
-    const 目标 = themePath(id)
-    if (!目标 || existsSync(目标)) return null
+    const target = themePath(id)
+    if (!target || existsSync(target)) return null
     try {
       mkdirSync(getAppPaths().themes, { recursive: true })
       writeFileSync(
-        目标,
+        target,
         `/**\n * @name ${id}\n * @dark false\n */\n\n` +
           `/* 变量分两层，两层都在 renderer/src/styles/base.css 的 :root 里：\n` +
           ` *   1. 通用变量层：--bg-color / --text-color / --side-bar-bg-color …\n` +
@@ -243,8 +243,8 @@ export function registerAppIpc(): void {
           ` */\n\n:root {\n  --bg-color: #ffffff;\n  --text-color: #1f2328;\n}\n`,
         'utf8'
       )
-    } catch (错误) {
-      console.error('[themes] 新建主题失败：', 错误)
+    } catch (error) {
+      console.error('[themes] 新建主题失败：', error)
       return null
     }
     rebuildMenu()
@@ -253,7 +253,7 @@ export function registerAppIpc(): void {
 
   // --------------------------------------------------------------- 导出 --
   ipcMain.handle(CH.exportFormats, async () => ({
-    格式: await 可用格式(),
+    format: await 可用格式(),
     pandoc版本: await 取Pandoc版本()
   }))
 
@@ -261,40 +261,40 @@ export function registerAppIpc(): void {
     CH.exportDoc,
     async (
       e,
-      请求: {
-        格式: string
-        源: string
-        文档路径: string | null
+      request: {
+        format: string
+        source: string
+        docPath: string | null
         默认文件名: string
         附大纲?: boolean
         内嵌图片?: boolean
       }
     ) => {
-      const 扩展名 = 格式扩展名(请求.格式)
+      const ext = 格式扩展名(request.format)
       const win = windowOf(e)
       const { dialog } = await import('electron')
-      const 选项: Electron.SaveDialogOptions = {
-        title: `导出为 ${请求.格式.toUpperCase()}`,
-        defaultPath: 请求.默认文件名.endsWith(扩展名)
-          ? 请求.默认文件名
-          : `${请求.默认文件名}${扩展名}`,
-        filters: [{ name: 请求.格式.toUpperCase(), extensions: [扩展名.replace(/^\./, '')] }]
+      const options: Electron.SaveDialogOptions = {
+        title: `导出为 ${request.format.toUpperCase()}`,
+        defaultPath: request.默认文件名.endsWith(ext)
+          ? request.默认文件名
+          : `${request.默认文件名}${ext}`,
+        filters: [{ name: request.format.toUpperCase(), extensions: [ext.replace(/^\./, '')] }]
       }
       const 选择 = win
-        ? await dialog.showSaveDialog(win, 选项)
-        : await dialog.showSaveDialog(选项)
-      if (选择.canceled || !选择.filePath) return { 路径: null, 错误: null }
+        ? await dialog.showSaveDialog(win, options)
+        : await dialog.showSaveDialog(options)
+      if (选择.canceled || !选择.filePath) return { filePath: null, error: null }
 
-      const 结果 = await 执行导出({
-        目标: 选择.filePath,
-        源: 请求.源,
-        文档路径: 请求.文档路径,
-        格式: 请求.格式 as never,
+      const result = await 执行导出({
+        target: 选择.filePath,
+        source: request.source,
+        docPath: request.docPath,
+        format: request.format as never,
         // 导出选项由渲染层按设置传入；没传时用这里的默认值。
-        附大纲: 请求.附大纲 ?? true,
-        内嵌图片: 请求.内嵌图片 ?? false
+        附大纲: request.附大纲 ?? true,
+        内嵌图片: request.内嵌图片 ?? false
       })
-      return { 路径: 结果.路径, 错误: 结果.错误 }
+      return { filePath: result.filePath, error: result.error }
     }
   )
 
@@ -304,10 +304,10 @@ export function registerAppIpc(): void {
   // 公式、图表、代码高亮都得重做，而且两边迟早不一致。
   ipcMain.handle(
     CH.editCopyAsImage,
-    async (_e, 请求: { 源: string; 文档路径: string | null; 宽度?: number }) => {
+    async (_e, request: { source: string; docPath: string | null; widthPx?: number }) => {
       return 复制为图片(
-        { 目标: '', 源: 请求.源, 文档路径: 请求.文档路径, 格式: 'html' },
-        请求.宽度
+        { target: '', source: request.source, docPath: request.docPath, format: 'html' },
+        request.widthPx
       )
     }
   )
@@ -330,10 +330,10 @@ export function registerAppIpc(): void {
   // `printBackground`，否则打印出来的代码块与引用块背景全丢。
   ipcMain.handle(CH.appPrint, async (e) => {
     const win = windowOf(e)
-    if (!win) return { 成功: false, 错误: '找不到窗口' }
-    return new Promise<{ 成功: boolean; 错误: string | null }>((完成) => {
-      win.webContents.print({ silent: false, printBackground: true }, (成功, 原因) => {
-        完成({ 成功, 错误: 成功 ? null : 原因 || '打印已取消' })
+    if (!win) return { success: false, error: '找不到窗口' }
+    return new Promise<{ success: boolean; error: string | null }>((done) => {
+      win.webContents.print({ silent: false, printBackground: true }, (success, 原因) => {
+        done({ success, error: success ? null : 原因 || '打印已取消' })
       })
     })
   })
@@ -341,15 +341,15 @@ export function registerAppIpc(): void {
   // --------------------------------------------------------------- 草稿 --
   // 自动保存是后台行为：写失败不抛异常，也不弹窗。磁盘满或文件被占用时
   // 安静跳过即可，下一次改动还会再试——用错误框打断打字才是更糟的选择。
-  ipcMain.handle(CH.draftSave, (_e, 原路径: string | null, 内容: string) =>
-    写草稿(原路径, 内容)
+  ipcMain.handle(CH.draftSave, (_e, rawPath: string | null, content: string) =>
+    写草稿(rawPath, content)
   )
   ipcMain.handle(CH.draftList, () => 列出草稿())
-  ipcMain.handle(CH.draftRead, (_e, 键: string) => 读草稿(键))
-  ipcMain.handle(CH.draftDiscard, (_e, 键: string) => 删除草稿(键))
+  ipcMain.handle(CH.draftRead, (_e, key: string) => 读草稿(key))
+  ipcMain.handle(CH.draftDiscard, (_e, key: string) => 删除草稿(key))
   ipcMain.handle(CH.draftPending, () => 需要恢复的草稿())
-  ipcMain.handle(CH.draftClearFor, (_e, 原路径: string | null, 内容: string) =>
-    清理该文档的草稿(原路径, 内容)
+  ipcMain.handle(CH.draftClearFor, (_e, rawPath: string | null, content: string) =>
+    清理该文档的草稿(rawPath, content)
   )
 
   // --------------------------------------------------------------- 最近 --
@@ -533,20 +533,20 @@ export function registerAppIpc(): void {
       }
       if (info.commandResults) {
         console.log('[selfMD] 编辑命令自测：')
-        for (const [名, 输出] of Object.entries(info.commandResults)) {
-          console.log(`    ${名}  →  ${输出}`)
+        for (const [name, output] of Object.entries(info.commandResults)) {
+          console.log(`    ${name}  →  ${output}`)
         }
       }
       if (info.pureResults) {
         console.log('[selfMD] 纯函数自测：')
-        for (const [名, 输出] of Object.entries(info.pureResults)) {
-          console.log(`    ${名}  =>  ${输出}`)
+        for (const [name, output] of Object.entries(info.pureResults)) {
+          console.log(`    ${name}  =>  ${output}`)
         }
       }
       if (info.imageResults) {
         console.log('[selfMD] 图片管线自测：')
-        for (const [名, 输出] of Object.entries(info.imageResults)) {
-          console.log(`    ${名}  =>  ${输出}`)
+        for (const [name, output] of Object.entries(info.imageResults)) {
+          console.log(`    ${name}  =>  ${output}`)
         }
       }
       if (info.imageInsertResult) {
@@ -557,8 +557,8 @@ export function registerAppIpc(): void {
       }
       if (info.outlineResults) {
         console.log('[selfMD] 大纲自测：')
-        for (const [名, 输出] of Object.entries(info.outlineResults)) {
-          console.log(`    ${名}  =>  ${输出}`)
+        for (const [name, output] of Object.entries(info.outlineResults)) {
+          console.log(`    ${name}  =>  ${output}`)
         }
       }
       if (info.sidebarResult) {
@@ -569,14 +569,14 @@ export function registerAppIpc(): void {
       }
       if (info.exportResults) {
         console.log('[selfMD] 导出渲染自测：')
-        for (const [名, 输出] of Object.entries(info.exportResults)) {
-          console.log(`    ${名}  =>  ${输出}`)
+        for (const [name, output] of Object.entries(info.exportResults)) {
+          console.log(`    ${name}  =>  ${output}`)
         }
       }
       if (info.prefsResults) {
         console.log('[selfMD] 偏好设置表自测：')
-        for (const [名, 输出] of Object.entries(info.prefsResults)) {
-          console.log(`    ${名}  =>  ${输出}`)
+        for (const [name, output] of Object.entries(info.prefsResults)) {
+          console.log(`    ${name}  =>  ${output}`)
         }
       }
       if (info.prefsUiResult) {
@@ -584,8 +584,8 @@ export function registerAppIpc(): void {
       }
       if (info.uploadResults) {
         console.log('[selfMD] 上传结果解析自测：')
-        for (const [名, 输出] of Object.entries(info.uploadResults)) {
-          console.log(`    ${名}  =>  ${输出}`)
+        for (const [name, output] of Object.entries(info.uploadResults)) {
+          console.log(`    ${name}  =>  ${output}`)
         }
       }
       if (info.imageMenuResult) {
@@ -593,8 +593,8 @@ export function registerAppIpc(): void {
       }
       if (info.mathResults) {
         console.log('[selfMD] 数学公式自测：')
-        for (const [名, 输出] of Object.entries(info.mathResults)) {
-          console.log(`    ${名}  =>  ${输出}`)
+        for (const [name, output] of Object.entries(info.mathResults)) {
+          console.log(`    ${name}  =>  ${output}`)
         }
       }
       if (info.tableResult) {
@@ -616,14 +616,14 @@ export function registerAppIpc(): void {
       if (info.imageCopyResult) console.log(`[selfMD] 复制为图片自测：${info.imageCopyResult}`)
       if (info.matchResults) {
         console.log('[selfMD] 模糊匹配自测：')
-        for (const [名, 输出] of Object.entries(info.matchResults)) {
-          console.log(`    ${名}  =>  ${输出}`)
+        for (const [name, output] of Object.entries(info.matchResults)) {
+          console.log(`    ${name}  =>  ${output}`)
         }
       }
       if (info.punctResults) {
         console.log('[selfMD] 渲染标点自测：')
-        for (const [名, 输出] of Object.entries(info.punctResults)) {
-          console.log(`    ${名}  =>  ${输出}`)
+        for (const [name, output] of Object.entries(info.punctResults)) {
+          console.log(`    ${name}  =>  ${output}`)
         }
       }
       openedResolvers.forEach((fn) => fn())

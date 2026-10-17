@@ -27,7 +27,7 @@ export { 取文件名, 取目录, 唯一文件名, 时间戳图片名 } from '@s
 
 export interface 目标解析输入 {
   /** 当前文档所在目录的绝对路径；未保存的文档为 null。 */
-  文档目录: string | null
+  docDir: string | null
   /** 当前文档的文件名（含扩展名）；未保存的文档为 null。 */
   文档名: string | null
   /** TextBundle / TextPack：图片一律进包的 `assets/`。 */
@@ -45,23 +45,23 @@ export interface 目标解析输入 {
 }
 
 export type 目标结果 =
-  | { 类型: '目录'; 路径: string; 来源: '文本包' | '文档级设置' | '全局设置' }
-  | { 类型: '上传'; 来源: '文档级设置' | '全局设置' }
+  | { kind: '目录'; filePath: string; origin: '文本包' | '文档级设置' | '全局设置' }
+  | { kind: '上传'; origin: '文档级设置' | '全局设置' }
   /** 策略要求"什么都不做"：图片留在原处，引用原路径。 */
-  | { 类型: '不动' }
+  | { kind: '不动' }
   /** 目标依赖文档路径，但文档尚未保存。 */
-  | { 类型: '需要保存' }
+  | { kind: '需要保存' }
 
 /** 上传哨兵值。通行做法用 `ipic` 与 `upload` 两个词表示同一件事。 */
-function 是上传标记(值: string): boolean {
-  const 小写 = 值.toLowerCase()
+function 是上传标记(value: string): boolean {
+  const 小写 = value.toLowerCase()
   return 小写 === 'ipic' || 小写 === 'upload'
 }
 
 /** 把 `${filename}` 换成不含扩展名的文档名。 */
-function 替换文件名占位符(模板: string, 文档名: string | null): string {
+function 替换文件名占位符(template: string, 文档名: string | null): string {
   const 基名 = 文档名 ? 去扩展名(文档名) : ''
-  return 模板.replace(/\$\{filename\}/g, 基名)
+  return template.replace(/\$\{filename\}/g, 基名)
 }
 
 /**
@@ -72,62 +72,62 @@ function 替换文件名占位符(模板: string, 文档名: string | null): str
  *   2. 文档级设置（YAML 前置元数据）
  *   3. 全局策略
  */
-export function 解析目标目录(输入: 目标解析输入): 目标结果 {
+export function 解析目标目录(input: 目标解析输入): 目标结果 {
   // --- 1. 文本包：图片是包的内部资源，用户没有选择余地 -------------------
-  if (输入.是文本包) {
-    if (!输入.文档目录) return { 类型: '需要保存' }
-    return { 类型: '目录', 路径: 拼接(输入.文档目录, 'assets'), 来源: '文本包' }
+  if (input.是文本包) {
+    if (!input.docDir) return { kind: '需要保存' }
+    return { kind: '目录', filePath: 拼接(input.docDir, 'assets'), origin: '文本包' }
   }
 
   // --- 2. 文档级设置优先于全局 ------------------------------------------
-  const 文档级 = 输入.文档级设置?.trim()
+  const 文档级 = input.文档级设置?.trim()
   if (文档级 && 文档级.length > 0) {
-    if ((输入.允许自动上传 || 输入.强制上传) && 是上传标记(文档级)) {
-      return { 类型: '上传', 来源: '文档级设置' }
+    if ((input.允许自动上传 || input.强制上传) && 是上传标记(文档级)) {
+      return { kind: '上传', origin: '文档级设置' }
     }
-    const 展开 = 替换文件名占位符(文档级, 输入.文档名)
-    if (是绝对路径(展开)) return { 类型: '目录', 路径: 归一化路径(展开), 来源: '文档级设置' }
-    if (!输入.文档目录) return { 类型: '需要保存' }
-    return { 类型: '目录', 路径: 拼接(输入.文档目录, 展开), 来源: '文档级设置' }
+    const 展开 = 替换文件名占位符(文档级, input.文档名)
+    if (是绝对路径(展开)) return { kind: '目录', filePath: 归一化路径(展开), origin: '文档级设置' }
+    if (!input.docDir) return { kind: '需要保存' }
+    return { kind: '目录', filePath: 拼接(input.docDir, 展开), origin: '文档级设置' }
   }
 
   // --- 3. 全局策略 -------------------------------------------------------
-  switch (输入.全局策略) {
+  switch (input.全局策略) {
     case '':
-      return { 类型: '不动' }
+      return { kind: '不动' }
 
     case 'upload':
-      return { 类型: '上传', 来源: '全局设置' }
+      return { kind: '上传', origin: '全局设置' }
 
     case 'folder':
-      if (!输入.文档目录) return { 类型: '需要保存' }
-      return { 类型: '目录', 路径: 输入.文档目录, 来源: '全局设置' }
+      if (!input.docDir) return { kind: '需要保存' }
+      return { kind: '目录', filePath: input.docDir, origin: '全局设置' }
 
     case 'assets':
-      if (!输入.文档目录) return { 类型: '需要保存' }
-      return { 类型: '目录', 路径: 拼接(输入.文档目录, 'assets'), 来源: '全局设置' }
+      if (!input.docDir) return { kind: '需要保存' }
+      return { kind: '目录', filePath: 拼接(input.docDir, 'assets'), origin: '全局设置' }
 
     case 'per-file-assets': {
-      if (!输入.文档目录 || !输入.文档名) return { 类型: '需要保存' }
+      if (!input.docDir || !input.文档名) return { kind: '需要保存' }
       return {
-        类型: '目录',
-        路径: 拼接(输入.文档目录, `${去扩展名(输入.文档名)}.assets`),
-        来源: '全局设置'
+        kind: '目录',
+        filePath: 拼接(input.docDir, `${去扩展名(input.文档名)}.assets`),
+        origin: '全局设置'
       }
     }
 
     case 'custom': {
-      const 模板 = 输入.自定义目录?.trim()
+      const template = input.自定义目录?.trim()
       // 自定义目录没填时退回"不动"，而不是悄悄把图片丢到某个默认位置。
-      if (!模板) return { 类型: '不动' }
-      const 展开 = 替换文件名占位符(模板, 输入.文档名)
-      if (是绝对路径(展开)) return { 类型: '目录', 路径: 归一化路径(展开), 来源: '全局设置' }
-      if (!输入.文档目录) return { 类型: '需要保存' }
-      return { 类型: '目录', 路径: 拼接(输入.文档目录, 展开), 来源: '全局设置' }
+      if (!template) return { kind: '不动' }
+      const 展开 = 替换文件名占位符(template, input.文档名)
+      if (是绝对路径(展开)) return { kind: '目录', filePath: 归一化路径(展开), origin: '全局设置' }
+      if (!input.docDir) return { kind: '需要保存' }
+      return { kind: '目录', filePath: 拼接(input.docDir, 展开), origin: '全局设置' }
     }
 
     default:
-      return { 类型: '不动' }
+      return { kind: '不动' }
   }
 }
 
@@ -136,17 +136,17 @@ export function 解析目标目录(输入: 目标解析输入): 目标结果 {
 // ---------------------------------------------------------------------------
 
 /** 判定图片来源。 */
-export function 是远程来源(源: string): boolean {
-  return /^\s*(https?|ftp):\/\//i.test(源)
+export function 是远程来源(source: string): boolean {
+  return /^\s*(https?|ftp):\/\//i.test(source)
 }
 
-export function 是数据地址(源: string): boolean {
-  return /^\s*data:/i.test(源)
+export function 是数据地址(source: string): boolean {
+  return /^\s*data:/i.test(source)
 }
 
 export interface 搬运判定输入 {
   /** 图片的原始 src。 */
-  源: string
+  source: string
   /** 解析出的目标目录绝对路径（`上传` 与 `不动` 不参与本判定）。 */
   目标目录: string
   /** 本地图片是否自动搬运。 */
@@ -163,16 +163,16 @@ export interface 搬运判定输入 {
  *   - `data:` 内联图片没有实体文件可搬
  *   - 用户关掉了对应来源的自动搬运
  */
-export function 应当搬运(输入: 搬运判定输入): boolean {
-  const { 源, 目标目录 } = 输入
-  if (!源 || !目标目录) return false
+export function 应当搬运(input: 搬运判定输入): boolean {
+  const { source, 目标目录 } = input
+  if (!source || !目标目录) return false
   // 已经在目标目录内：路径前缀匹配，且后面确实还有一层，不是目录本身。
   const 归一目标 = 目标目录.replace(/[\\/]+$/, '').replace(/\\/g, '/')
-  const 归一本源 = 源.replace(/^file:\/\//, '').replace(/\\/g, '/')
+  const 归一本源 = source.replace(/^file:\/\//, '').replace(/\\/g, '/')
   if (归一本源 === 归一目标) return false
   if (归一本源.startsWith(`${归一目标}/`)) return false
 
-  if (是数据地址(源)) return false
-  return 是远程来源(源) ? 输入.搬运在线 : 输入.搬运本地
+  if (是数据地址(source)) return false
+  return 是远程来源(source) ? input.搬运在线 : input.搬运本地
 }
 

@@ -26,23 +26,23 @@ export type 导出格式 = 'html' | 'html-plain' | 'pdf' | 'docx' | 'latex' | 'e
 
 export interface 导出选项 {
   /** 导出后的目标文件路径。 */
-  目标: string
+  target: string
   /** 源 Markdown 文本。 */
-  源: string
+  source: string
   /** 当前文档路径，用于解析相对图片地址。没有则为 null。 */
-  文档路径: string | null
+  docPath: string | null
   /** 是否在导出结果里附带侧边目录（大纲）。 */
   附大纲?: boolean
   /** 是否把本地图片内嵌成 base64（自包含单文件）。 */
   内嵌图片?: boolean
   /** 导出格式。 */
-  格式: 导出格式
+  format: 导出格式
 }
 
 export interface 导出结果 {
-  成功: boolean
-  路径: string | null
-  错误: string | null
+  success: boolean
+  filePath: string | null
+  error: string | null
 }
 
 // ---------------------------------------------------------------------------
@@ -140,23 +140,23 @@ body.selfmd-export * { -webkit-print-color-adjust: exact; print-color-adjust: ex
 `
 
 /** 生成导出时的侧边目录 HTML。 */
-function 构建目录(源: string): string {
-  const 标题们 = 提取大纲(源)
-  if (标题们.length === 0) return ''
-  const 最浅 = Math.min(...标题们.map((t) => t.级别))
-  const 行 = 标题们
-    .map((标题) => {
-      const 缩进 = (标题.级别 - 最浅) * 14
-      const 文本 = 标题.文本 || '（空标题）'
-      const 转义 = 文本.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+function 构建目录(source: string): string {
+  const headings = 提取大纲(source)
+  if (headings.length === 0) return ''
+  const 最浅 = Math.min(...headings.map((t) => t.级别))
+  const line = headings
+    .map((title) => {
+      const indent = (title.级别 - 最浅) * 14
+      const docText = title.docText || '（空标题）'
+      const 转义 = docText.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
       // 锚点用位置偏移生成，与正文标题的 id 对应
-      return `      <div class="outline-item" style="padding-left:${缩进}px"><a class="outline-label" href="#t${标题.位置}">${转义}</a></div>`
+      return `      <div class="outline-item" style="padding-left:${indent}px"><a class="outline-label" href="#t${title.position}">${转义}</a></div>`
     })
     .join('\n')
 
   return `  <aside class="selfmd-export-sidebar">
     <div class="outline-content">
-${行}
+${line}
     </div>
   </aside>
 `
@@ -183,24 +183,24 @@ const 图片MIME: Record<string, string> = {
  * 远程图片保持不变——下载它们既慢又可能失败，而且用户放一个远程地址在
  * 文档里，本来就不指望它离线可见。
  */
-function 内嵌本地图片(html: string, 文档路径: string | null): string {
-  return html.replace(/(<img[^>]+src=")([^"]+)(")/gi, (整体, 前: string, 地址: string, 后: string) => {
-    if (/^(https?:|data:)/i.test(地址)) return 整体
+function 内嵌本地图片(html: string, docPath: string | null): string {
+  return html.replace(/(<img[^>]+src=")([^"]+)(")/gi, (整体, before: string, url: string, 后: string) => {
+    if (/^(https?:|data:)/i.test(url)) return 整体
     // 还原百分号编码，中文路径才找得到文件
-    let 路径 = 地址
+    let filePath = url
     try {
-      路径 = decodeURI(地址)
+      filePath = decodeURI(url)
     } catch {
       // 编码损坏就按原样找
     }
-    const 基准 = 文档路径 ? dirname(文档路径) : getAppPaths().userImages
-    const 全 = isAbsolute(路径) ? 路径 : resolve(基准, 路径)
+    const 基准 = docPath ? dirname(docPath) : getAppPaths().userImages
+    const 全 = isAbsolute(filePath) ? filePath : resolve(基准, filePath)
     if (!existsSync(全)) return 整体
-    const 类型 = 图片MIME[extname(全).toLowerCase()]
-    if (!类型) return 整体
+    const kind = 图片MIME[extname(全).toLowerCase()]
+    if (!kind) return 整体
     try {
-      const 数据 = readFileSync(全).toString('base64')
-      return `${前}data:${类型};base64,${数据}${后}`
+      const data = readFileSync(全).toString('base64')
+      return `${before}data:${kind};base64,${data}${后}`
     } catch {
       return 整体
     }
@@ -217,27 +217,27 @@ function 内嵌本地图片(html: string, 文档路径: string | null): string {
  * PDF 与 Pandoc 都要先落一份中间 HTML：`data:` URL 在超长文档时会超出长度
  * 限制，而且相对图片地址需要真实的文件基准。
  */
-function 临时目录(): string {
-  const 目录 = join(app.getPath('temp'), 'selfmd-导出')
-  mkdirSync(目录, { recursive: true })
-  return 目录
+function tempDir(): string {
+  const dir = join(app.getPath('temp'), 'selfmd-导出')
+  mkdirSync(dir, { recursive: true })
+  return dir
 }
 
 /** 取当前主题的完整样式（三层级联），并做导出处理。 */
 async function 收集样式(): Promise<string> {
-  const 设置 = getSettings()
-  const id = 生效主题(设置)
+  const settings = getSettings()
+  const id = 生效主题(settings)
   const 部件: string[] = []
 
   // 基础样式：带上设计变量与排版规则，否则导出的 HTML 无样式可依。
   // 它同时定义了两层变量契约（通用变量层 + 本项目层）。
-  const 变量 = 读基础样式()
-  if (变量) 部件.push(变量)
+  const variable = 读基础样式()
+  if (variable) 部件.push(variable)
 
-  const 主题 = themePath(id)
-  if (主题 && existsSync(主题)) {
+  const theme = themePath(id)
+  if (theme && existsSync(theme)) {
     部件.push(
-      await 处理样式表(readFileSync(主题, 'utf8'), {
+      await 处理样式表(readFileSync(theme, 'utf8'), {
         基准目录: getAppPaths().themes,
         导出模式: true
       })
@@ -261,14 +261,14 @@ async function 收集样式(): Promise<string> {
 
 /** 基础样式表：优先读打包产物，开发时读源码目录。 */
 function 读基础样式(): string | null {
-  const 候选 = [
+  const candidate = [
     join(app.getAppPath(), 'src', 'renderer', 'src', 'styles', 'base.css'),
     join(__dirname, '..', '..', '..', 'src', 'renderer', 'src', 'styles', 'base.css')
   ]
-  for (const 路径 of 候选) {
-    if (existsSync(路径)) {
+  for (const filePath of candidate) {
+    if (existsSync(filePath)) {
       try {
-        return readFileSync(路径, 'utf8')
+        return readFileSync(filePath, 'utf8')
       } catch {
         // 继续试下一个
       }
@@ -277,32 +277,32 @@ function 读基础样式(): string | null {
   return null
 }
 
-export async function 构建导出HTML(选项: 导出选项): Promise<string> {
-  const 附大纲 = 选项.附大纲 ?? true
-  const 内嵌 = 选项.内嵌图片 ?? true
+export async function 构建导出HTML(options: 导出选项): Promise<string> {
+  const 附大纲 = options.附大纲 ?? true
+  const 内嵌 = options.内嵌图片 ?? true
 
-  let 正文 = 渲染Markdown为HTML(选项.源)
-  if (内嵌) 正文 = 内嵌本地图片(正文, 选项.文档路径)
+  let body = 渲染Markdown为HTML(options.source)
+  if (内嵌) body = 内嵌本地图片(body, options.docPath)
 
   // 无样式模式：只出结构，不带任何 CSS
-  if (选项.格式 === 'html-plain') {
+  if (options.format === 'html-plain') {
     return `<!doctype html>
 <html lang="zh-Hans">
 <head>
 <meta charset="utf-8">
-<title>${转义标题(选项.文档路径)}</title>
+<title>${转义标题(options.docPath)}</title>
 </head>
 <body>
 <div id="write">
-${正文}</div>
+${body}</div>
 </body>
 </html>
 `
   }
 
-  const 样式 = await 收集样式()
+  const style = await 收集样式()
   const 类 = `selfmd-export${附大纲 ? ' selfmd-export-show-outline' : ''}`
-  const 目录 = 附大纲 ? 构建目录(选项.源) : ''
+  const dir = 附大纲 ? 构建目录(options.source) : ''
 
   return `<!doctype html>
 <html lang="zh-Hans">
@@ -310,25 +310,25 @@ ${正文}</div>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="generator" content="selfMD">
-<title>${转义标题(选项.文档路径)}</title>
+<title>${转义标题(options.docPath)}</title>
 <style>
 ${导出基础样式}
-${样式}
+${style}
 </style>
 </head>
 <body class="${类}">
   <div class="selfmd-export-content">
-${目录}    <div id="write">
-${正文}</div>
+${dir}    <div id="write">
+${body}</div>
   </div>
 </body>
 </html>
 `
 }
 
-function 转义标题(文档路径: string | null): string {
-  const 名 = 文档路径 ? basename(文档路径, extname(文档路径)) : '未命名文档'
-  return 名.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+function 转义标题(docPath: string | null): string {
+  const name = docPath ? basename(docPath, extname(docPath)) : '未命名文档'
+  return name.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }
 
 // ---------------------------------------------------------------------------
@@ -341,15 +341,15 @@ function 转义标题(文档路径: string | null): string {
  * 用一个**隐藏窗口**加载生成好的 HTML，再调 `printToPDF`。
  * 这是 Electron 白拿的能力——不需要装任何外部程序。
  */
-async function 导出PDF(选项: 导出选项): Promise<导出结果> {
-  const html = await 构建导出HTML({ ...选项, 格式: 'html' })
+async function 导出PDF(options: 导出选项): Promise<导出结果> {
+  const html = await 构建导出HTML({ ...options, format: 'html' })
 
   // 落一个临时 HTML：data: URL 在超长文档时会超出长度限制，
   // 而且相对图片地址需要真实的文件基准。
-  const 临时文件 = join(临时目录(), `导出-${Date.now()}.html`)
+  const 临时文件 = join(tempDir(), `导出-${Date.now()}.html`)
   writeFileSync(临时文件, html, 'utf8')
 
-  const 窗口 = new BrowserWindow({
+  const win = new BrowserWindow({
     show: false,
     width: 900,
     height: 1200,
@@ -357,27 +357,27 @@ async function 导出PDF(选项: 导出选项): Promise<导出结果> {
   })
 
   try {
-    await 窗口.loadURL(pathToFileURL(临时文件).toString())
+    await win.loadURL(pathToFileURL(临时文件).toString())
     // 等一帧，让字体与布局稳定下来；否则首行有时会挤出页面。
-    await new Promise((完成) => setTimeout(完成, 120))
+    await new Promise((done) => setTimeout(done, 120))
 
-    const 缓冲 = await 窗口.webContents.printToPDF({
+    const 缓冲 = await win.webContents.printToPDF({
       printBackground: true, // 与 print-color-adjust 同等重要
       margins: { top: 0.6, bottom: 0.6, left: 0.6, right: 0.6 },
       pageSize: 'A4'
     })
 
-    mkdirSync(dirname(选项.目标), { recursive: true })
-    writeFileSync(选项.目标, 缓冲)
-    return { 成功: true, 路径: 选项.目标, 错误: null }
-  } catch (错误) {
+    mkdirSync(dirname(options.target), { recursive: true })
+    writeFileSync(options.target, 缓冲)
+    return { success: true, filePath: options.target, error: null }
+  } catch (error) {
     return {
-      成功: false,
-      路径: null,
-      错误: `PDF 导出失败：${错误 instanceof Error ? 错误.message : String(错误)}`
+      success: false,
+      filePath: null,
+      error: `PDF 导出失败：${error instanceof Error ? error.message : String(error)}`
     }
   } finally {
-    窗口.destroy()
+    win.destroy()
   }
 }
 
@@ -391,28 +391,28 @@ let 缓存的Pandoc路径: string | null | undefined
 export async function 检测Pandoc(): Promise<string | null> {
   if (缓存的Pandoc路径 !== undefined) return 缓存的Pandoc路径
 
-  const 候选 = getSettings().pandocPath || 'pandoc'
-  缓存的Pandoc路径 = await new Promise<string | null>((完成) => {
+  const candidate = getSettings().pandocPath || 'pandoc'
+  缓存的Pandoc路径 = await new Promise<string | null>((done) => {
     let 子进程: ReturnType<typeof spawn>
     try {
-      子进程 = spawn(候选, ['--version'], { windowsHide: true })
+      子进程 = spawn(candidate, ['--version'], { windowsHide: true })
     } catch {
-      完成(null)
+      done(null)
       return
     }
-    let 输出 = ''
-    子进程.stdout?.on('data', (块) => {
-      输出 += String(块)
+    let output = ''
+    子进程.stdout?.on('data', (block) => {
+      output += String(block)
     })
-    子进程.on('error', () => 完成(null))
+    子进程.on('error', () => done(null))
     子进程.on('close', (码) => {
       if (码 !== 0) {
-        完成(null)
+        done(null)
         return
       }
       // 首行形如 `pandoc 3.1.9`，取出其中的版本号
-      const 版本 = (/[\d.]+/.exec(输出.split(/\r?\n/)[0] ?? '') ?? [])[0] ?? ''
-      完成(版本 ? 候选 : null)
+      const version = (/[\d.]+/.exec(output.split(/\r?\n/)[0] ?? '') ?? [])[0] ?? ''
+      done(version ? candidate : null)
     })
   })
 
@@ -421,17 +421,17 @@ export async function 检测Pandoc(): Promise<string | null> {
 
 /** 取 Pandoc 的版本号字符串，供界面显示。 */
 export async function 取Pandoc版本(): Promise<string | null> {
-  const 路径 = await 检测Pandoc()
-  if (!路径) return null
-  return new Promise((完成) => {
-    const 子进程 = spawn(路径, ['--version'], { windowsHide: true })
-    let 输出 = ''
-    子进程.stdout?.on('data', (块) => {
-      输出 += String(块)
+  const filePath = await 检测Pandoc()
+  if (!filePath) return null
+  return new Promise((done) => {
+    const 子进程 = spawn(filePath, ['--version'], { windowsHide: true })
+    let output = ''
+    子进程.stdout?.on('data', (block) => {
+      output += String(block)
     })
-    子进程.on('error', () => 完成(null))
+    子进程.on('error', () => done(null))
     子进程.on('close', () => {
-      完成((/[\d.]+/.exec(输出.split(/\r?\n/)[0] ?? '') ?? [])[0] ?? null)
+      done((/[\d.]+/.exec(output.split(/\r?\n/)[0] ?? '') ?? [])[0] ?? null)
     })
   })
 }
@@ -445,68 +445,68 @@ const PANDOC格式: Record<string, string> = {
   odt: 'odt'
 }
 
-async function 导出经Pandoc(选项: 导出选项): Promise<导出结果> {
+async function 导出经Pandoc(options: 导出选项): Promise<导出结果> {
   const 程序 = await 检测Pandoc()
   if (!程序) {
     return {
-      成功: false,
-      路径: null,
-      错误:
+      success: false,
+      filePath: null,
+      error:
         '未检测到 Pandoc。HTML 与 PDF 导出不需要它；' +
         '导出 Word / LaTeX / ePub 等格式需要先安装 Pandoc 并在设置中填写路径。'
     }
   }
 
-  const 目标格式 = PANDOC格式[选项.格式]
+  const 目标格式 = PANDOC格式[options.format]
   if (!目标格式) {
-    return { 成功: false, 路径: null, 错误: `不支持的导出格式：${选项.格式}` }
+    return { success: false, filePath: null, error: `不支持的导出格式：${options.format}` }
   }
 
   // 先落一份 HTML 中间文件，再交给 Pandoc 转换。
   // 用 HTML 而不是 Markdown 作输入：这样图片、表格、脚注等已经由我们
   // 自己的渲染器处理过，与屏幕上看到的保持一致。
-  const 中间目录 = 临时目录()
+  const 中间目录 = tempDir()
   const 中间文件 = join(中间目录, `导出-${Date.now()}.html`)
   writeFileSync(
     中间文件,
-    await 构建导出HTML({ ...选项, 格式: 'html', 附大纲: false, 内嵌图片: true }),
+    await 构建导出HTML({ ...options, format: 'html', 附大纲: false, 内嵌图片: true }),
     'utf8'
   )
 
-  mkdirSync(dirname(选项.目标), { recursive: true })
+  mkdirSync(dirname(options.target), { recursive: true })
 
-  return new Promise<导出结果>((完成) => {
-    const 参数 = [中间文件, '-f', 'html', '-t', 目标格式, '-o', 选项.目标, '--standalone']
+  return new Promise<导出结果>((done) => {
+    const params = [中间文件, '-f', 'html', '-t', 目标格式, '-o', options.target, '--standalone']
     let 错误输出 = ''
     let 子进程: ReturnType<typeof spawn>
     try {
-      子进程 = spawn(程序, 参数, {
+      子进程 = spawn(程序, params, {
         windowsHide: true,
         // 以文档所在目录为工作目录，相对资源才能被 Pandoc 找到
-        cwd: 选项.文档路径 ? dirname(选项.文档路径) : 中间目录
+        cwd: options.docPath ? dirname(options.docPath) : 中间目录
       })
-    } catch (错误) {
-      完成({
-        成功: false,
-        路径: null,
-        错误: `无法启动 Pandoc：${错误 instanceof Error ? 错误.message : String(错误)}`
+    } catch (error) {
+      done({
+        success: false,
+        filePath: null,
+        error: `无法启动 Pandoc：${error instanceof Error ? error.message : String(error)}`
       })
       return
     }
 
-    子进程.stderr?.on('data', (块) => {
-      错误输出 += String(块)
+    子进程.stderr?.on('data', (block) => {
+      错误输出 += String(block)
     })
-    子进程.on('error', (错误) => {
-      完成({ 成功: false, 路径: null, 错误: `Pandoc 执行失败：${错误.message}` })
+    子进程.on('error', (error) => {
+      done({ success: false, filePath: null, error: `Pandoc 执行失败：${error.message}` })
     })
     子进程.on('close', (码) => {
-      if (码 === 0) 完成({ 成功: true, 路径: 选项.目标, 错误: null })
+      if (码 === 0) done({ success: true, filePath: options.target, error: null })
       else {
-        完成({
-          成功: false,
-          路径: null,
-          错误: `Pandoc 返回错误码 ${码}：${错误输出.trim().slice(0, 400) || '（无输出）'}`
+        done({
+          success: false,
+          filePath: null,
+          error: `Pandoc 返回错误码 ${码}：${错误输出.trim().slice(0, 400) || '（无输出）'}`
         })
       }
     })
@@ -532,34 +532,34 @@ export async function 可用格式(): Promise<Record<导出格式, boolean>> {
   }
 }
 
-export async function 执行导出(选项: 导出选项): Promise<导出结果> {
+export async function 执行导出(options: 导出选项): Promise<导出结果> {
   try {
-    if (选项.格式 === 'pdf') return await 导出PDF(选项)
+    if (options.format === 'pdf') return await 导出PDF(options)
 
-    if (选项.格式 === 'html' || 选项.格式 === 'html-plain') {
-      const html = await 构建导出HTML(选项)
-      mkdirSync(dirname(选项.目标), { recursive: true })
-      writeFileSync(选项.目标, html, 'utf8')
-      return { 成功: true, 路径: 选项.目标, 错误: null }
+    if (options.format === 'html' || options.format === 'html-plain') {
+      const html = await 构建导出HTML(options)
+      mkdirSync(dirname(options.target), { recursive: true })
+      writeFileSync(options.target, html, 'utf8')
+      return { success: true, filePath: options.target, error: null }
     }
 
-    return await 导出经Pandoc(选项)
-  } catch (错误) {
+    return await 导出经Pandoc(options)
+  } catch (error) {
     return {
-      成功: false,
-      路径: null,
-      错误: 错误 instanceof Error ? 错误.message : String(错误)
+      success: false,
+      filePath: null,
+      error: error instanceof Error ? error.message : String(error)
     }
   }
 }
 
 /** 供自测使用：直接拿一段 Markdown 生成 HTML，不落盘。 */
-export async function 试渲染(源: string, 格式: 导出格式 = 'html'): Promise<string> {
+export async function 试渲染(source: string, format: 导出格式 = 'html'): Promise<string> {
   return 构建导出HTML({
-    源,
-    目标: '',
-    文档路径: null,
-    格式,
+    source,
+    target: '',
+    docPath: null,
+    format,
     附大纲: true,
     内嵌图片: false
   })

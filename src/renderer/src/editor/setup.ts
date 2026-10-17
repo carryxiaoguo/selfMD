@@ -177,8 +177,8 @@ const editorTheme = EditorView.theme({
  * 一对，反而要先删掉多余的半个。星号成对是"加粗"命令该干的事，不该由
  * 配对器抢着做。
  */
-export function 按设置构建配对(设置: Settings): Extension {
-  const 配对 = 设置.enableInlineMath ? "()[]{}''\"\"``$$" : "()[]{}''\"\"``"
+export function 按设置构建配对(settings: Settings): Extension {
+  const 配对 = settings.enableInlineMath ? "()[]{}''\"\"``$$" : "()[]{}''\"\"``"
   return [
     closeBrackets(),
     EditorState.languageData.of(() => [{ closeBrackets: { brackets: [...配对] } }])
@@ -225,8 +225,8 @@ export function baseExtensions(options: EditorOptions): Extension[] {
       // 表格内 Tab / Shift+Tab 走单元格，不走缩进。
       // **必须排在 `indentWithTab` 之前**——后者会把 Tab 吃掉当缩进。
       // 光标不在表格里时这两条返回 false，Tab 照旧缩进。
-      { key: 'Tab', run: (视图) => 跳到相邻单元格(视图, 1) },
-      { key: 'Shift-Tab', run: (视图) => 跳到相邻单元格(视图, -1) },
+      { key: 'Tab', run: (view) => 跳到相邻单元格(view, 1) },
+      { key: 'Shift-Tab', run: (view) => 跳到相邻单元格(view, -1) },
       ...closeBracketsKeymap,
       ...defaultKeymap,
       ...searchKeymap,

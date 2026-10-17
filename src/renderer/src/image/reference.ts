@@ -26,20 +26,20 @@ export interface 引用选项 {
  * 此时原样返回目标路径——回退成绝对路径永远比给出一个错误相对路径好。
  */
 export function 相对路径(从: string, 到: string): string {
-  const 甲 = 归一化路径(从).split('/').filter(Boolean)
-  const 乙 = 归一化路径(到).split('/').filter(Boolean)
-  if (甲.length === 0 || 乙.length === 0) return 归一化路径(到)
-  if (甲[0].toLowerCase() !== 乙[0].toLowerCase()) return 归一化路径(到)
+  const alpha = 归一化路径(从).split('/').filter(Boolean)
+  const beta = 归一化路径(到).split('/').filter(Boolean)
+  if (alpha.length === 0 || beta.length === 0) return 归一化路径(到)
+  if (alpha[0].toLowerCase() !== beta[0].toLowerCase()) return 归一化路径(到)
 
   let 共同 = 0
-  while (共同 < 甲.length && 共同 < 乙.length && 甲[共同] === 乙[共同]) 共同 += 1
+  while (共同 < alpha.length && 共同 < beta.length && alpha[共同] === beta[共同]) 共同 += 1
   // 只有一个根段相同时（例如 C: 对 C:），相对关系不成立。
   if (共同 === 0) return 归一化路径(到)
 
-  const 上行 = new Array(Math.max(0, 甲.length - 共同)).fill('..')
-  const 下行 = 乙.slice(共同)
-  const 结果 = [...上行, ...下行].join('/')
-  return 结果.length > 0 ? 结果 : '.'
+  const 上行 = new Array(Math.max(0, alpha.length - 共同)).fill('..')
+  const 下行 = beta.slice(共同)
+  const result = [...上行, ...下行].join('/')
+  return result.length > 0 ? result : '.'
 }
 
 /**
@@ -75,11 +75,11 @@ const 需转义: Record<string, string> = {
  * 直觉的做法是 `encodeURI`，这里有意偏离：
  * 现代 Markdown 渲染器与浏览器都能正确处理 UTF-8 路径，可读性更重要。
  */
-export function 转义图片地址(路径: string): string {
-  let 结果 = ''
+export function 转义图片地址(filePath: string): string {
+  let result = ''
   // 逐字符处理：输出不再参与匹配，因此 `%` 只会被编码一次。
-  for (const 字符 of 路径) 结果 += 需转义[字符] ?? 字符
-  return 结果
+  for (const ch of filePath) result += 需转义[ch] ?? ch
+  return result
 }
 
 /**
@@ -89,22 +89,22 @@ export function 转义图片地址(路径: string): string {
  */
 export function 生成引用地址(
   图片绝对路径: string,
-  文档目录: string | null,
-  选项: 引用选项
+  docDir: string | null,
+  options: 引用选项
 ): string {
-  const 图片 = 归一化路径(图片绝对路径)
+  const image = 归一化路径(图片绝对路径)
 
-  let 结果 = 图片
-  if (选项.用相对路径 && 文档目录 && 是绝对路径(图片)) {
-    const 相对 = 相对路径(文档目录, 图片)
+  let result = image
+  if (options.用相对路径 && docDir && 是绝对路径(image)) {
+    const 相对 = 相对路径(docDir, image)
     // 相对路径算不出上行、又不是平级文件时（例如跨盘），回退到绝对路径。
     if (是绝对路径(相对) === false) {
-      结果 = 相对
-      if (选项.加点前缀 && !结果.startsWith('.')) 结果 = `./${结果}`
+      result = 相对
+      if (options.加点前缀 && !result.startsWith('.')) result = `./${result}`
     }
   }
 
-  return 选项.转义地址 ? 转义图片地址(结果) : 结果
+  return options.转义地址 ? 转义图片地址(result) : result
 }
 
 /** 由图片路径推断 alt 文本：取文件名去掉扩展名。 */
@@ -121,15 +121,15 @@ export type 图片语法 = 'markdown' | 'html'
  * HTML `<img>` 则能带上 `width`/`style` 之类的属性。默认走 Markdown。
  */
 export function 生成图片语法(
-  地址: string,
+  url: string,
   替代文本: string,
   语法: 图片语法 = 'markdown'
 ): string {
   if (语法 === 'html') {
     const 转义 = 替代文本.replace(/"/g, '&quot;')
-    return `<img src="${地址}" alt="${转义}" />`
+    return `<img src="${url}" alt="${转义}" />`
   }
   // alt 里的 `]` 会提前闭合方括号，必须转义。
   const 安全替代 = 替代文本.replace(/]/g, '\\]')
-  return `![${安全替代}](${地址})`
+  return `![${安全替代}](${url})`
 }

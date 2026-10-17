@@ -66,14 +66,14 @@ export function activeThemeId(settings: Settings): string {
 /** 强制重新拉取当前三层样式表（用户在外部编辑器里改了 CSS 之后用）。 */
 export function 重新加载主题(settings: Settings): void {
   const id = activeThemeId(settings)
-  for (const [元素, href] of [
+  for (const [el, href] of [
     ['theme-css', themeCssUrl(id)],
     ['base-user-css', 全局自定义样式Url()],
     ['theme-user-css', 主题自定义样式Url(id)]
   ] as const) {
     // 清空再设：同一个 URL 不会触发重新拉取，必须先断开
-    取链接(元素).setAttribute('href', '')
-    设置链接(元素, href)
+    取链接(el).setAttribute('href', '')
+    设置链接(el, href)
   }
 }
 
@@ -92,10 +92,10 @@ export function applyTheme(settings: Settings): void {
   //
   // **0 / 空字符串表示"跟随主题"**，此时必须把内联值清掉而不是设成 0：
   // 设成 0 会得到 `0px` 这种无效值，而清掉之后主题与基础样式才有机会生效。
-  const 根 = document.documentElement
-  const 设或清 = (名: string, 值: string): void => {
-    if (值) 根.style.setProperty(名, 值)
-    else 根.style.removeProperty(名)
+  const root = document.documentElement
+  const 设或清 = (name: string, value: string): void => {
+    if (value) root.style.setProperty(name, value)
+    else root.style.removeProperty(name)
   }
   设或清('--font-size', settings.fontSize > 0 ? `${settings.fontSize}px` : '')
   设或清('--line-height', settings.lineHeight > 0 ? String(settings.lineHeight) : '')

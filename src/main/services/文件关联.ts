@@ -21,7 +21,7 @@ import { execFileSync } from 'node:child_process'
 
 export interface 关联状态 {
   /** 系统里 `.md` 当前生效的打开方式（ProgID 或可执行文件名）。 */
-  当前: string
+  current: string
   /** 是否就是本程序。 */
   是默认: boolean
   /** 是否已注册「新建」菜单项。 */
@@ -32,33 +32,33 @@ const 扩展 = '.md'
 const 本程序ProgId = 'selfMD.md'
 
 /** 读一个注册表值；不存在或读不到时返回空串。 */
-function 读注册表(键: string, 值: string): string {
+function 读注册表(key: string, value: string): string {
   if (process.platform !== 'win32') return ''
   try {
-    const 输出 = execFileSync('reg', ['query', 键, '/v', 值], {
+    const output = execFileSync('reg', ['query', key, '/v', value], {
       encoding: 'utf8',
       windowsHide: true,
       // 键不存在时 reg 会以非零码退出并打到 stderr，这里静默当空处理
       stdio: ['ignore', 'pipe', 'ignore']
     })
     // 形如：`    (默认)    REG_SZ    selfMD.md`
-    const 行 = 输出
+    const line = output
       .split(/\r?\n/)
       .map((l) => l.trim())
-      .find((l) => l.startsWith(值) || l.startsWith('(默认)'))
-    if (!行) return ''
-    const 段 = 行.split(/\s{2,}/)
-    return (段[段.length - 1] ?? '').trim()
+      .find((l) => l.startsWith(value) || l.startsWith('(默认)'))
+    if (!line) return ''
+    const segment = line.split(/\s{2,}/)
+    return (segment[segment.length - 1] ?? '').trim()
   } catch {
     return ''
   }
 }
 
 /** 查某个注册表键是否存在。 */
-function 键存在(键: string): boolean {
+function 键存在(key: string): boolean {
   if (process.platform !== 'win32') return false
   try {
-    execFileSync('reg', ['query', 键], { windowsHide: true, stdio: 'ignore' })
+    execFileSync('reg', ['query', key], { windowsHide: true, stdio: 'ignore' })
     return true
   } catch {
     return false
@@ -78,11 +78,11 @@ function 键存在(键: string): boolean {
 export function 取关联状态(): 关联状态 {
   const 用户选择 = 读注册表(`HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\FileExts\\${扩展}\\UserChoice`, 'ProgId')
   const 类默认 = 读注册表(`HKCU\\Software\\Classes\\${扩展}`, '(默认)')
-  const 当前 = 用户选择 || 类默认
+  const current = 用户选择 || 类默认
 
   return {
-    当前,
-    是默认: 当前 === 本程序ProgId,
+    current,
+    是默认: current === 本程序ProgId,
     有新建菜单: 键存在(`HKCU\\Software\\Classes\\${扩展}\\ShellNew`)
   }
 }

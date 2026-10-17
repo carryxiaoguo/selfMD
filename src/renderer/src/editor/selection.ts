@@ -21,14 +21,14 @@ import type { EditorView } from '@codemirror/view'
 const 硬终止符 = /[。！？；]/
 
 /** 英文句点只有在"后面是空白或行尾"时才算断句，"3.14" 里的不算。 */
-function 是英文句点(行文本: string, 位置: number): boolean {
-  if (行文本[位置] !== '.') return false
-  const 后 = 行文本[位置 + 1]
+function 是英文句点(lineText: string, position: number): boolean {
+  if (lineText[position] !== '.') return false
+  const 后 = lineText[position + 1]
   return 后 === undefined || /\s/.test(后)
 }
 
-function 是终止符(行文本: string, 位置: number): boolean {
-  return 硬终止符.test(行文本[位置]) || 是英文句点(行文本, 位置)
+function 是终止符(lineText: string, position: number): boolean {
+  return 硬终止符.test(lineText[position]) || 是英文句点(lineText, position)
 }
 
 /**
@@ -37,27 +37,27 @@ function 是终止符(行文本: string, 位置: number): boolean {
  * 边界取"上一个终止符之后"到"下一个终止符（含）"；找不到终止符时
  * 整行就是一句——这符合直觉：没有句号的一行本来就是一整句。
  */
-export function 句子区间(行文本: string, 偏移: number): { 起: number; 终: number } {
-  let 起 = 0
-  for (let i = Math.min(偏移, 行文本.length) - 1; i >= 0; i--) {
-    if (是终止符(行文本, i)) {
-      起 = i + 1
+export function 句子区间(lineText: string, offset: number): { start: number; end: number } {
+  let start = 0
+  for (let i = Math.min(offset, lineText.length) - 1; i >= 0; i--) {
+    if (是终止符(lineText, i)) {
+      start = i + 1
       break
     }
   }
 
-  let 终 = 行文本.length
-  for (let i = Math.max(0, Math.min(偏移, 行文本.length)); i < 行文本.length; i++) {
-    if (是终止符(行文本, i)) {
-      终 = i + 1
+  let end = lineText.length
+  for (let i = Math.max(0, Math.min(offset, lineText.length)); i < lineText.length; i++) {
+    if (是终止符(lineText, i)) {
+      end = i + 1
       break
     }
   }
 
   // 去掉两端空白：选中" 你好 "时用户想要的是"你好"。
-  while (起 < 终 && /\s/.test(行文本[起])) 起 += 1
-  while (终 > 起 && /\s/.test(行文本[终 - 1])) 终 -= 1
-  return { 起, 终 }
+  while (start < end && /\s/.test(lineText[start])) start += 1
+  while (end > start && /\s/.test(lineText[end - 1])) end -= 1
+  return { start, end }
 }
 
 // ---------------------------------------------------------------------------
@@ -73,23 +73,23 @@ const 拉丁词字符 = /[A-Za-z0-9_\u00c0-\u024f]/
  * 中日韩文字按**单字成词**处理。没有分词器的情况下这是唯一诚实的选择：
  * 按标点切会把"选中当前词"变成"选中整句"，反而更糟。
  */
-export function 词区间(行文本: string, 偏移: number): { 起: number; 终: number } | null {
-  const 光标处 = 行文本[偏移]
-  const 光标前 = 偏移 > 0 ? 行文本[偏移 - 1] : undefined
+export function 词区间(lineText: string, offset: number): { start: number; end: number } | null {
+  const 光标处 = lineText[offset]
+  const 光标前 = offset > 0 ? lineText[offset - 1] : undefined
 
   // 中日韩：单字
-  if (光标处 !== undefined && 中日韩.test(光标处)) return { 起: 偏移, 终: 偏移 + 1 }
-  if (光标前 !== undefined && 中日韩.test(光标前)) return { 起: 偏移 - 1, 终: 偏移 }
+  if (光标处 !== undefined && 中日韩.test(光标处)) return { start: offset, end: offset + 1 }
+  if (光标前 !== undefined && 中日韩.test(光标前)) return { start: offset - 1, end: offset }
 
   // 拉丁词：向两侧扩展到非词字符
-  const 起点 = 光标处 !== undefined && 拉丁词字符.test(光标处) ? 偏移 : 偏移 - 1
-  if (起点 < 0 || 起点 >= 行文本.length || !拉丁词字符.test(行文本[起点])) return null
+  const 起点 = 光标处 !== undefined && 拉丁词字符.test(光标处) ? offset : offset - 1
+  if (起点 < 0 || 起点 >= lineText.length || !拉丁词字符.test(lineText[起点])) return null
 
-  let 起 = 起点
-  let 终 = 起点 + 1
-  while (起 > 0 && 拉丁词字符.test(行文本[起 - 1])) 起 -= 1
-  while (终 < 行文本.length && 拉丁词字符.test(行文本[终])) 终 += 1
-  return { 起, 终 }
+  let start = 起点
+  let end = 起点 + 1
+  while (start > 0 && 拉丁词字符.test(lineText[start - 1])) start -= 1
+  while (end < lineText.length && 拉丁词字符.test(lineText[end])) end += 1
+  return { start, end }
 }
 
 // ---------------------------------------------------------------------------
@@ -97,11 +97,11 @@ export function 词区间(行文本: string, 偏移: number): { 起: number; 终
 // ---------------------------------------------------------------------------
 
 /** 把行内区间映射为文档选区。 */
-function 行内选区(状态: EditorState, 位置: number, 区间: { 起: number; 终: number }): EditorSelection {
-  const 行 = 状态.doc.lineAt(位置)
+function 行内选区(state: EditorState, position: number, range: { start: number; end: number }): EditorSelection {
+  const line = state.doc.lineAt(position)
   // EditorSelection.range() 返回的是单个 SelectionRange，不是 EditorSelection；
   // 单区间要用 single()。
-  return EditorSelection.single(行.from + 区间.起, 行.from + 区间.终)
+  return EditorSelection.single(line.from + range.start, line.from + range.end)
 }
 
 /**
@@ -110,31 +110,31 @@ function 行内选区(状态: EditorState, 位置: number, 区间: { 起: number
  * 与通行取舍一致：**优先按句选**。光标停在一句中间时选中整句；
  * 该行只有一句（或没有终止符）时，效果就等于选中整行。
  */
-export function 选中当前行或句(视图: EditorView): boolean {
-  const 状态 = 视图.state
-  const 主 = 状态.selection.main
-  const 行 = 状态.doc.lineAt(主.head)
-  const 区间 = 句子区间(行.text, 主.head - 行.from)
+export function 选中当前行或句(view: EditorView): boolean {
+  const state = view.state
+  const main = state.selection.main
+  const line = state.doc.lineAt(main.head)
+  const range = 句子区间(line.text, main.head - line.from)
 
   // 整行已经选中时再按一次，扩展为整行（含首尾空白），给用户一个"退路"。
-  const 当前已满 = 主.from === 行.from + 区间.起 && 主.to === 行.from + 区间.终
-  const 目标 = 当前已满
-    ? EditorSelection.single(行.from, 行.to)
-    : 行内选区(状态, 主.head, 区间)
+  const 当前已满 = main.from === line.from + range.start && main.to === line.from + range.end
+  const target = 当前已满
+    ? EditorSelection.single(line.from, line.to)
+    : 行内选区(state, main.head, range)
 
-  视图.dispatch({ selection: 目标, userEvent: 'select' })
+  view.dispatch({ selection: target, userEvent: 'select' })
   return true
 }
 
 /** 选中光标所在或紧邻的词。 */
-export function 选中当前词(视图: EditorView): boolean {
-  const 状态 = 视图.state
-  const 主 = 状态.selection.main
-  const 行 = 状态.doc.lineAt(主.head)
-  const 区间 = 词区间(行.text, 主.head - 行.from)
-  if (!区间) return false
-  视图.dispatch({
-    selection: 行内选区(状态, 主.head, 区间),
+export function 选中当前词(view: EditorView): boolean {
+  const state = view.state
+  const main = state.selection.main
+  const line = state.doc.lineAt(main.head)
+  const range = 词区间(line.text, main.head - line.from)
+  if (!range) return false
+  view.dispatch({
+    selection: 行内选区(state, main.head, range),
     userEvent: 'select'
   })
   return true
@@ -146,18 +146,18 @@ export function 选中当前词(视图: EditorView): boolean {
  * 块的范围直接取自语法树顶层节点，因此"选中这段引用"、"选中这个表格"
  * 这类操作对任何块级语法都自动成立，不需要逐个语法写规则。
  */
-export function 选中当前块(视图: EditorView): boolean {
-  const 状态 = 视图.state
-  const 位置 = 状态.selection.main.head
-  const 树 = syntaxTree(状态)
+export function 选中当前块(view: EditorView): boolean {
+  const state = view.state
+  const position = state.selection.main.head
+  const 树 = syntaxTree(state)
 
   // 向上找到 Document 的直接子节点，那就是一个"块"。
-  let 节点 = 树.resolveInner(位置, -1)
-  while (节点.parent && 节点.parent.name !== 'Document') 节点 = 节点.parent
-  if (节点.name === 'Document') return false
+  let node = 树.resolveInner(position, -1)
+  while (node.parent && node.parent.name !== 'Document') node = node.parent
+  if (node.name === 'Document') return false
 
-  视图.dispatch({
-    selection: EditorSelection.single(节点.from, 节点.to),
+  view.dispatch({
+    selection: EditorSelection.single(node.from, node.to),
     userEvent: 'select'
   })
   return true
@@ -169,45 +169,45 @@ export function 选中当前块(视图: EditorView): boolean {
  * 有选区时删选区；无选区时按句删。行内容被删空后连同换行一并吃掉，
  * 避免留下一个空行——这与"删除当前行"的常见观感一致。
  */
-export function 删除当前行或句(视图: EditorView): boolean {
-  const 状态 = 视图.state
-  const 主 = 状态.selection.main
+export function 删除当前行或句(view: EditorView): boolean {
+  const state = view.state
+  const main = state.selection.main
 
-  if (!主.empty) {
-    视图.dispatch({ changes: { from: 主.from, to: 主.to }, userEvent: 'delete' })
+  if (!main.empty) {
+    view.dispatch({ changes: { from: main.from, to: main.to }, userEvent: 'delete' })
     return true
   }
 
-  const 行 = 状态.doc.lineAt(主.head)
-  const 区间 = 句子区间(行.text, 主.head - 行.from)
-  const 起 = 行.from + 区间.起
-  const 终 = 行.from + 区间.终
+  const line = state.doc.lineAt(main.head)
+  const range = 句子区间(line.text, main.head - line.from)
+  const start = line.from + range.start
+  const end = line.from + range.end
 
   // 整行被选中时，连同行尾换行一起删除。
-  const 整行 = 区间.起 === 0 && 区间.终 === 行.text.length
-  if (整行 && 行.number < 状态.doc.lines) {
-    视图.dispatch({
-      changes: { from: 行.from, to: 行.to + 1 },
+  const 整行 = range.start === 0 && range.end === line.text.length
+  if (整行 && line.number < state.doc.lines) {
+    view.dispatch({
+      changes: { from: line.from, to: line.to + 1 },
       userEvent: 'delete'
     })
     return true
   }
-  if (终 > 起) {
-    视图.dispatch({ changes: { from: 起, to: 终 }, userEvent: 'delete' })
+  if (end > start) {
+    view.dispatch({ changes: { from: start, to: end }, userEvent: 'delete' })
     return true
   }
   return false
 }
 
 /** 跳转到行首（第一次按到文字开头，已在文字开头时到行首缩进处）。 */
-export function 跳转到行首(视图: EditorView): boolean {
-  const 状态 = 视图.state
-  const 主 = 状态.selection.main
-  const 行 = 状态.doc.lineAt(主.head)
-  const 首个非空白 = 行.from + (行.text.length - 行.text.trimStart().length)
-  const 目标 = 主.head === 首个非空白 ? 行.from : 首个非空白
-  视图.dispatch({
-    selection: EditorSelection.cursor(目标),
+export function 跳转到行首(view: EditorView): boolean {
+  const state = view.state
+  const main = state.selection.main
+  const line = state.doc.lineAt(main.head)
+  const 首个非空白 = line.from + (line.text.length - line.text.trimStart().length)
+  const target = main.head === 首个非空白 ? line.from : 首个非空白
+  view.dispatch({
+    selection: EditorSelection.cursor(target),
     scrollIntoView: true,
     userEvent: 'select'
   })
@@ -215,11 +215,11 @@ export function 跳转到行首(视图: EditorView): boolean {
 }
 
 /** 跳转到行尾。 */
-export function 跳转到行尾(视图: EditorView): boolean {
-  const 状态 = 视图.state
-  const 行 = 状态.doc.lineAt(状态.selection.main.head)
-  视图.dispatch({
-    selection: EditorSelection.cursor(行.to),
+export function 跳转到行尾(view: EditorView): boolean {
+  const state = view.state
+  const line = state.doc.lineAt(state.selection.main.head)
+  view.dispatch({
+    selection: EditorSelection.cursor(line.to),
     scrollIntoView: true,
     userEvent: 'select'
   })
@@ -227,8 +227,8 @@ export function 跳转到行尾(视图: EditorView): boolean {
 }
 
 /** 跳转到文首 / 文末。 */
-export function 跳转到文首(视图: EditorView): boolean {
-  视图.dispatch({
+export function 跳转到文首(view: EditorView): boolean {
+  view.dispatch({
     selection: EditorSelection.cursor(0),
     scrollIntoView: true,
     userEvent: 'select'
@@ -236,9 +236,9 @@ export function 跳转到文首(视图: EditorView): boolean {
   return true
 }
 
-export function 跳转到文末(视图: EditorView): boolean {
-  视图.dispatch({
-    selection: EditorSelection.cursor(视图.state.doc.length),
+export function 跳转到文末(view: EditorView): boolean {
+  view.dispatch({
+    selection: EditorSelection.cursor(view.state.doc.length),
     scrollIntoView: true,
     userEvent: 'select'
   })

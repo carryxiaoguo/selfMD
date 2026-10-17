@@ -28,7 +28,7 @@ import { getSettings } from './settings'
  * 回填文档由渲染层负责——主进程不该去改用户的 Markdown。
  */
 
-const 执行 = promisify(exec)
+const run = promisify(exec)
 
 /** 单次上传的输出上限，照抄 值。 */
 const 输出上限 = 2097152
@@ -37,18 +37,18 @@ const 输出上限 = 2097152
 const 启动等待 = 5000
 
 export interface 上传成功项 {
-  原路径: string
-  地址: string
+  rawPath: string
+  url: string
 }
 
 export interface 上传失败项 {
-  原路径: string
+  rawPath: string
   原因: string
 }
 
 export interface 上传结果 {
-  成功: 上传成功项[]
-  失败: 上传失败项[]
+  success: 上传成功项[]
+  failure: 上传失败项[]
 }
 
 /** PicGo / PicList 的本地端点。 */
@@ -60,12 +60,12 @@ function 是应用模式(上传器: 上传器类型): boolean {
 }
 
 /** 一次 HTTP 上传尝试。连不上时返回 null 而不是抛异常。 */
-async function 试HTTP上传(路径们: string[]): Promise<string | null> {
+async function 试HTTP上传(paths: string[]): Promise<string | null> {
   try {
     const 响应 = await net.fetch(本地端点, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ list: 路径们 })
+      body: JSON.stringify({ list: paths })
     })
     if (!响应.ok) return null
     return await 响应.text()
@@ -81,7 +81,7 @@ async function 启动应用(程序: string): Promise<void> {
   try {
     // 用 exec 而不是 spawn + detached：这里只关心"把它拉起来"，
     // 不接管它的生命周期——用户可能本来就想让它常驻托盘。
-    await 执行(`start "" ${JSON.stringify(程序)}`, {
+    await run(`start "" ${JSON.stringify(程序)}`, {
       windowsHide: true,
       shell: 'cmd.exe'
     })
@@ -91,65 +91,65 @@ async function 启动应用(程序: string): Promise<void> {
 }
 
 /** 应用模式的完整流程：先试 HTTP，失败则启动应用后重试一次。 */
-async function 应用模式上传(路径们: string[]): Promise<{ 地址: string[]; 错误: string | null }> {
-  const 设置 = getSettings()
+async function 应用模式上传(paths: string[]): Promise<{ url: string[]; error: string | null }> {
+  const settings = getSettings()
 
-  const 首次 = await 试HTTP上传(路径们)
+  const 首次 = await 试HTTP上传(paths)
   if (首次 !== null) {
-    return 解析上传结果(首次, 设置.imageUploader, 路径们.length)
+    return 解析上传结果(首次, settings.imageUploader, paths.length)
   }
 
   // 没连上：需要知道去哪儿找这个应用才能把它拉起来
-  const 程序 = 设置.picgoPath.trim()
+  const 程序 = settings.picgoPath.trim()
   if (程序.length === 0) {
-    const 名 = 设置.imageUploader === 'picgo-app' ? 'PicGo' : 'PicList'
+    const name = settings.imageUploader === 'picgo-app' ? 'PicGo' : 'PicList'
     return {
-      地址: [],
-      错误:
-        `无法连接 ${名} 的本地服务（${本地端点}）。` +
-        `请先启动 ${名}，或在「偏好设置 → 图片」里填写它的可执行文件路径，` +
+      url: [],
+      error:
+        `无法连接 ${name} 的本地服务（${本地端点}）。` +
+        `请先启动 ${name}，或在「偏好设置 → 图片」里填写它的可执行文件路径，` +
         `以便自动启动。`
     }
   }
 
   if (!existsSync(程序)) {
-    return { 地址: [], 错误: `配置的路径不存在：${程序}` }
+    return { url: [], error: `配置的路径不存在：${程序}` }
   }
 
   await 启动应用(程序)
-  await new Promise((完成) => setTimeout(完成, 启动等待))
+  await new Promise((done) => setTimeout(done, 启动等待))
 
-  const 重试 = await 试HTTP上传(路径们)
+  const 重试 = await 试HTTP上传(paths)
   if (重试 === null) {
     return {
-      地址: [],
-      错误: `已尝试启动 ${程序}，但等待 ${启动等待 / 1000} 秒后仍未连上 ${本地端点}。`
+      url: [],
+      error: `已尝试启动 ${程序}，但等待 ${启动等待 / 1000} 秒后仍未连上 ${本地端点}。`
     }
   }
-  return 解析上传结果(重试, 设置.imageUploader, 路径们.length)
+  return 解析上传结果(重试, settings.imageUploader, paths.length)
 }
 
 /** 命令行模式的完整流程。 */
 async function 命令行上传(
   上传器: 上传器类型,
-  路径们: string[]
-): Promise<{ 地址: string[]; 错误: string | null }> {
-  const 设置 = getSettings()
-  const 地址: string[] = []
+  paths: string[]
+): Promise<{ url: string[]; error: string | null }> {
+  const settings = getSettings()
+  const url: string[] = []
 
   // 命令行上传器一次只吃一个文件，所以逐个执行。
   // 这也让"部分失败"成为可能——某一张图挂了不该让整批都失败。
-  for (const 路径 of 路径们) {
-    const 命令 = 生成上传命令(上传器, 路径, {
-      自定义命令: 设置.customImageUploader,
+  for (const filePath of paths) {
+    const command = 生成上传命令(上传器, filePath, {
+      自定义命令: settings.customImageUploader,
       用户数据目录: getAppPaths().userData.replace(/\\/g, '/'),
-      平台: process.platform === 'win32' ? 'win32' : process.platform === 'darwin' ? 'darwin' : 'linux'
+      platform: process.platform === 'win32' ? 'win32' : process.platform === 'darwin' ? 'darwin' : 'linux'
     })
 
-    if (!命令) {
+    if (!command) {
       return {
-        地址: [],
-        错误:
+        url: [],
+        error:
           上传器 === 'custom'
             ? '尚未配置自定义上传命令。请在「偏好设置 → 图片」里填写。'
             : `无法为上传器「${上传器}」生成命令。`
@@ -157,17 +157,17 @@ async function 命令行上传(
     }
 
     try {
-      const { stdout } = await 执行(命令, { maxBuffer: 输出上限, windowsHide: true })
+      const { stdout } = await run(command, { maxBuffer: 输出上限, windowsHide: true })
       const 单个 = 解析上传结果(stdout, 上传器, 1)
-      if (单个.错误) return { 地址: [], 错误: 单个.错误 }
-      地址.push(...单个.地址)
-    } catch (错误) {
-      const 文本 = 错误 instanceof Error ? 错误.message : String(错误)
-      return { 地址: [], 错误: `执行上传命令失败：${文本.slice(0, 300)}` }
+      if (单个.error) return { url: [], error: 单个.error }
+      url.push(...单个.url)
+    } catch (error) {
+      const docText = error instanceof Error ? error.message : String(error)
+      return { url: [], error: `执行上传命令失败：${docText.slice(0, 300)}` }
     }
   }
 
-  return { 地址, 错误: null }
+  return { url, error: null }
 }
 
 /**
@@ -176,58 +176,58 @@ async function 命令行上传(
  * 返回一一对应的「原路径 → 远程地址」。上层据此改写文档里的引用。
  */
 export async function 上传图片(文件路径们: string[]): Promise<上传结果> {
-  const 设置 = getSettings()
-  const 待传 = 文件路径们.filter((路径) => 路径.length > 0)
+  const settings = getSettings()
+  const 待传 = 文件路径们.filter((filePath) => filePath.length > 0)
 
-  if (待传.length === 0) return { 成功: [], 失败: [] }
+  if (待传.length === 0) return { success: [], failure: [] }
 
-  if (设置.imageUploader === 'none') {
+  if (settings.imageUploader === 'none') {
     return {
-      成功: [],
-      失败: 待传.map((原路径) => ({
-        原路径,
+      success: [],
+      failure: 待传.map((rawPath) => ({
+        rawPath,
         原因: '尚未选择图床上传器。请在「偏好设置 → 图片」里选择。'
       }))
     }
   }
 
-  const 缺失 = 待传.filter((路径) => !existsSync(路径))
-  const 存在 = 待传.filter((路径) => existsSync(路径))
-  const 失败: 上传失败项[] = 缺失.map((原路径) => ({
-    原路径,
+  const 缺失 = 待传.filter((filePath) => !existsSync(filePath))
+  const exists = 待传.filter((filePath) => existsSync(filePath))
+  const failure: 上传失败项[] = 缺失.map((rawPath) => ({
+    rawPath,
     原因: '文件不存在（可能已被移动或删除）'
   }))
 
-  if (存在.length === 0) return { 成功: [], 失败 }
+  if (exists.length === 0) return { success: [], failure }
 
-  const 回应 = 是应用模式(设置.imageUploader)
-    ? await 应用模式上传(存在)
-    : await 命令行上传(设置.imageUploader, 存在)
+  const 回应 = 是应用模式(settings.imageUploader)
+    ? await 应用模式上传(exists)
+    : await 命令行上传(settings.imageUploader, exists)
 
-  if (回应.错误) {
+  if (回应.error) {
     return {
-      成功: [],
-      失败: [...失败, ...存在.map((原路径) => ({ 原路径, 原因: 回应.错误 as string }))]
+      success: [],
+      failure: [...failure, ...exists.map((rawPath) => ({ rawPath, 原因: 回应.error as string }))]
     }
   }
 
   return {
-    成功: 存在.map((原路径, 下标) => ({ 原路径, 地址: 回应.地址[下标] ?? '' })),
-    失败
+    success: exists.map((rawPath, subscript) => ({ rawPath, url: 回应.url[subscript] ?? '' })),
+    failure
   }
 }
 
 /** 当前上传器是否配置完整（供菜单置灰与提示使用）。 */
 export function 上传器可用(): { 可用: boolean; 原因: string | null } {
-  const 设置 = getSettings()
-  if (设置.imageUploader === 'none') {
+  const settings = getSettings()
+  if (settings.imageUploader === 'none') {
     return { 可用: false, 原因: '尚未选择图床上传器' }
   }
-  if (是应用模式(设置.imageUploader)) {
+  if (是应用模式(settings.imageUploader)) {
     // app 模式即使没填路径也可能成功——PicGo 可能已经在运行
     return { 可用: true, 原因: null }
   }
-  if (设置.imageUploader === 'custom' && 设置.customImageUploader.trim().length === 0) {
+  if (settings.imageUploader === 'custom' && settings.customImageUploader.trim().length === 0) {
     return { 可用: false, 原因: '尚未配置自定义上传命令' }
   }
   return { 可用: true, 原因: null }

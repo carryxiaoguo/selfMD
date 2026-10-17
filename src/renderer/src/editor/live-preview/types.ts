@@ -1,5 +1,5 @@
 import type { Decoration } from '@codemirror/view'
-import type { 语法节点 } from '../syntax-node'
+import type { SyntaxNode } from '../syntax-node'
 
 /**
  * 装饰层内部共用的数据类型。
@@ -10,7 +10,7 @@ import type { 语法节点 } from '../syntax-node'
  */
 
 /** 语法节点类型定义在 ../syntax-node.ts，这里转出，方便装饰层内部统一从本文件取。 */
-export type { 语法节点 }
+export type { SyntaxNode }
 
 export interface 装饰条目 {
   from: number
@@ -39,18 +39,18 @@ export interface 构建上下文 {
    * 抛异常，被渲染层的降级逻辑吞掉后，界面上只表现为"这个块没渲染出来"。
    */
   已换头部栏: Set<number>
-  条目: 装饰条目[]
+  entry: 装饰条目[]
 }
 
 /** 把一条行装饰加入收集器；同一位置只保留第一条。 */
 export function 加行装饰(
-  上下文: 构建上下文,
-  行首: number,
+  context: 构建上下文,
+  lineStart: number,
   装饰: Decoration
 ): void {
-  if (上下文.行装饰已用.has(行首)) return
-  上下文.行装饰已用.add(行首)
-  上下文.条目.push({ from: 行首, to: 行首, deco: 装饰, rank: -1 })
+  if (context.行装饰已用.has(lineStart)) return
+  context.行装饰已用.add(lineStart)
+  context.entry.push({ from: lineStart, to: lineStart, deco: 装饰, rank: -1 })
 }
 
 // ---------------------------------------------------------------------------
@@ -69,7 +69,7 @@ export function 加行装饰(
  */
 let 行内公式启用 = true
 
-export function 设置行内公式启用(启用: boolean): void {
+export function setInlineMathEnabled(启用: boolean): void {
   行内公式启用 = 启用
 }
 
@@ -85,7 +85,7 @@ export function 行内公式已启用(): boolean {
  */
 let 渲染标点启用 = false
 
-export function 设置渲染标点启用(启用: boolean): void {
+export function setPunctuationRenderingEnabled(启用: boolean): void {
   渲染标点启用 = 启用
 }
 

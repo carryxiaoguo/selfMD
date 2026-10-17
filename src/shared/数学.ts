@@ -25,15 +25,15 @@ export interface 数学区间 {
   /** 结束偏移（不含结尾的 `$`）。 */
   to: number
   /** `$` 之间的公式源码。 */
-  公式: string
+  formula: string
   /** 是 `$$…$$` 块级公式。 */
   块级: boolean
 }
 
 /** 判断一个位置上的 `$` 是否是转义的。 */
-function 被转义(文本: string, 位置: number): boolean {
+function 被转义(docText: string, position: number): boolean {
   let 反斜杠数 = 0
-  for (let i = 位置 - 1; i >= 0 && 文本[i] === '\\'; i--) 反斜杠数++
+  for (let i = position - 1; i >= 0 && docText[i] === '\\'; i--) 反斜杠数++
   return 反斜杠数 % 2 === 1
 }
 
@@ -45,13 +45,13 @@ function 被转义(文本: string, 位置: number): boolean {
  * 块级公式的识别很宽松：整段以 `$$` 开头、以 `$$` 结尾即可（中间可以跨行）。
  * 不做"`$$` 必须独占一行"的要求——用户在段落里直接敲 `$$x$$` 也希望它渲染。
  */
-export function 识别块级公式(文本: string): string | null {
-  const 修剪 = 文本.trim()
+export function 识别块级公式(docText: string): string | null {
+  const 修剪 = docText.trim()
   if (修剪.length < 4) return null
   if (!修剪.startsWith('$$') || !修剪.endsWith('$$')) return null
   // 首尾各去掉两个 `$`
-  const 公式 = 修剪.slice(2, -2).trim()
-  return 公式.length > 0 ? 公式 : null
+  const formula = 修剪.slice(2, -2).trim()
+  return formula.length > 0 ? formula : null
 }
 
 /**
@@ -61,59 +61,59 @@ export function 识别块级公式(文本: string): string | null {
  * @param 基准 文本在文档中的起始偏移（返回的区间是文档坐标）
  * @param 启用 设置里是否开启了行内公式；关闭时直接返回空数组
  */
-export function 扫描行内公式(文本: string, 基准: number, 启用 = true): 数学区间[] {
+export function 扫描行内公式(docText: string, 基准: number, 启用 = true): 数学区间[] {
   if (!启用) return []
-  const 结果: 数学区间[] = []
+  const result: 数学区间[] = []
 
   let i = 0
-  while (i < 文本.length) {
-    const 位置 = 文本.indexOf('$', i)
-    if (位置 < 0) break
+  while (i < docText.length) {
+    const position = docText.indexOf('$', i)
+    if (position < 0) break
 
     // 跳过 `$$`：那是块级公式的开头，交给 识别块级公式 处理
-    if (文本[位置 + 1] === '$') {
-      i = 位置 + 2
+    if (docText[position + 1] === '$') {
+      i = position + 2
       continue
     }
     // 转义的 `\$` 不是公式
-    if (被转义(文本, 位置)) {
-      i = 位置 + 1
+    if (被转义(docText, position)) {
+      i = position + 1
       continue
     }
 
-    const 公式起 = 位置 + 1
+    const 公式起 = position + 1
     // 规则 1：开头 `$` 后面不能紧跟空白
-    if (公式起 >= 文本.length || /\s/.test(文本[公式起])) {
-      i = 位置 + 1
+    if (公式起 >= docText.length || /\s/.test(docText[公式起])) {
+      i = position + 1
       continue
     }
 
     // 找配对的收尾 `$`
     let 结束 = -1
-    for (let j = 公式起; j < 文本.length; j++) {
-      if (文本[j] !== '$') continue
-      if (被转义(文本, j)) continue
+    for (let j = 公式起; j < docText.length; j++) {
+      if (docText[j] !== '$') continue
+      if (被转义(docText, j)) continue
       // 规则 2：结尾 `$` 前面不能是空白
-      if (/\s/.test(文本[j - 1] ?? '')) continue
+      if (/\s/.test(docText[j - 1] ?? '')) continue
       结束 = j
       break
     }
 
     if (结束 < 0) {
-      i = 位置 + 1
+      i = position + 1
       continue
     }
 
-    const 公式 = 文本.slice(公式起, 结束)
+    const formula = docText.slice(公式起, 结束)
     // 规则 3：内容不能为空
-    if (公式.length === 0) {
-      i = 位置 + 1
+    if (formula.length === 0) {
+      i = position + 1
       continue
     }
 
-    结果.push({ from: 基准 + 位置, to: 基准 + 结束, 公式, 块级: false })
+    result.push({ from: 基准 + position, to: 基准 + 结束, formula, 块级: false })
     i = 结束 + 1
   }
 
-  return 结果
+  return result
 }

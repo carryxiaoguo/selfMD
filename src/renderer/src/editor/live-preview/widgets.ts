@@ -26,18 +26,18 @@ import {
 // ---------------------------------------------------------------------------
 
 export class 语言标签 extends WidgetType {
-  constructor(readonly 语言: string) {
+  constructor(readonly language: string) {
     super()
   }
 
   override eq(other: 语言标签): boolean {
-    return other.语言 === this.语言
+    return other.language === this.language
   }
 
   override toDOM(): HTMLElement {
     const el = document.createElement('span')
     el.className = 'cm-w-lang'
-    el.textContent = this.语言
+    el.textContent = this.language
     el.setAttribute('aria-hidden', 'true')
     return el
   }
@@ -60,21 +60,21 @@ export class 语言标签 extends WidgetType {
  * `languages` 有上百项，原生 `<select>` 能靠首字母跳转应付长列表，
  * 所以不做裁剪——裁掉的那几个恰好是用户想用的，比列表长更让人恼火。
  */
-const 语言选项: { 值: string; 名: string }[] = (() => {
-  const 表: { 值: string; 名: string }[] = []
-  for (const 项 of languages) {
-    const 值 = 项.alias[0] ?? 项.name.toLowerCase()
-    表.push({ 值, 名: 项.name })
+const 语言选项: { value: string; name: string }[] = (() => {
+  const tbl: { value: string; name: string }[] = []
+  for (const item of languages) {
+    const value = item.alias[0] ?? item.name.toLowerCase()
+    tbl.push({ value, name: item.name })
   }
   // 按显示名排序；中文用户找语言主要靠认名字，字母序比包内顺序好找
-  return 表.sort((甲, 乙) => 甲.名.localeCompare(乙.名))
+  return tbl.sort((alpha, beta) => alpha.name.localeCompare(beta.name))
 })()
 
 /** 围栏在文档中的位置。头部栏的所有动作都要靠它换算回文档坐标。 */
 export interface 代码块位置 {
-  围栏起: number
-  围栏终: number
-  首行起: number
+  fenceStart: number
+  fenceEnd: number
+  firstLineStart: number
 }
 
 /**
@@ -94,28 +94,28 @@ export interface 代码块位置 {
  */
 export class 代码块头部 extends WidgetType {
   constructor(
-    readonly 信息: 围栏信息,
-    readonly 位置: 代码块位置
+    readonly info: 围栏信息,
+    readonly position: 代码块位置
   ) {
     super()
   }
 
   override eq(other: 代码块头部): boolean {
     return (
-      other.信息.语言 === this.信息.语言 &&
-      other.信息.名称 === this.信息.名称 &&
-      other.信息.样式 === this.信息.样式 &&
-      other.信息.字体 === this.信息.字体 &&
-      other.位置.首行起 === this.位置.首行起
+      other.info.language === this.info.language &&
+      other.info.displayName === this.info.displayName &&
+      other.info.style === this.info.style &&
+      other.info.font === this.info.font &&
+      other.position.firstLineStart === this.position.firstLineStart
     )
   }
 
   override toDOM(view: EditorView): HTMLElement {
-    const 盒 = document.createElement('div')
-    盒.className = 'cm-w-codehead'
+    const box = document.createElement('div')
+    box.className = 'cm-w-codehead'
     // 头部栏是控件而不是文本，屏幕阅读器不该把它读成正文
-    盒.setAttribute('role', 'group')
-    盒.setAttribute('aria-label', '代码块设置')
+    box.setAttribute('role', 'group')
+    box.setAttribute('aria-label', '代码块设置')
 
     // --- 折叠 -----------------------------------------------------------
     const 折叠 = document.createElement('button')
@@ -124,85 +124,85 @@ export class 代码块头部 extends WidgetType {
     折叠.textContent = '▾'
     折叠.title = '折叠代码块'
     折叠.setAttribute('aria-label', '折叠代码块')
-    折叠.addEventListener('click', (事件) => {
-      事件.preventDefault()
+    折叠.addEventListener('click', (event) => {
+      event.preventDefault()
       // 先把光标放到围栏首行，折叠才会作用在这个块上——
       // 否则折的是光标当前所在的那个块，用户会觉得"点错了"。
-      view.dispatch({ selection: { anchor: this.位置.首行起 } })
+      view.dispatch({ selection: { anchor: this.position.firstLineStart } })
       foldCode(view)
     })
 
     // --- 名称 -----------------------------------------------------------
-    const 名称 = document.createElement('input')
-    名称.type = 'text'
-    名称.className = 'cm-w-codehead-name'
-    名称.placeholder = '请输入代码块名称'
-    名称.value = this.信息.名称
-    名称.setAttribute('aria-label', '代码块名称')
+    const displayName = document.createElement('input')
+    displayName.type = 'text'
+    displayName.className = 'cm-w-codehead-name'
+    displayName.placeholder = '请输入代码块名称'
+    displayName.value = this.info.displayName
+    displayName.setAttribute('aria-label', '代码块名称')
     // 用 `change` 而不是每次按键都写回：逐字同步会让撤销栈里塞满
     // 半截名称，Ctrl+Z 得按十几次才能退回去。
-    名称.addEventListener('change', () => {
-      this.改信息(view, { 名称: 名称.value.trim() })
+    displayName.addEventListener('change', () => {
+      this.改信息(view, { displayName: displayName.value.trim() })
     })
-    名称.addEventListener('keydown', (事件) => {
-      if (事件.key === 'Enter') {
-        事件.preventDefault()
-        名称.blur()
+    displayName.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        event.preventDefault()
+        displayName.blur()
       }
     })
 
     // --- 语言 -----------------------------------------------------------
-    const 语言 = this.选单('cm-w-codehead-lang', '代码块语言')
-    for (const 项 of 语言选项) 语言.append(new Option(项.名, 项.值))
+    const language = this.选单('cm-w-codehead-lang', '代码块语言')
+    for (const item of 语言选项) language.append(new Option(item.name, item.value))
     // 当前语言不在表里（用户手写了冷门别名）时补一项，
     // 否则下拉会显示成第一项，用户以为语言被改掉了
-    if (this.信息.语言 && !语言选项.some((项) => 项.值 === this.信息.语言)) {
-      语言.prepend(new Option(this.信息.语言, this.信息.语言, true, true))
+    if (this.info.language && !语言选项.some((item) => item.value === this.info.language)) {
+      language.prepend(new Option(this.info.language, this.info.language, true, true))
     }
     // 空值表示"没有语言"，退化成纯文本块
-    语言.prepend(new Option('纯文本', '', this.信息.语言 === '', this.信息.语言 === ''))
-    语言.value = this.信息.语言
-    语言.addEventListener('change', () => {
-      this.改信息(view, { 语言: 语言.value })
+    language.prepend(new Option('纯文本', '', this.info.language === '', this.info.language === ''))
+    language.value = this.info.language
+    language.addEventListener('change', () => {
+      this.改信息(view, { language: language.value })
     })
 
     // --- 字体 -----------------------------------------------------------
-    const 字体 = this.选单('cm-w-codehead-font', '代码字体')
-    for (const 项 of 内置字体) 字体.append(new Option(项.名, 项.值))
-    字体.value = this.信息.字体
-    字体.addEventListener('change', () => {
-      this.改信息(view, { 字体: 字体.value })
+    const font = this.选单('cm-w-codehead-font', '代码字体')
+    for (const item of 内置字体) font.append(new Option(item.name, item.value))
+    font.value = this.info.font
+    font.addEventListener('change', () => {
+      this.改信息(view, { font: font.value })
     })
 
     // --- 配色 -----------------------------------------------------------
-    const 样式 = this.选单('cm-w-codehead-style', '代码块配色')
-    for (const 名 of 样式顺序) 样式.append(new Option(样式显示名[名], 名))
-    样式.value = this.信息.样式
-    样式.addEventListener('change', () => {
-      this.改信息(view, { 样式: 样式.value as 围栏信息['样式'] })
+    const style = this.选单('cm-w-codehead-style', '代码块配色')
+    for (const name of 样式顺序) style.append(new Option(样式显示名[name], name))
+    style.value = this.info.style
+    style.addEventListener('change', () => {
+      this.改信息(view, { style: style.value as 围栏信息['style'] })
     })
 
     // --- 复制 -----------------------------------------------------------
-    const 复制 = document.createElement('button')
-    复制.type = 'button'
-    复制.className = 'cm-w-codehead-btn cm-w-codehead-copy'
-    复制.textContent = '复制'
-    复制.title = '复制代码'
-    复制.addEventListener('click', () => {
+    const copy = document.createElement('button')
+    copy.type = 'button'
+    copy.className = 'cm-w-codehead-btn cm-w-codehead-copy'
+    copy.textContent = '复制'
+    copy.title = '复制代码'
+    copy.addEventListener('click', () => {
       void navigator.clipboard.writeText(this.取代码(view)).then(
-        () => 提示(复制, '已复制'),
-        () => 提示(复制, '复制失败')
+        () => hint(copy, '已复制'),
+        () => hint(copy, '复制失败')
       )
     })
 
-    盒.append(折叠, 名称, 语言, 字体, 样式, 复制)
-    return 盒
+    box.append(折叠, displayName, language, font, style, copy)
+    return box
   }
 
   /** 造一个下拉；三个下拉的公共部分收在这里，免得样式类名写漏。 */
-  private 选单(类名: string, 无障碍名: string): HTMLSelectElement {
+  private 选单(className: string, 无障碍名: string): HTMLSelectElement {
     const el = document.createElement('select')
-    el.className = `cm-w-codehead-select ${类名}`
+    el.className = `cm-w-codehead-select ${className}`
     el.setAttribute('aria-label', 无障碍名)
     return el
   }
@@ -214,12 +214,12 @@ export class 代码块头部 extends WidgetType {
    * 内容多半已经和 widget 构造时不一样了。
    */
   private 取代码(view: EditorView): string {
-    const 状态 = view.state
-    const 起 = Math.min(this.位置.围栏起, 状态.doc.length)
-    const 终 = Math.min(this.位置.围栏终, 状态.doc.length)
-    const 原文 = 状态.sliceDoc(起, 终)
+    const state = view.state
+    const start = Math.min(this.position.fenceStart, state.doc.length)
+    const end = Math.min(this.position.fenceEnd, state.doc.length)
+    const originalText = state.sliceDoc(start, end)
     // 去掉首行的围栏、末行的围栏，只留中间正文
-    return 原文
+    return originalText
       .split('\n')
       .slice(1, -1)
       .join('\n')
@@ -227,22 +227,22 @@ export class 代码块头部 extends WidgetType {
 
   /** 把改动写回围栏首行的信息串。 */
   private 改信息(view: EditorView, 部分: Partial<围栏信息>): void {
-    const 状态 = view.state
-    const 行 = 状态.doc.lineAt(Math.min(this.位置.首行起, 状态.doc.length))
-    const 行文本 = 状态.sliceDoc(行.from, 行.to)
-    const 区间 = 信息串区间(行文本)
-    if (!区间) return
+    const state = view.state
+    const line = state.doc.lineAt(Math.min(this.position.firstLineStart, state.doc.length))
+    const lineText = state.sliceDoc(line.from, line.to)
+    const range = 信息串区间(lineText)
+    if (!range) return
 
     // **必须用 `解析围栏首行`，不能对整行调 `解析围栏信息`。**
     // 后者会把反引号当成语言的一部分，构建时再写回去——每改一次多三个
     // 反引号，攒到十几个才看得出来。
-    const 新信息 = { ...解析围栏首行(行文本), ...部分 }
-    const 新文 = 构建围栏信息(新信息)
-    if (新文 === 行文本.slice(区间.起, 区间.终)) return
+    const nextInfo = { ...解析围栏首行(lineText), ...部分 }
+    const nextText = 构建围栏信息(nextInfo)
+    if (nextText === lineText.slice(range.start, range.end)) return
 
     view.dispatch({
       // 只替换反引号之后的部分：反引号是围栏的语法标记，动它等于换语法
-      changes: { from: 行.from + 区间.起, to: 行.from + 区间.终, insert: 新文 },
+      changes: { from: line.from + range.start, to: line.from + range.end, insert: nextText },
       userEvent: 'input.codeBlockInfo'
     })
   }
@@ -254,13 +254,13 @@ export class 代码块头部 extends WidgetType {
 }
 
 /** 按钮上短暂换一下文字，给点击一个可见的反馈。 */
-function 提示(按钮: HTMLButtonElement, 文字: string): void {
-  const 原文 = 按钮.textContent
-  按钮.textContent = 文字
-  按钮.classList.add('cm-w-codehead-done')
+function hint(button: HTMLButtonElement, text: string): void {
+  const originalText = button.textContent
+  button.textContent = text
+  button.classList.add('cm-w-codehead-done')
   window.setTimeout(() => {
-    按钮.textContent = 原文
-    按钮.classList.remove('cm-w-codehead-done')
+    button.textContent = originalText
+    button.classList.remove('cm-w-codehead-done')
   }, 1200)
 }
 
@@ -297,18 +297,18 @@ export class 提示标签 extends WidgetType {
 const 项目符号 = ['•', '◦', '▪']
 
 export class 列表圆点 extends WidgetType {
-  constructor(readonly 层级: number) {
+  constructor(readonly layer: number) {
     super()
   }
 
   override eq(other: 列表圆点): boolean {
-    return other.层级 === this.层级
+    return other.layer === this.layer
   }
 
   override toDOM(): HTMLElement {
     const el = document.createElement('span')
     el.className = 'cm-w-bullet'
-    el.textContent = 项目符号[this.层级 % 项目符号.length]
+    el.textContent = 项目符号[this.layer % 项目符号.length]
     el.setAttribute('aria-hidden', 'true')
     return el
   }
@@ -329,18 +329,18 @@ export class 列表圆点 extends WidgetType {
  * 上层注册。这样 widget 保持"只负责画"的单一职责，测试时也能不接菜单单独渲染。
  */
 export type 图片右键处理器 = (
-  事件: MouseEvent,
+  event: MouseEvent,
   /** 文档里写的原始地址（相对路径形态，未解析）。 */
   原地址: string,
   替代文字: string,
   /** widget 的根元素；上层用它反查文档位置。 */
-  元素: HTMLElement
+  el: HTMLElement
 ) => void
 
 let 图片右键: 图片右键处理器 | null = null
 
-export function 设置图片右键处理器(处理器: 图片右键处理器 | null): void {
-  图片右键 = 处理器
+export function 设置图片右键处理器(handler: 图片右键处理器 | null): void {
+  图片右键 = handler
 }
 
 /**
@@ -354,68 +354,68 @@ export function 设置图片右键处理器(处理器: 图片右键处理器 | n
  * 破图图标会让人以为是图片文件坏了，而实际原因常常是"文档还没保存，
  * 相对路径没有基准目录"。
  */
-export class 图片 extends WidgetType {
+export class image extends WidgetType {
   constructor(
     /** 解析后的可加载 URL；空串表示解析失败。 */
-    readonly 地址: string,
+    readonly url: string,
     /** 文档里写的原始地址，右键菜单与上传回填要用。 */
     readonly 原地址: string,
     readonly 替代文字: string,
     /** 本地文件在磁盘上的绝对路径；远程图片为 null。 */
-    readonly 本地路径: string | null
+    readonly localPath: string | null
   ) {
     super()
   }
 
-  override eq(other: 图片): boolean {
+  override eq(other: image): boolean {
     return (
-      other.地址 === this.地址 &&
+      other.url === this.url &&
       other.原地址 === this.原地址 &&
       other.替代文字 === this.替代文字
     )
   }
 
   override toDOM(): HTMLElement {
-    const 盒 = document.createElement('span')
+    const box = document.createElement('span')
     // `md-image` 是通用的类名，挂上它主题规则才有机会生效
-    盒.className = 'cm-w-image md-image'
-    盒.setAttribute('data-src', this.原地址)
+    box.className = 'cm-w-image md-image'
+    box.setAttribute('data-src', this.原地址)
 
-    if (!this.地址) {
-      盒.classList.add('md-img-error')
-      盒.textContent = `⚠ 无法显示图片${this.替代文字 ? `：${this.替代文字}` : `：${this.原地址}`}`
-      盒.title =
+    if (!this.url) {
+      box.classList.add('md-img-error')
+      box.textContent = `⚠ 无法显示图片${this.替代文字 ? `：${this.替代文字}` : `：${this.原地址}`}`
+      box.title =
         '无法解析图片地址。若用的是相对路径，请先保存文档——' +
         '相对路径需要一个基准目录。'
-      this.挂右键(盒)
-      return 盒
+      this.挂右键(box)
+      return box
     }
 
-    const 图 = document.createElement('img')
-    图.src = this.地址
-    图.alt = this.替代文字
-    图.draggable = false
+    const img = document.createElement('img')
+    img.src = this.url
+    img.alt = this.替代文字
+    img.draggable = false
     // 延迟加载：长文档里几十张图同时解码会让滚动卡顿
-    图.loading = 'lazy'
+    img.loading = 'lazy'
 
     // 文件被删、被改名、路径写错都会走到这里。把盒子换成占位，
     // 并保留原地址供排查——只留一个破图图标等于什么都没说。
-    图.addEventListener('error', () => {
-      盒.classList.add('md-img-error')
-      盒.textContent = `⚠ 图片加载失败：${this.替代文字 || this.原地址}`
-      盒.title = `找不到文件：${this.本地路径 ?? this.原地址}`
+    img.addEventListener('error', () => {
+      box.classList.add('md-img-error')
+      box.textContent = `⚠ 图片加载失败：${this.替代文字 || this.原地址}`
+      box.title = `找不到文件：${this.localPath ?? this.原地址}`
     })
 
-    盒.append(图)
-    this.挂右键(盒)
-    return 盒
+    box.append(img)
+    this.挂右键(box)
+    return box
   }
 
-  private 挂右键(盒: HTMLElement): void {
-    盒.addEventListener('contextmenu', (事件) => {
-      事件.preventDefault()
-      事件.stopPropagation()
-      图片右键?.(事件, this.原地址, this.替代文字, 盒)
+  private 挂右键(box: HTMLElement): void {
+    box.addEventListener('contextmenu', (event) => {
+      event.preventDefault()
+      event.stopPropagation()
+      图片右键?.(event, this.原地址, this.替代文字, box)
     })
   }
 
@@ -430,13 +430,13 @@ export class 任务框 extends WidgetType {
   constructor(
     readonly 已勾选: boolean,
     /** 标记 `[ ]` 在文档中的起始位置，用于回写。 */
-    readonly 位置: number
+    readonly position: number
   ) {
     super()
   }
 
   override eq(other: 任务框): boolean {
-    return other.已勾选 === this.已勾选 && other.位置 === this.位置
+    return other.已勾选 === this.已勾选 && other.position === this.position
   }
 
   override toDOM(view: EditorView): HTMLElement {
@@ -449,7 +449,7 @@ export class 任务框 extends WidgetType {
     el.addEventListener('mousedown', (event) => {
       // 阻止默认行为，否则点击会把光标移进被替换的标记区间。
       event.preventDefault()
-      this.切换(view)
+      this.toggle(view)
     })
 
     return el
@@ -461,21 +461,21 @@ export class 任务框 extends WidgetType {
    * 只改动方括号内的那一个字符，其余字节原样保留——包括用户可能写的
    * `[X]`（大写）与任务文字前后的空白。
    */
-  private 切换(view: EditorView): void {
-    const 状态 = view.state
-    const 起 = this.位置
+  private toggle(view: EditorView): void {
+    const state = view.state
+    const start = this.position
     // 标记形如 `[ ]`、`[x]`、`[X]`，长度固定为 3。
-    const 终 = Math.min(起 + 3, 状态.doc.length)
-    if (终 - 起 !== 3) return
+    const end = Math.min(start + 3, state.doc.length)
+    if (end - start !== 3) return
 
-    const 原文 = 状态.sliceDoc(起, 终)
-    if (!/^\[[ xX]\]$/.test(原文)) return
+    const originalText = state.sliceDoc(start, end)
+    if (!/^\[[ xX]\]$/.test(originalText)) return
 
-    const 新文 = this.已勾选 ? '[ ]' : '[x]'
+    const nextText = this.已勾选 ? '[ ]' : '[x]'
     view.dispatch({
-      changes: { from: 起, to: 终, insert: 新文 },
+      changes: { from: start, to: end, insert: nextText },
       // 保持光标不动：勾选复选框不应该抢走输入焦点。
-      selection: EditorSelection.cursor(状态.selection.main.head),
+      selection: EditorSelection.cursor(state.selection.main.head),
       userEvent: 'input.toggleTask'
     })
   }
@@ -511,18 +511,18 @@ export class 水平线 extends WidgetType {
 // ---------------------------------------------------------------------------
 
 export class 表格分隔 extends WidgetType {
-  constructor(readonly 字符: string) {
+  constructor(readonly ch: string) {
     super()
   }
 
   override eq(other: 表格分隔): boolean {
-    return other.字符 === this.字符
+    return other.ch === this.ch
   }
 
   override toDOM(): HTMLElement {
     const el = document.createElement('span')
     el.className = 'cm-w-pipe'
-    el.textContent = this.字符
+    el.textContent = this.ch
     el.setAttribute('aria-hidden', 'true')
     return el
   }
@@ -556,20 +556,20 @@ let 已初始化 = false
 let 已初始化主题 = ''
 
 /** 初始化 Mermaid，并在主题变化时重新初始化。 */
-async function 确保初始化(主题: 'default' | 'dark'): Promise<typeof import('mermaid').default> {
+async function 确保初始化(theme: 'default' | 'dark'): Promise<typeof import('mermaid').default> {
   const mermaid = await 取Mermaid()
   // 主题变了必须重新 initialize，否则旧主题的配色会一直用下去
-  if (!已初始化 || 已初始化主题 !== 主题) {
+  if (!已初始化 || 已初始化主题 !== theme) {
     mermaid.initialize({
       // 不自动扫描页面：我们自己控制什么时候渲染哪一个
       startOnLoad: false,
-      theme: 主题,
+      theme: theme,
       // 语法错误交给调用方处理，由它决定显示什么
       securityLevel: 'strict',
       fontFamily: 'inherit'
     })
     已初始化 = true
-    已初始化主题 = 主题
+    已初始化主题 = theme
   }
   return mermaid
 }
@@ -589,7 +589,7 @@ export class 图表 extends WidgetType {
     readonly 源码: string,
     readonly 暗色: boolean,
     /** 渲染成功后回调，让上层扣掉"正在渲染"的状态。 */
-    readonly 完成?: () => void
+    readonly done?: () => void
   ) {
     super()
   }
@@ -599,21 +599,21 @@ export class 图表 extends WidgetType {
   }
 
   override toDOM(): HTMLElement {
-    const 盒 = document.createElement('div')
+    const box = document.createElement('div')
     // `.md-diagram-panel` 是通用的类名
-    盒.className = 'cm-w-diagram md-diagram-panel'
-    盒.setAttribute('data-diagram', this.源码)
+    box.className = 'cm-w-diagram md-diagram-panel'
+    box.setAttribute('data-diagram', this.源码)
     // 显式标记渲染状态。
     //
     // 不靠"文字里有没有『正在渲染』"来判断——那种判断既脆弱（改一个字就失效）
     // 又不可靠（错误信息里也可能出现同样的词）。属性是明确的契约，
     // 等待逻辑、统计与将来的调试工具都读它。
-    盒.dataset.状态 = '渲染中'
+    box.dataset.state = '渲染中'
 
-    const 状态 = document.createElement('div')
-    状态.className = 'cm-w-diagram-status'
-    状态.textContent = '正在渲染图表…'
-    盒.append(状态)
+    const state = document.createElement('div')
+    state.className = 'cm-w-diagram-status'
+    state.textContent = '正在渲染图表…'
+    box.append(state)
 
     void (async () => {
       try {
@@ -623,32 +623,32 @@ export class 图表 extends WidgetType {
         const id = `selfmd-图表-${Math.random().toString(36).slice(2, 10)}`
         const { svg } = await mermaid.render(id, this.源码)
 
-        盒.textContent = ''
-        盒.innerHTML = svg
-        盒.dataset.状态 = '完成'
-      } catch (错误) {
+        box.textContent = ''
+        box.innerHTML = svg
+        box.dataset.state = '完成'
+      } catch (error) {
         // 失败时**同时**给出错误与源码：只看错误信息找不出问题在哪
-        盒.classList.add('md-diagram-error')
-        盒.textContent = ''
+        box.classList.add('md-diagram-error')
+        box.textContent = ''
 
-        const 提示 = document.createElement('div')
-        提示.className = 'cm-w-diagram-status'
-        提示.textContent = `图表渲染失败：${
-          错误 instanceof Error ? 错误.message.split('\n')[0] : String(错误)
+        const hint = document.createElement('div')
+        hint.className = 'cm-w-diagram-status'
+        hint.textContent = `图表渲染失败：${
+          error instanceof Error ? error.message.split('\n')[0] : String(error)
         }`
 
         const 源码块 = document.createElement('pre')
         源码块.className = 'cm-w-diagram-source'
         源码块.textContent = this.源码
 
-        盒.append(提示, 源码块)
-        盒.dataset.状态 = '失败'
+        box.append(hint, 源码块)
+        box.dataset.state = '失败'
       } finally {
-        this.完成?.()
+        this.done?.()
       }
     })()
 
-    return 盒
+    return box
   }
 
   /** 图表里的文字应当可以被选中复制，所以不拦截事件。 */
@@ -658,13 +658,13 @@ export class 图表 extends WidgetType {
 }
 
 /** 当前行的缩进层级，用于选择列表符号。制表符按 4 个空格计。 */
-export function 计算层级(状态: EditorState, 行首: number): number {
-  const 行 = 状态.doc.lineAt(行首)
-  const 文本 = 状态.sliceDoc(行.from, 行.to)
-  const 缩进 = /^[\t ]*/.exec(文本)?.[0] ?? ''
-  let 宽度 = 0
-  for (const 字符 of 缩进) 宽度 += 字符 === '\t' ? 4 : 1
-  return Math.floor(宽度 / 2)
+export function 计算层级(state: EditorState, lineStart: number): number {
+  const line = state.doc.lineAt(lineStart)
+  const docText = state.sliceDoc(line.from, line.to)
+  const indent = /^[\t ]*/.exec(docText)?.[0] ?? ''
+  let widthPx = 0
+  for (const ch of indent) widthPx += ch === '\t' ? 4 : 1
+  return Math.floor(widthPx / 2)
 }
 
 // ---------------------------------------------------------------------------
@@ -696,30 +696,30 @@ async function 取KaTeX(): Promise<{ render: typeof import('katex').default.rend
  */
 export class 数学公式 extends WidgetType {
   constructor(
-    readonly 公式: string,
+    readonly formula: string,
     readonly 块级: boolean
   ) {
     super()
   }
 
   override eq(other: 数学公式): boolean {
-    return other.公式 === this.公式 && other.块级 === this.块级
+    return other.formula === this.formula && other.块级 === this.块级
   }
 
   override toDOM(): HTMLElement {
-    const 盒 = document.createElement(this.块级 ? 'div' : 'span')
-    盒.className = this.块级
+    const box = document.createElement(this.块级 ? 'div' : 'span')
+    box.className = this.块级
       ? 'cm-w-math cm-w-math-block md-math-block'
       : 'cm-w-math cm-w-math-inline md-inline-math'
-    盒.setAttribute('data-math', this.公式)
+    box.setAttribute('data-math', this.formula)
     // 先把源码放进去，KaTeX 加载完再替换。
     // 这样公式区域从一开始就有内容，不会先空一块再突然出现。
-    盒.textContent = this.公式
+    box.textContent = this.formula
 
     void (async () => {
       try {
         const katex = await 取KaTeX()
-        katex.render(this.公式, 盒, {
+        katex.render(this.formula, box, {
           displayMode: this.块级,
           throwOnError: false,
           // 出错时的颜色；正常渲染的颜色由 CSS 接管
@@ -731,7 +731,7 @@ export class 数学公式 extends WidgetType {
       }
     })()
 
-    return 盒
+    return box
   }
 
   override ignoreEvent(): boolean {

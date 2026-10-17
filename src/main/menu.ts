@@ -138,7 +138,7 @@ export function 设置Pandoc可用(可用: boolean): void {
  * 看到它灰着并附一句说明，才知道"装了 Pandoc 就能用"。
  */
 function 导出子菜单(): MenuItemConstructorOptions[] {
-  const 项 = (id: string, 可用 = true): MenuItemConstructorOptions => {
+  const item = (id: string, 可用 = true): MenuItemConstructorOptions => {
     const 定义 = pick('File', id)
     return {
       // 带上命令 id，菜单摘要才能从注册表读出真实实现状态
@@ -150,27 +150,27 @@ function 导出子菜单(): MenuItemConstructorOptions[] {
     }
   }
 
-  const 结果: MenuItemConstructorOptions[] = [
-    项('file.exportHtml'),
-    项('file.exportPdf'),
+  const result: MenuItemConstructorOptions[] = [
+    item('file.exportHtml'),
+    item('file.exportPdf'),
     { type: 'separator' },
-    项('file.exportDocx', 有Pandoc),
-    项('file.exportLatex', 有Pandoc),
-    项('file.exportEpub', 有Pandoc),
-    项('file.exportRtf', 有Pandoc),
-    项('file.exportOdt', 有Pandoc),
+    item('file.exportDocx', 有Pandoc),
+    item('file.exportLatex', 有Pandoc),
+    item('file.exportEpub', 有Pandoc),
+    item('file.exportRtf', 有Pandoc),
+    item('file.exportOdt', 有Pandoc),
     { type: 'separator' },
-    项('file.exportHtmlPlain'),
+    item('file.exportHtmlPlain'),
     // 导出设置放在最后：它是"调整"而不是"执行"，
     // 混在格式列表中间会让人以为点了就开始导出。
-    项('file.exportSetting')
+    item('file.exportSetting')
   ]
 
   if (!有Pandoc) {
-    结果.push({ type: 'separator' }, { label: '安装 Pandoc 后可用 Word 等格式', enabled: false })
+    result.push({ type: 'separator' }, { label: '安装 Pandoc 后可用 Word 等格式', enabled: false })
   }
 
-  return 结果
+  return result
 }
 
 function fileMenu(): MenuItemConstructorOptions {
@@ -273,11 +273,11 @@ function smartPunctuationSubmenu(): MenuItemConstructorOptions[] {
   // 可以同时开两个，而实际只有后设的那个生效。
   const 模式项 = (
     id: string,
-    值: 'input' | 'rendering' | 'none'
+    value: 'input' | 'rendering' | 'none'
   ): MenuItemConstructorOptions => ({
     label: pick('Edit', id).label,
     type: 'radio',
-    checked: s.smartPunctuationMode === 值,
+    checked: s.smartPunctuationMode === value,
     click: () => send(id)
   })
 
@@ -529,13 +529,13 @@ function helpMenu(): MenuItemConstructorOptions {
           const win = BrowserWindow.getFocusedWindow()
           if (!win) return
           const { total, done } = roadmap()
-          const 图标 = 图标路径('icon-128.png')
+          const icon = 图标路径('icon-128.png')
           void dialog.showMessageBox(win, {
             type: 'info',
             title: '关于 selfMD',
             message: 'selfMD',
             // 有图标就带上；缺失时退回系统默认图标，不影响对话框本身。
-            ...(图标 ? { icon: 图标 } : {}),
+            ...(icon ? { icon: icon } : {}),
             detail:
               `版本 ${app.getVersion()}\n` +
               `Electron ${process.versions.electron} · Chromium ${process.versions.chrome} · Node ${process.versions.node}\n\n` +
@@ -573,9 +573,9 @@ export function rebuildMenu(): void {
  * 生效不再依赖肉眼。
  */
 export function 菜单摘要(): string[] {
-  const 行: string[] = []
-  const 菜单 = Menu.getApplicationMenu()
-  if (!菜单) return ['（未设置应用菜单）']
+  const line: string[] = []
+  const menu = Menu.getApplicationMenu()
+  if (!menu) return ['（未设置应用菜单）']
 
   /**
    * 递归展开子菜单：嵌套项（例如"智能标点"里的四个开关）同样要接受中文化检查。
@@ -588,30 +588,30 @@ export function 菜单摘要(): string[] {
    * 一开始两者都写成"未实现"，于是"装了 Pandoc 就能用"的功能在验证日志里
    * 显示成没做——断言会因此失去意义。实现状态一律从注册表读，不看 enabled。
    */
-  const 展开 = (项: Electron.MenuItem, 层: number): void => {
-    const 标签 = 项.label || 项.role || '(无标题)'
-    const 键 = 项.accelerator ? `  [${项.accelerator}]` : ''
-    const 是命令 = Boolean(项.id)
+  const 展开 = (item: Electron.MenuItem, 层: number): void => {
+    const label = item.label || item.role || '(无标题)'
+    const key = item.accelerator ? `  [${item.accelerator}]` : ''
+    const 是命令 = Boolean(item.id)
     let 态 = ''
     if (是命令) {
-      if (!isImplemented(项.id)) 态 = '  ← 未实现'
-      else if (!项.enabled) 态 = '  ← 暂不可用'
+      if (!isImplemented(item.id)) 态 = '  ← 未实现'
+      else if (!item.enabled) 态 = '  ← 暂不可用'
     }
-    行.push(`${' '.repeat(6 + (层 - 1) * 4)}${标签}${键}${态}`)
-    if (项.submenu) {
-      for (const 子 of 项.submenu.items) {
-        if (子.type !== 'separator') 展开(子, 层 + 1)
+    line.push(`${' '.repeat(6 + (层 - 1) * 4)}${label}${key}${态}`)
+    if (item.submenu) {
+      for (const child of item.submenu.items) {
+        if (child.type !== 'separator') 展开(child, 层 + 1)
       }
     }
   }
 
-  for (const 顶层 of 菜单.items) {
+  for (const 顶层 of menu.items) {
     const 子项 = 顶层.submenu?.items ?? []
     const 非分隔 = 子项.filter((i) => i.type !== 'separator')
     const 已启用 = 非分隔.filter((i) => i.enabled).length
-    行.push(`${顶层.label || 顶层.role || '(无标题)'}（${已启用}/${非分隔.length} 可用）`)
+    line.push(`${顶层.label || 顶层.role || '(无标题)'}（${已启用}/${非分隔.length} 可用）`)
 
-    for (const 子 of 非分隔) 展开(子, 1)
+    for (const child of 非分隔) 展开(child, 1)
   }
-  return 行
+  return line
 }

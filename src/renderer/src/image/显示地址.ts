@@ -21,8 +21,8 @@ import { localFileUrl } from '@shared/url'
 let 当前文档目录: string | null = null
 
 /** 文档切换时调用。传 null 表示文档尚未保存。 */
-export function 设置文档目录(目录: string | null): void {
-  当前文档目录 = 目录
+export function 设置文档目录(dir: string | null): void {
+  当前文档目录 = dir
 }
 
 export function 取文档目录(): string | null {
@@ -30,23 +30,23 @@ export function 取文档目录(): string | null {
 }
 
 /** 是否是无需解析的外部地址。 */
-function 是外部地址(地址: string): boolean {
-  return /^(https?:|data:|blob:|selfmd:)/i.test(地址)
+function 是外部地址(url: string): boolean {
+  return /^(https?:|data:|blob:|selfmd:)/i.test(url)
 }
 
 /** 是否是绝对路径。Windows 盘符与 POSIX 根路径都算。 */
-function 是绝对路径(地址: string): boolean {
-  return /^[a-zA-Z]:[\\/]/.test(地址) || 地址.startsWith('/') || 地址.startsWith('\\\\')
+function 是绝对路径(url: string): boolean {
+  return /^[a-zA-Z]:[\\/]/.test(url) || url.startsWith('/') || url.startsWith('\\\\')
 }
 
 /** 把反斜杠统一成正斜杠，便于拼接与比较。 */
-function 归一(路径: string): string {
-  return 路径.replace(/\\/g, '/')
+function 归一(filePath: string): string {
+  return filePath.replace(/\\/g, '/')
 }
 
 /** 拼两段路径，处理中间的斜杠与 `./`。 */
-function 拼接(目录: string, 相对: string): string {
-  const 左 = 归一(目录).replace(/\/+$/, '')
+function 拼接(dir: string, 相对: string): string {
+  const 左 = 归一(dir).replace(/\/+$/, '')
   const 右 = 归一(相对).replace(/^\.\//, '')
   return `${左}/${右}`
 }
@@ -58,31 +58,31 @@ function 拼接(目录: string, 相对: string): string {
  * 而不是留一个破图图标让人以为是文件坏了。
  */
 export function 解析图片地址(原始: string): string {
-  const 地址 = 原始.trim()
-  if (地址.length === 0) return ''
+  const url = 原始.trim()
+  if (url.length === 0) return ''
 
-  if (是外部地址(地址)) return 地址
+  if (是外部地址(url)) return url
 
   // `file://` 直接转成本地协议，省掉一次解码
-  if (/^file:\/\//i.test(地址)) {
+  if (/^file:\/\//i.test(url)) {
     try {
-      return localFileUrl(decodeURIComponent(new URL(地址).pathname.replace(/^\//, '')))
+      return localFileUrl(decodeURIComponent(new URL(url).pathname.replace(/^\//, '')))
     } catch {
       return ''
     }
   }
 
   // 地址里可能有百分号编码（存进文档时转义过），解析回真实路径
-  let 路径 = 地址
+  let filePath = url
   try {
-    路径 = decodeURI(地址)
+    filePath = decodeURI(url)
   } catch {
     // 编码损坏就按原样找，总比直接放弃好
   }
 
-  if (是绝对路径(路径)) return localFileUrl(路径)
+  if (是绝对路径(filePath)) return localFileUrl(filePath)
   if (!当前文档目录) return ''
-  return localFileUrl(拼接(当前文档目录, 路径))
+  return localFileUrl(拼接(当前文档目录, filePath))
 }
 
 /**
@@ -91,6 +91,6 @@ export function 解析图片地址(原始: string): string {
  * 上传后回填时要用它做查找替换——文档里存的是相对路径，
  * 不是解析后的 URL。
  */
-export function 是本地图片地址(地址: string): boolean {
-  return !是外部地址(地址)
+export function 是本地图片地址(url: string): boolean {
+  return !是外部地址(url)
 }

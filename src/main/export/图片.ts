@@ -37,26 +37,26 @@ const 默认宽度 = 900
 const 最大高度 = 8000
 
 export interface 图片结果 {
-  成功: boolean
+  success: boolean
   /** 实际截取的像素尺寸，供调用方如实反馈。 */
-  宽: number
-  高: number
+  width: number
+  height: number
   /** 是否因为超过高度上限而被截断。 */
   已截断: boolean
-  错误: string | null
+  error: string | null
 }
 
 export async function 复制为图片(
-  选项: 导出选项,
+  options: 导出选项,
   /** 目标宽度；省略时用默认值。 */
-  宽 = 默认宽度
+  width = 默认宽度
 ): Promise<图片结果> {
-  const 失败 = (错误: string): 图片结果 => ({
-    成功: false,
-    宽: 0,
-    高: 0,
+  const failure = (error: string): 图片结果 => ({
+    success: false,
+    width: 0,
+    height: 0,
     已截断: false,
-    错误
+    error
   })
 
   let html: string
@@ -64,26 +64,26 @@ export async function 复制为图片(
     // 内嵌图片：截图是"拿走一份"，图片必须跟着走，
     // 否则粘到别处就是一堆破图。
     html = await 构建导出HTML({
-      ...选项,
-      格式: 'html',
+      ...options,
+      format: 'html',
       附大纲: false,
       内嵌图片: true
     })
-  } catch (错误) {
-    return 失败(`渲染失败：${错误 instanceof Error ? 错误.message : String(错误)}`)
+  } catch (error) {
+    return failure(`渲染失败：${error instanceof Error ? error.message : String(error)}`)
   }
 
   const 临时文件 = join(tmpdir(), `selfmd-图片-${Date.now()}.html`)
   try {
     mkdirSync(dirname(临时文件), { recursive: true })
     writeFileSync(临时文件, html, 'utf8')
-  } catch (错误) {
-    return 失败(`写入临时文件失败：${错误 instanceof Error ? 错误.message : String(错误)}`)
+  } catch (error) {
+    return failure(`写入临时文件失败：${error instanceof Error ? error.message : String(error)}`)
   }
 
-  const 窗口 = new BrowserWindow({
+  const win = new BrowserWindow({
     show: false,
-    width: 宽,
+    width: width,
     height: 1200,
     webPreferences: {
       // 必须开 JS：要用它量内容高度。
@@ -96,10 +96,10 @@ export async function 复制为图片(
   })
 
   try {
-    await 窗口.loadURL(pathToFileURL(临时文件).toString())
+    await win.loadURL(pathToFileURL(临时文件).toString())
 
     // 等图片真正解码完。只等 load 事件不够——那时图片可能还没画上去。
-    await 窗口.webContents.executeJavaScript(`
+    await win.webContents.executeJavaScript(`
       Promise.all(
         Array.from(document.images).map((图) =>
           图.complete ? Promise.resolve() : new Promise((完成) => {
@@ -112,42 +112,42 @@ export async function 复制为图片(
       ).then(() => new Promise((完成) => requestAnimationFrame(() => requestAnimationFrame(完成))))
     `)
 
-    const 量得高度 = await 窗口.webContents.executeJavaScript(
+    const 量得高度 = await win.webContents.executeJavaScript(
       'Math.max(document.body.scrollHeight, document.documentElement.scrollHeight)'
     )
     const 内容高 = typeof 量得高度 === 'number' && 量得高度 > 0 ? Math.ceil(量得高度) : 1200
     const 目标高 = Math.min(内容高, 最大高度)
 
-    窗口.setContentSize(宽, 目标高)
+    win.setContentSize(width, 目标高)
     // 改尺寸之后要再等一帧，布局才会按新高度重排
-    await new Promise((完成) => setTimeout(完成, 180))
+    await new Promise((done) => setTimeout(done, 180))
 
-    const 图 = await 窗口.webContents.capturePage()
-    if (图.isEmpty()) return 失败('截图为空，可能是内容过高或渲染未完成')
+    const img = await win.webContents.capturePage()
+    if (img.isEmpty()) return failure('截图为空，可能是内容过高或渲染未完成')
 
-    clipboard.writeImage(图)
-    const 尺寸 = 图.getSize()
+    clipboard.writeImage(img)
+    const size = img.getSize()
     return {
-      成功: true,
-      宽: 尺寸.width,
-      高: 尺寸.height,
+      success: true,
+      width: size.width,
+      height: size.height,
       已截断: 内容高 > 最大高度,
-      错误: null
+      error: null
     }
-  } catch (错误) {
-    return 失败(`截图失败：${错误 instanceof Error ? 错误.message : String(错误)}`)
+  } catch (error) {
+    return failure(`截图失败：${error instanceof Error ? error.message : String(error)}`)
   } finally {
-    窗口.destroy()
+    win.destroy()
   }
 }
 
 /** 供自测使用：把图片存到磁盘，避免测试污染用户剪贴板。 */
-export function 存图片到(路径: string): boolean {
-  const 图 = clipboard.readImage()
-  if (图.isEmpty()) return false
+export function 存图片到(filePath: string): boolean {
+  const img = clipboard.readImage()
+  if (img.isEmpty()) return false
   try {
-    mkdirSync(dirname(路径), { recursive: true })
-    writeFileSync(路径, 图.toPNG())
+    mkdirSync(dirname(filePath), { recursive: true })
+    writeFileSync(filePath, img.toPNG())
     return true
   } catch {
     return false

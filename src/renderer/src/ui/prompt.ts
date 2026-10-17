@@ -9,43 +9,43 @@
  */
 
 export interface 询问选项 {
-  标题: string
+  title: string
   /** 初始值。 */
   初值?: string
    /** 占位提示。 */
   占位?: string
   /** 标题下方的一段说明文字。 */
-  说明?: string
+  description?: string
   /** 确定按钮文字。 */
   确定文字?: string
 }
 
 /** 打开一个输入框；用户取消时返回 null。 */
-export function 询问文本(选项: 询问选项): Promise<string | null> {
-  return new Promise((完成) => {
-    const 遮罩 = document.createElement('div')
-    遮罩.className = 'selfmd-modal-mask'
+export function 询问文本(options: 询问选项): Promise<string | null> {
+  return new Promise((done) => {
+    const overlay = document.createElement('div')
+    overlay.className = 'selfmd-modal-mask'
 
     const 盒子 = document.createElement('div')
     盒子.className = 'selfmd-modal'
 
-    const 标题 = document.createElement('div')
-    标题.className = 'selfmd-modal-title'
-    标题.textContent = 选项.标题
+    const title = document.createElement('div')
+    title.className = 'selfmd-modal-title'
+    title.textContent = options.title
 
-    if (选项.说明) {
-      盒子.append(标题)
-      const 说明 = document.createElement('div')
-      说明.className = 'selfmd-modal-desc'
-      说明.textContent = 选项.说明
-      盒子.append(说明)
+    if (options.description) {
+      盒子.append(title)
+      const description = document.createElement('div')
+      description.className = 'selfmd-modal-desc'
+      description.textContent = options.description
+      盒子.append(description)
     }
 
-    const 输入 = document.createElement('input')
-    输入.className = 'selfmd-modal-input'
-    输入.type = 'text'
-    输入.value = 选项.初值 ?? ''
-    if (选项.占位) 输入.placeholder = 选项.占位
+    const input = document.createElement('input')
+    input.className = 'selfmd-modal-input'
+    input.type = 'text'
+    input.value = options.初值 ?? ''
+    if (options.占位) input.placeholder = options.占位
 
     const 按钮行 = document.createElement('div')
     按钮行.className = 'selfmd-modal-buttons'
@@ -56,48 +56,48 @@ export function 询问文本(选项: 询问选项): Promise<string | null> {
 
     const 确定 = document.createElement('button')
     确定.className = 'selfmd-btn selfmd-btn-primary'
-    确定.textContent = 选项.确定文字 ?? '确定'
+    确定.textContent = options.确定文字 ?? '确定'
 
     /** 收尾：移除 DOM、解绑键盘、回传结果。所有出口都必须走这里。 */
     let 已关闭 = false
-    const 收尾 = (值: string | null): void => {
+    const 收尾 = (value: string | null): void => {
       if (已关闭) return
       已关闭 = true
-      document.removeEventListener('keydown', 键盘, true)
-      遮罩.remove()
-      完成(值)
+      document.removeEventListener('keydown', keyboard, true)
+      overlay.remove()
+      done(value)
     }
 
-    const 键盘 = (事件: KeyboardEvent): void => {
-      if (事件.key === 'Escape') {
-        事件.preventDefault()
-        事件.stopPropagation()
+    const keyboard = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        event.stopPropagation()
         收尾(null)
-      } else if (事件.key === 'Enter' && !事件.isComposing) {
+      } else if (event.key === 'Enter' && !event.isComposing) {
         // 输入法正在组字时按回车是"选词"，不能当成确定。
-        事件.preventDefault()
-        事件.stopPropagation()
-        收尾(输入.value.trim())
+        event.preventDefault()
+        event.stopPropagation()
+        收尾(input.value.trim())
       }
     }
 
     取消.addEventListener('click', () => 收尾(null))
-    确定.addEventListener('click', () => 收尾(输入.value.trim()))
+    确定.addEventListener('click', () => 收尾(input.value.trim()))
     // 点击遮罩空白处等同取消，但不影响点击盒子内部。
-    遮罩.addEventListener('mousedown', (事件) => {
-      if (事件.target === 遮罩) 收尾(null)
+    overlay.addEventListener('mousedown', (event) => {
+      if (event.target === overlay) 收尾(null)
     })
 
     按钮行.append(取消, 确定)
     // 标题与说明已在上面按需 append，这里只补剩余部分
-    if (!选项.说明) 盒子.append(标题)
-    盒子.append(输入, 按钮行)
-    遮罩.append(盒子)
-    document.body.append(遮罩)
+    if (!options.description) 盒子.append(title)
+    盒子.append(input, 按钮行)
+    overlay.append(盒子)
+    document.body.append(overlay)
 
     // 捕获阶段监听，避免编辑器抢先处理回车与 Esc。
-    document.addEventListener('keydown', 键盘, true)
-    输入.focus()
-    输入.select()
+    document.addEventListener('keydown', keyboard, true)
+    input.focus()
+    input.select()
   })
 }

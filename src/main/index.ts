@@ -99,12 +99,12 @@ if (!gotLock) {
     registerIpc()
     rebuildMenu()
 
-    onSettingsChanged((设置) => {
+    onSettingsChanged((settings) => {
       // 菜单勾选状态与主题单选项状态都由设置推导而来。
       rebuildMenu()
       // 拼写词典要在会话上生效。已经在窗口里渲染过的文本不会重新检查——
       // 用户改完之后需要重新打开文档才能看到效果，这一点写进了设置项的说明里。
-      应用拼写词典(设置)
+      应用拼写词典(settings)
     })
 
     // `openPathFromArgv` 总是返回一个对象，所以要判断字段而不是对象本身：
@@ -114,8 +114,8 @@ if (!gotLock) {
       createWindow(fromArgv)
     } else if (SMOKE_IMAGE) {
       const 素材 = 准备图片素材()
-      console.log(`[selfMD] 图片测试素材：文档=${素材.文档} 图片=${素材.图片}`)
-      createWindow({ path: 素材.文档 })
+      console.log(`[selfMD] 图片测试素材：文档=${素材.docModel} 图片=${素材.image}`)
+      createWindow({ path: 素材.docModel })
     } else {
       createWindow(smokeOpen())
     }
@@ -124,8 +124,8 @@ if (!gotLock) {
 
     // Pandoc 探测要跑子进程，会拖慢启动，所以放到窗口创建之后。
     // 结果回来再重建菜单，把 Word 等格式点亮。
-    void 检测Pandoc().then((路径: string | null) => {
-      设置Pandoc可用(路径 !== null)
+    void 检测Pandoc().then((filePath: string | null) => {
+      设置Pandoc可用(filePath !== null)
       rebuildMenu()
     })
 
@@ -171,19 +171,19 @@ function smokeOpen(): { path?: string } {
  * 只服务 `<主题名>.css` 会让这些引用全部 404。
  */
 function 准备主题素材(): void {
-  const 目录 = getAppPaths().themes
-  const 子目录 = join(目录, '__冒烟__')
+  const dir = getAppPaths().themes
+  const 子目录 = join(dir, '__冒烟__')
   mkdirSync(子目录, { recursive: true })
-  writeFileSync(join(目录, '__冒烟__.css'), '@import "__冒烟__/子样式.css";\n', 'utf8')
+  writeFileSync(join(dir, '__冒烟__.css'), '@import "__冒烟__/子样式.css";\n', 'utf8')
   writeFileSync(join(子目录, '子样式.css'), ':root { --冒烟标记: 1; }\n', 'utf8')
 }
 
 /** 清掉冒烟测试造的主题素材，避免污染用户真实的主题目录。 */
 function 清理主题素材(): void {
-  const 目录 = getAppPaths().themes
+  const dir = getAppPaths().themes
   try {
-    rmSync(join(目录, '__冒烟__.css'), { force: true })
-    rmSync(join(目录, '__冒烟__'), { recursive: true, force: true })
+    rmSync(join(dir, '__冒烟__.css'), { force: true })
+    rmSync(join(dir, '__冒烟__'), { recursive: true, force: true })
   } catch {
     // 清理失败不影响测试结论。
   }
@@ -220,50 +220,50 @@ const a = 1 < 2
 `
 
 async function 运行导出测试(): Promise<boolean> {
-  const 目录 = join(app.getPath('temp'), `selfmd-导出测试-${Date.now()}`)
-  mkdirSync(目录, { recursive: true })
-  const 目标 = join(目录, '导出测试.html')
+  const dir = join(app.getPath('temp'), `selfmd-导出测试-${Date.now()}`)
+  mkdirSync(dir, { recursive: true })
+  const target = join(dir, '导出测试.html')
 
-  const 结果 = await 执行导出({
-    目标,
-    源: 导出测试文档,
-    文档路径: null,
-    格式: 'html',
+  const result = await 执行导出({
+    target,
+    source: 导出测试文档,
+    docPath: null,
+    format: 'html',
     附大纲: true,
     内嵌图片: false
   })
 
-  if (!结果.成功) {
-    console.error(`[selfMD] 导出端到端：失败 — ${结果.错误}`)
+  if (!result.success) {
+    console.error(`[selfMD] 导出端到端：失败 — ${result.error}`)
     return false
   }
 
-  const 内容 = readFileSync(目标, 'utf8')
+  const content = readFileSync(target, 'utf8')
   const 检查: [string, boolean][] = [
-    ['文档类型声明', 内容.startsWith('<!doctype html>')],
-    ['导出态类名', 内容.includes('class="selfmd-export selfmd-export-show-outline"')],
-    ['内容容器', 内容.includes('<div id="write">')],
-    ['渲染出标题', 内容.includes('<h1>导出测试标题</h1>')],
-    ['渲染出粗体', 内容.includes('<strong>粗体</strong>')],
-    ['代码块转义', 内容.includes('const a = 1 &lt; 2')],
-    ['渲染出表格', 内容.includes('<table>')],
-    ['渲染出任务框', 内容.includes('type="checkbox" disabled checked')],
-    ['渲染出引用', 内容.includes('<blockquote>')],
-    ['附带了侧边目录', 内容.includes('selfmd-export-sidebar')],
+    ['文档类型声明', content.startsWith('<!doctype html>')],
+    ['导出态类名', content.includes('class="selfmd-export selfmd-export-show-outline"')],
+    ['内容容器', content.includes('<div id="write">')],
+    ['渲染出标题', content.includes('<h1>导出测试标题</h1>')],
+    ['渲染出粗体', content.includes('<strong>粗体</strong>')],
+    ['代码块转义', content.includes('const a = 1 &lt; 2')],
+    ['渲染出表格', content.includes('<table>')],
+    ['渲染出任务框', content.includes('type="checkbox" disabled checked')],
+    ['渲染出引用', content.includes('<blockquote>')],
+    ['附带了侧边目录', content.includes('selfmd-export-sidebar')],
     // 这条是 PDF 能否正确的关键：缺了它 Chromium 打印会丢弃全部背景色
-    ['打印保留背景色', 内容.includes('print-color-adjust: exact')],
-    ['内联了主题变量', 内容.includes('--bg-color')],
+    ['打印保留背景色', content.includes('print-color-adjust: exact')],
+    ['内联了主题变量', content.includes('--bg-color')],
     // @include-when-export 是 非标准指令，浏览器不认，必须被处理掉
-    ['无残留专有指令', !内容.includes('@include-when-export')]
+    ['无残留专有指令', !content.includes('@include-when-export')]
   ]
 
-  const 失败 = 检查.filter(([, 好]) => !好)
+  const failure = 检查.filter(([, 好]) => !好)
   console.log(
-    `[selfMD] 导出端到端：${检查.length - 失败.length}/${检查.length} 项通过` +
-      `  文件 ${内容.length} 字符  路径=${目标}`
+    `[selfMD] 导出端到端：${检查.length - failure.length}/${检查.length} 项通过` +
+      `  文件 ${content.length} 字符  路径=${target}`
   )
-  if (失败.length > 0) {
-    console.error(`[selfMD] 导出端到端：未通过 — ${失败.map(([名]) => 名).join('、')}`)
+  if (failure.length > 0) {
+    console.error(`[selfMD] 导出端到端：未通过 — ${failure.map(([name]) => name).join('、')}`)
     return false
   }
   return true
@@ -277,14 +277,14 @@ async function 运行导出测试(): Promise<boolean> {
  * 所以只有在「草稿内容 === 刚保存的内容」时才清——下面这条断言就是在钉它。
  */
 async function 运行草稿测试(): Promise<boolean> {
-  const 目录 = join(app.getPath('temp'), `selfmd-草稿测试-${Date.now()}`)
-  mkdirSync(目录, { recursive: true })
-  const 文档 = join(目录, '草稿测试.md')
-  writeFileSync(文档, '磁盘上的旧内容\n', 'utf8')
+  const dir = join(app.getPath('temp'), `selfmd-草稿测试-${Date.now()}`)
+  mkdirSync(dir, { recursive: true })
+  const docModel = join(dir, '草稿测试.md')
+  writeFileSync(docModel, '磁盘上的旧内容\n', 'utf8')
 
   const 检查: [string, boolean][] = []
-  const 记录 = (名: string, 好: boolean): void => {
-    检查.push([名, 好])
+  const 记录 = (name: string, 好: boolean): void => {
+    检查.push([name, 好])
   }
 
   // 先把历史遗留的无名草稿清掉。
@@ -294,78 +294,78 @@ async function 运行草稿测试(): Promise<boolean> {
   // 不先打扫就会因为别人的残渣而失败——表现为单独跑能过、
   // 放进完整流水线就挂，这类顺序依赖最难排查。
   for (const 旧 of 列出草稿()) {
-    if (旧.原路径 === null) 删除草稿(旧.键)
+    if (旧.rawPath === null) 删除草稿(旧.key)
   }
 
   // 1) 写一份比原文件新的草稿
   const 草稿内容 = '磁盘上的旧内容\n\n用户后来敲的新内容\n'
-  记录('写入草稿', 写草稿(文档, 草稿内容))
+  记录('写入草稿', 写草稿(docModel, 草稿内容))
 
   // 2) 能列出来
-  const 这条 = 列出草稿().find((c) => c.原路径 === 文档)
+  const 这条 = 列出草稿().find((c) => c.rawPath === docModel)
   记录('能列出草稿', 这条 !== undefined)
 
   // 3) 能读回同样的内容
-  记录('读回内容一致', 这条 !== undefined && 读草稿(这条.键) === 草稿内容)
+  记录('读回内容一致', 这条 !== undefined && 读草稿(这条.key) === 草稿内容)
 
   // 4) 需要恢复：草稿比原文件新，且内容长度不同
   记录(
     '被判定为需要恢复',
-    需要恢复的草稿().some((c) => c.原路径 === 文档)
+    需要恢复的草稿().some((c) => c.rawPath === docModel)
   )
 
   // 5) 竞态守卫：内容不一致时**不能**清掉草稿
-  清理该文档的草稿(文档, '这是另一个内容')
-  记录('内容不一致时保留草稿', 列出草稿().some((c) => c.原路径 === 文档))
+  清理该文档的草稿(docModel, '这是另一个内容')
+  记录('内容不一致时保留草稿', 列出草稿().some((c) => c.rawPath === docModel))
 
   // 6) 内容一致时才清掉
-  清理该文档的草稿(文档, 草稿内容)
-  记录('内容一致时清除草稿', !列出草稿().some((c) => c.原路径 === 文档))
+  清理该文档的草稿(docModel, 草稿内容)
+  记录('内容一致时清除草稿', !列出草稿().some((c) => c.rawPath === docModel))
 
   // 7) 未命名文档（原路径为 null）也要能存与恢复
   记录('未命名文档可写草稿', 写草稿(null, '未命名的内容'))
-  const 未命名 = 列出草稿().find((c) => c.原路径 === null)
+  const 未命名 = 列出草稿().find((c) => c.rawPath === null)
   记录(
     '未命名文档需要恢复',
-    未命名 !== undefined && 需要恢复的草稿().some((c) => c.键 === 未命名.键)
+    未命名 !== undefined && 需要恢复的草稿().some((c) => c.key === 未命名.key)
   )
-  if (未命名) 删除草稿(未命名.键)
-  记录('未命名草稿可删除', !列出草稿().some((c) => c.原路径 === null))
+  if (未命名) 删除草稿(未命名.key)
+  记录('未命名草稿可删除', !列出草稿().some((c) => c.rawPath === null))
 
   // 8) 原文件已被删除时也要提示恢复——草稿是唯一副本
-  const 幽灵 = join(目录, '已经不存在了.md')
+  const 幽灵 = join(dir, '已经不存在了.md')
   写草稿(幽灵, '文件被删了但草稿还在')
   记录(
     '原文件缺失时提示恢复',
-    需要恢复的草稿().some((c) => c.原路径 === 幽灵)
+    需要恢复的草稿().some((c) => c.rawPath === 幽灵)
   )
-  const 幽灵条目 = 列出草稿().find((c) => c.原路径 === 幽灵)
-  if (幽灵条目) 删除草稿(幽灵条目.键)
+  const 幽灵条目 = 列出草稿().find((c) => c.rawPath === 幽灵)
+  if (幽灵条目) 删除草稿(幽灵条目.key)
 
-  const 失败 = 检查.filter(([, 好]) => !好)
-  console.log(`[selfMD] 草稿与恢复：${检查.length - 失败.length}/${检查.length} 项通过`)
-  if (失败.length > 0) {
-    console.error(`[selfMD] 草稿与恢复：未通过 — ${失败.map(([名]) => 名).join('、')}`)
+  const failure = 检查.filter(([, 好]) => !好)
+  console.log(`[selfMD] 草稿与恢复：${检查.length - failure.length}/${检查.length} 项通过`)
+  if (failure.length > 0) {
+    console.error(`[selfMD] 草稿与恢复：未通过 — ${failure.map(([name]) => name).join('、')}`)
     return false
   }
   return true
 }
 
 /** 图标是否真的能解码，而不是"文件存在"就算数。 */
-function 报告图标(): void {  const 文件 = 图标路径('icon-256.png')
-  if (!文件) {
+function 报告图标(): void {  const file = 图标路径('icon-256.png')
+  if (!file) {
     console.log('[selfMD] 窗口图标：未找到（将使用系统默认图标）')
     return
   }
-  const 图 = nativeImage.createFromPath(文件)
-  const 尺寸 = 图.getSize()
+  const img = nativeImage.createFromPath(file)
+  const size = img.getSize()
   console.log(
-    `[selfMD] 窗口图标：${文件}  ` +
-      `${尺寸.width}×${尺寸.height}  ${图.isEmpty() ? '解码失败' : '可正常解码'}`
+    `[selfMD] 窗口图标：${file}  ` +
+      `${size.width}×${size.height}  ${img.isEmpty() ? '解码失败' : '可正常解码'}`
   )
-  for (const 名 of ['icon.ico', 'icon-16.png', 'icon-64.png']) {
-    const 路径 = 图标路径(名)
-    console.log(`    附属图标 ${名}：${路径 ? '存在' : '缺失'}`)
+  for (const name of ['icon.ico', 'icon-16.png', 'icon-64.png']) {
+    const filePath = 图标路径(name)
+    console.log(`    附属图标 ${name}：${filePath ? '存在' : '缺失'}`)
   }
 }
 
@@ -389,18 +389,18 @@ const 最小PNG = Buffer.from(
  * 刻意在文档里写上 `image-folder: 图`：它同时验证了
  * "能读出 YAML 前置元数据"与"文档级设置压过全局"两条规则。
  */
-function 准备图片素材(): { 文档: string; 图片: string; 目标目录: string } {
-  const 根 = join(app.getPath('temp'), `selfmd-图片测试-${Date.now()}`)
-  const 目标目录 = join(根, '图')
+function 准备图片素材(): { docModel: string; image: string; 目标目录: string } {
+  const root = join(app.getPath('temp'), `selfmd-图片测试-${Date.now()}`)
+  const 目标目录 = join(root, '图')
   mkdirSync(目标目录, { recursive: true })
 
-  const 文档 = join(根, '测试.md')
-  writeFileSync(文档, '---\nimage-folder: 图\n---\n\n# 图片测试\n\n', 'utf8')
+  const docModel = join(root, '测试.md')
+  writeFileSync(docModel, '---\nimage-folder: 图\n---\n\n# 图片测试\n\n', 'utf8')
 
-  const 图片 = join(根, '样本.png')
-  writeFileSync(图片, 最小PNG)
+  const image = join(root, '样本.png')
+  writeFileSync(image, 最小PNG)
 
-  return { 文档, 图片, 目标目录 }
+  return { docModel, image, 目标目录 }
 }
 
 // 把解析后的路径打印一次，这样首次运行就能从日志里核对。
@@ -436,22 +436,22 @@ function smokeOpenPath(): string | null {
  * 就测不到任何东西了。
  */
 async function 运行全屏自测(): Promise<string> {
-  const 窗口 = BrowserWindow.getAllWindows()[0]
-  if (!窗口) return '没有窗口，未测'
+  const win = BrowserWindow.getAllWindows()[0]
+  if (!win) return '没有窗口，未测'
 
-  const 原本 = 窗口.isFullScreen()
+  const 原本 = win.isFullScreen()
   try {
-    窗口.setFullScreen(true)
-    await new Promise((完成) => setTimeout(完成, 500))
-    const 进入 = 窗口.isFullScreen()
+    win.setFullScreen(true)
+    await new Promise((done) => setTimeout(done, 500))
+    const 进入 = win.isFullScreen()
 
-    窗口.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'Escape' })
-    await new Promise((完成) => setTimeout(完成, 500))
-    const 按Esc后仍全屏 = 窗口.isFullScreen()
+    win.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'Escape' })
+    await new Promise((done) => setTimeout(done, 500))
+    const 按Esc后仍全屏 = win.isFullScreen()
 
     return `进入全屏=${进入} 按Esc后仍全屏=${按Esc后仍全屏}`
   } finally {
-    if (!窗口.isDestroyed()) 窗口.setFullScreen(原本)
+    if (!win.isDestroyed()) win.setFullScreen(原本)
   }
 }
 
@@ -492,7 +492,7 @@ async function runSmokeTest(): Promise<void> {  const target = smokeOpenPath()
   // 原生菜单由操作系统绘制，无头测试截不到图。导出成文本，
   // 中文化与"哪些命令已实现"才有可断言的证据。
   console.log('[selfMD] 应用菜单：')
-  for (const 行 of 菜单摘要()) console.log('  ' + 行)
+  for (const line of 菜单摘要()) console.log('  ' + line)
 
   await whenRendererReady()
   console.log('[selfMD] 冒烟：渲染进程已就绪')
@@ -508,7 +508,7 @@ async function runSmokeTest(): Promise<void> {  const target = smokeOpenPath()
   {
     const 关联 = 取关联状态()
     console.log(
-      `[selfMD] 文件关联：当前=${关联.当前 || '（未设置）'} ` +
+      `[selfMD] 文件关联：当前=${关联.current || '（未设置）'} ` +
         `是默认=${关联.是默认} 有新建菜单=${关联.有新建菜单}`
     )
   }

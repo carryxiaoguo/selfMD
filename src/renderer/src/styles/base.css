@@ -418,11 +418,11 @@ body.live-preview .cm-md-marker-hidden {
    画在 `::before` 上，所以它**不是 DOM 文本**，复制代码不会把行号带出去。
    这一点是刻意的：行号是给眼睛看的，混进剪贴板粘到别处就全是垃圾。
 
-   行号来自行装饰上的 `data-行号`，不是 CSS 计数器——CodeMirror 会虚拟化
+   行号来自行装饰上的 `data-lineNo`，不是 CSS 计数器——CodeMirror 会虚拟化
    视口外的行，计数器在一屏之内会重新开始。 */
 
-.cm-lp-code[data-行号]::before {
-  content: attr(data-行号);
+.cm-lp-code[data-lineNo]::before {
+  content: attr(data-lineNo);
   display: inline-block;
   /* 固定宽度 + 右对齐，个位数与两位数才不会错开 */
   width: 2em;
@@ -438,7 +438,7 @@ body.live-preview .cm-md-marker-hidden {
 }
 
 /* 光标所在行高亮一下行号，方便对照位置 */
-.cm-lp-code[data-行号].cm-activeLine::before {
+.cm-lp-code[data-lineNo].cm-activeLine::before {
   opacity: 1;
   color: var(--code-function);
 }

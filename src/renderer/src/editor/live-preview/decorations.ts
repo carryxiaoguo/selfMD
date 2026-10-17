@@ -106,7 +106,7 @@ export const 块级行样式 = {
    * 与引言共用左边框的血统，但**整块字色更浅**——用户要的就是这个：
    * 提示是旁注，不该和正文抢注意力。
    */
-  提示框: Decoration.line({ class: 'cm-lp-quote cm-lp-callout' }),
+  callout: Decoration.line({ class: 'cm-lp-quote cm-lp-callout' }),
   // `md-fences` 与 `md-task-list-item` 是**通用的类名**
   // （用 scripts/CSS选择器.py 扫内置主题，分别出现 24 与 30 次）。
   // 挂上它们，针对这两个类写的现成主题规则就能直接生效；
@@ -119,10 +119,10 @@ export const 块级行样式 = {
   代码块中间行: Decoration.line({ class: 'cm-lp-code md-fences' }),
   代码块末行: Decoration.line({ class: 'cm-lp-code cm-lp-code-last md-fences' }),
   任务项行: Decoration.line({ class: 'md-task-list-item' }),
-  前置元数据: Decoration.line({ class: 'cm-lp-frontmatter' }),
+  frontMatter: Decoration.line({ class: 'cm-lp-frontmatter' }),
   数学块: Decoration.line({ class: 'cm-lp-math md-math-block' }),
   HTML块: Decoration.line({ class: 'cm-lp-html' }),
-  表格: Decoration.line({ class: 'cm-lp-table' }),
+  table: Decoration.line({ class: 'cm-lp-table' }),
   表头行: Decoration.line({ class: 'cm-lp-table cm-lp-table-head' }),
   // 刻意不带 cm-lp-table：对齐定义行被折叠后只剩一条分隔线，
   // 类名与数据行分开，统计时才不会互相污染。
@@ -159,29 +159,29 @@ const 代码块行缓存 = new Map<string, Decoration>()
 
 export function 代码块行装饰(
   配色: string,
-  位置: '首' | '中' | '末',
-  行号: number | null,
-  字体栈: string
+  position: '首' | '中' | '末',
+  lineNo: number | null,
+  fontStack: string
 ): Decoration {
-  const 类名 = ['cm-lp-code', 'md-fences']
-  if (位置 === '首') 类名.push('cm-lp-code-first')
-  if (位置 === '末') 类名.push('cm-lp-code-last')
-  if (配色 !== 'follow') 类名.push(`cm-code-${配色}`)
+  const className = ['cm-lp-code', 'md-fences']
+  if (position === '首') className.push('cm-lp-code-first')
+  if (position === '末') className.push('cm-lp-code-last')
+  if (配色 !== 'follow') className.push(`cm-code-${配色}`)
 
-  const 属性: Record<string, string> = {}
-  if (行号 !== null) 属性['data-行号'] = String(行号)
+  const attr: Record<string, string> = {}
+  if (lineNo !== null) attr['data-lineNo'] = String(lineNo)
   // 字体栈从 TS 来而不是在 CSS 里再写一份：写两份迟早会不一致，
   // 而且内置字体表本来就是 TS 里的数据。CSS 只负责兜底。
-  if (字体栈) 属性.style = `--code-font: ${字体栈}`
+  if (fontStack) attr.style = `--code-font: ${fontStack}`
 
   // 带行号的装饰每行都不同，缓存没有意义；围栏行（无行号）才缓存
-  if (行号 !== null) return Decoration.line({ class: 类名.join(' '), attributes: 属性 })
+  if (lineNo !== null) return Decoration.line({ class: className.join(' '), attributes: attr })
 
-  const 键 = `${配色}|${字体栈}|${位置}`
-  let 装饰 = 代码块行缓存.get(键)
+  const key = `${配色}|${fontStack}|${position}`
+  let 装饰 = 代码块行缓存.get(key)
   if (!装饰) {
-    装饰 = Decoration.line({ class: 类名.join(' '), attributes: 属性 })
-    代码块行缓存.set(键, 装饰)
+    装饰 = Decoration.line({ class: className.join(' '), attributes: attr })
+    代码块行缓存.set(key, 装饰)
   }
   return 装饰
 }

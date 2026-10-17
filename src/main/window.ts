@@ -25,22 +25,22 @@ import { getSettings } from './services/settings'
  *      传一个它不认识的值会整个调用失败，连原本能用的语言也一起丢掉。
  *      所以先与 `availableSpellCheckerLanguages` 取交集。
  */
-export function 应用拼写词典(设置: Settings): void {
+export function 应用拼写词典(settings: Settings): void {
   try {
     const 会话 = session.defaultSession
-    if (!设置.spellCheck) {
+    if (!settings.spellCheck) {
       // 关闭时清空语言列表，等价于停用检查
       会话.setSpellCheckerLanguages([])
       return
     }
     const 可用 = new Set(会话.availableSpellCheckerLanguages)
-    const 请求 = 设置.spellCheckLanguages.filter((语) => 可用.has(语))
+    const request = settings.spellCheckLanguages.filter((语) => 可用.has(语))
     // 一个都不匹配时回退到英语：有检查总比静默失效好，而且这是最常见的用法。
-    const 最终 = 请求.length > 0 ? 请求 : ['en-US'].filter((语) => 可用.has(语))
+    const 最终 = request.length > 0 ? request : ['en-US'].filter((语) => 可用.has(语))
     if (最终.length > 0) 会话.setSpellCheckerLanguages(最终)
-  } catch (错误) {
+  } catch (error) {
     // 拿不到会话时静默跳过：拼写检查是锦上添花，不该影响启动。
-    console.error('[拼写检查] 设置词典失败：', 错误)
+    console.error('[拼写检查] 设置词典失败：', error)
   }
 }
 
@@ -131,11 +131,11 @@ export function createWindow(options: WindowOptions = {}): BrowserWindow {
   //    全屏下没有任何可点的按钮，不给一条确定的退路就会真的卡住。
   //    用 `before-input-event` 而不是在渲染层监听键盘：渲染层的监听要看焦点，
   //    而全屏时用户可能刚点过侧边栏，焦点不在编辑器上。
-  win.webContents.on('before-input-event', (事件, 输入) => {
-    if (输入.type !== 'keyDown') return
-    if (输入.key === 'Escape' && win.isFullScreen()) {
+  win.webContents.on('before-input-event', (event, input) => {
+    if (input.type !== 'keyDown') return
+    if (input.key === 'Escape' && win.isFullScreen()) {
       win.setFullScreen(false)
-      事件.preventDefault()
+      event.preventDefault()
     }
   })
 

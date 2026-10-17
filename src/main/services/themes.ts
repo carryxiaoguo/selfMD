@@ -47,9 +47,9 @@ export function 主题目录文件(相对路径: string): string | null {
   归一 = 归一.replace(/\\/g, '/').replace(/^\/+/, '').replace(/[?#].*$/, '')
   if (归一.length === 0 || 归一.includes('..') || 归一.includes('\0')) return null
 
-  const 根 = getAppPaths().themes
-  const 全 = join(根, 归一)
-  const 回退 = relative(根, 全)
+  const root = getAppPaths().themes
+  const 全 = join(root, 归一)
+  const 回退 = relative(root, 全)
   if (回退.startsWith('..') || isAbsolute(回退)) return null
   return 全
 }

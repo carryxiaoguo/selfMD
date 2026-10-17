@@ -21,7 +21,7 @@ import type {
   WriteFileResult
 } from '@shared/ipc'
 import { CH, EV } from '@shared/ipc'
-import type { 草稿信息, RecentEntry, Settings, ThemeInfo } from '@shared/types'
+import type { DraftInfo, RecentEntry, Settings, ThemeInfo } from '@shared/types'
 
 /**
  * preload 桥。
@@ -92,33 +92,33 @@ const api: SelfMdApi = {
     install: () => invoke<ThemeInfo | null>(CH.themeInstall),
     delete: (id) => invoke<void>(CH.themeDelete, id),
     revealFolder: () => invoke<void>(CH.themeRevealFolder),
-    openCustom: (范围) => invoke<{ 路径: string | null }>(CH.themeOpenCustom, 范围),
-    create: (名) => invoke<ThemeInfo | null>(CH.themeCreate, 名)
+    openCustom: (rangeBounds) => invoke<{ filePath: string | null }>(CH.themeOpenCustom, rangeBounds),
+    create: (name) => invoke<ThemeInfo | null>(CH.themeCreate, name)
   },
   export: {
     formats: () =>
-      invoke<{ 格式: Record<string, boolean>; pandoc版本: string | null }>(CH.exportFormats),
-    run: (请求) =>
-      invoke<{ 路径: string | null; 错误: string | null }>(CH.exportDoc, 请求)
+      invoke<{ format: Record<string, boolean>; pandoc版本: string | null }>(CH.exportFormats),
+    run: (request) =>
+      invoke<{ filePath: string | null; error: string | null }>(CH.exportDoc, request)
   },
-  print: () => invoke<{ 成功: boolean; 错误: string | null }>(CH.appPrint),
+  print: () => invoke<{ success: boolean; error: string | null }>(CH.appPrint),
   fileAssoc: () =>
-    invoke<{ 当前: string; 是默认: boolean; 有新建菜单: boolean; 程序路径: string }>(
+    invoke<{ current: string; 是默认: boolean; 有新建菜单: boolean; 程序路径: string }>(
       CH.appFileAssoc
     ),
   openDefaultApps: () => invoke<void>(CH.appOpenDefaultApps),
-  copyAsImage: (请求: { 源: string; 文档路径: string | null; 宽度?: number }) =>
-    invoke<{ 成功: boolean; 宽: number; 高: number; 已截断: boolean; 错误: string | null }>(
+  copyAsImage: (request: { source: string; docPath: string | null; widthPx?: number }) =>
+    invoke<{ success: boolean; width: number; height: number; 已截断: boolean; error: string | null }>(
       CH.editCopyAsImage,
-      请求
+      request
     ),
   draft: {
-    save: (原路径, 内容) => invoke<boolean>(CH.draftSave, 原路径, 内容),
-    list: () => invoke<草稿信息[]>(CH.draftList),
-    read: (键) => invoke<string | null>(CH.draftRead, 键),
-    discard: (键) => invoke<void>(CH.draftDiscard, 键),
-    pending: () => invoke<草稿信息[]>(CH.draftPending),
-    clearFor: (原路径, 内容) => invoke<void>(CH.draftClearFor, 原路径, 内容)
+    save: (rawPath, content) => invoke<boolean>(CH.draftSave, rawPath, content),
+    list: () => invoke<DraftInfo[]>(CH.draftList),
+    read: (key) => invoke<string | null>(CH.draftRead, key),
+    discard: (key) => invoke<void>(CH.draftDiscard, key),
+    pending: () => invoke<DraftInfo[]>(CH.draftPending),
+    clearFor: (rawPath, content) => invoke<void>(CH.draftClearFor, rawPath, content)
   },
 
   recent: {
@@ -161,17 +161,17 @@ const api: SelfMdApi = {
 
   image: {
     readClipboard: () => invoke<ClipboardContent>(CH.imageReadClipboard),
-    saveBytes: (dir, 名称, 数据) =>
-      invoke<{ 路径: string } | null>(CH.imageSaveBytes, dir, 名称, 数据),
-    download: (url, dir, 名称) => invoke<ImageDownloadResult>(CH.imageDownload, url, dir, 名称),
-    import: (from, dir, 名称) =>
-      invoke<{ 路径: string } | null>(CH.imageImport, from, dir, 名称),
+    saveBytes: (dir, displayName, data) =>
+      invoke<{ filePath: string } | null>(CH.imageSaveBytes, dir, displayName, data),
+    download: (url, dir, displayName) => invoke<ImageDownloadResult>(CH.imageDownload, url, dir, displayName),
+    import: (from, dir, displayName) =>
+      invoke<{ filePath: string } | null>(CH.imageImport, from, dir, displayName),
     exists: (path) => invoke<boolean>(CH.fileExists, path),
-    upload: (路径们) =>
+    upload: (paths) =>
       invoke<{
-        成功: { 原路径: string; 地址: string }[]
-        失败: { 原路径: string; 原因: string }[]
-      }>(CH.imageUpload, 路径们),
+        success: { rawPath: string; url: string }[]
+        failure: { rawPath: string; 原因: string }[]
+      }>(CH.imageUpload, paths),
     uploaderStatus: () => invoke<{ 可用: boolean; 原因: string | null }>(CH.imageUploaderStatus)
   }
 }
@@ -191,17 +191,17 @@ const extras = {
   path: {
     dirname: (p: string) => invoke<string>(CH.pathDirname, p),
     basename: (p: string) => invoke<string>(CH.pathBasename, p),
-    join: (...段: string[]) => invoke<string>(CH.pathJoin, 段)
+    join: (...segment: string[]) => invoke<string>(CH.pathJoin, segment)
   },
   file: {
     copy: (from: string, to: string) => invoke<void>(CH.fileCopy, from, to),
     move: (from: string, to: string) => invoke<void>(CH.fileMove, from, to),
     rename: (from: string, to: string) => invoke<void>(CH.fileRename, from, to),
-    walk: (根: string, 选项?: { 上限?: number; 深度?: number }) =>
+    walk: (root: string, options?: { 上限?: number; 深度?: number }) =>
       invoke<{
-        文件: { 路径: string; 名字: string; 修改时间: number; 大小: number }[]
+        file: { filePath: string; 名字: string; 修改时间: number; 大小: number }[]
         已截断: boolean
-      }>(CH.fileWalk, 根, 选项)
+      }>(CH.fileWalk, root, options)
   },
   task: {
     report: (payload: TaskProgress) => invoke<void>(CH.taskProgress, payload)

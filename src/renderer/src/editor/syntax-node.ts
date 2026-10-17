@@ -8,11 +8,11 @@
  * TypeScript 是结构化类型，这个最小接口足以接收真实的 `SyntaxNode`，
  * 同时不引入隐式依赖。装饰层与智能标点都从这里取用，避免重复定义。
  */
-export interface 语法节点 {
+export interface SyntaxNode {
   readonly name: string
   readonly from: number
   readonly to: number
-  readonly parent: 语法节点 | null
-  readonly firstChild: 语法节点 | null
-  readonly nextSibling: 语法节点 | null
+  readonly parent: SyntaxNode | null
+  readonly firstChild: SyntaxNode | null
+  readonly nextSibling: SyntaxNode | null
 }

@@ -16,7 +16,7 @@ import type {
   Platform,
   RecentEntry,
   Settings,
-  草稿信息,
+  DraftInfo,
   ThemeInfo
 } from './types'
 
@@ -310,16 +310,16 @@ export interface MenuCommandPayload {
  * 剪贴板的 `FileNameW` 格式来发现被复制的文件。
  */
 export type ClipboardContent =
-  | { 类型: '位图'; 数据: string; 宽: number; 高: number }
-  | { 类型: '文件'; 路径: string[] }
-  | { 类型: '无' }
+  | { kind: '位图'; data: string; width: number; height: number }
+  | { kind: '文件'; filePath: string[] }
+  | { kind: '无' }
 
 export interface ImageDownloadResult {
-  成功: boolean
-  路径: string | null
+  success: boolean
+  filePath: string | null
   /** 服务端返回的 MIME 类型，用于在扩展名缺失时补全。 */
-  类型: string | null
-  错误: string | null
+  kind: string | null
+  error: string | null
 }
 
 // ---------------------------------------------------------------------------
@@ -429,30 +429,30 @@ export interface SelfMdApi {
      *
      * @param 范围 `base` = 对所有主题生效；`theme` = 只对当前主题生效
      */
-    openCustom(范围: 'base' | 'theme'): Promise<{ 路径: string | null }>
+    openCustom(rangeBounds: 'base' | 'theme'): Promise<{ filePath: string | null }>
     /** 新建一个主题文件（内容为带说明的模板）。 */
-    create(名: string): Promise<ThemeInfo | null>
+    create(name: string): Promise<ThemeInfo | null>
   }
   export: {
     /** 各格式是否可用；Word 等需要 Pandoc。 */
-    formats(): Promise<{ 格式: Record<string, boolean>; pandoc版本: string | null }>
+    formats(): Promise<{ format: Record<string, boolean>; pandoc版本: string | null }>
     /**
      * 导出当前文档：弹保存对话框，然后按格式执行。
      *
      * @returns 目标路径；用户取消或失败时为 null（失败原因在 `错误` 里）
      */
-    run(请求: {
-      格式: string
-      源: string
-      文档路径: string | null
+    run(request: {
+      format: string
+      source: string
+      docPath: string | null
       默认文件名: string
       /** 导出结果里是否附带侧边目录。省略时用主进程的默认值。 */
       附大纲?: boolean
       /** 是否把本地图片内嵌成 base64。省略时用主进程的默认值。 */
       内嵌图片?: boolean
-    }): Promise<{ 路径: string | null; 错误: string | null }>
+    }): Promise<{ filePath: string | null; error: string | null }>
   }
-  print(): Promise<{ 成功: boolean; 错误: string | null }>
+  print(): Promise<{ success: boolean; error: string | null }>
   /**
    * Markdown 文件关联的当前状态。
    *
@@ -460,7 +460,7 @@ export interface SelfMdApi {
    * 是这件事上最常见的误会。让他看得见当前是什么，比反复点按钮有用。
    */
   fileAssoc(): Promise<{
-    当前: string
+    current: string
     是默认: boolean
     有新建菜单: boolean
     程序路径: string
@@ -478,31 +478,31 @@ export interface SelfMdApi {
    * 渲染走的是导出那条路（离屏窗口加载导出 HTML 后截图），
    * 因此**公式、图表、代码高亮的呈现与导出完全一致**。
    */
-  copyAsImage(请求: {
-    源: string
-    文档路径: string | null
-    宽度?: number
+  copyAsImage(request: {
+    source: string
+    docPath: string | null
+    widthPx?: number
   }): Promise<{
-    成功: boolean
-    宽: number
-    高: number
+    success: boolean
+    width: number
+    height: number
     /** 内容超过高度上限时为 true——图被截断了，必须如实告诉用户。 */
     已截断: boolean
-    错误: string | null
+    error: string | null
   }>
   draft: {
     /** 写一份草稿。返回是否成功；失败不抛异常（自动保存是后台行为）。 */
-    save(原路径: string | null, 内容: string): Promise<boolean>
+    save(rawPath: string | null, content: string): Promise<boolean>
     /** 列出全部草稿，从新到旧。 */
-    list(): Promise<草稿信息[]>
+    list(): Promise<DraftInfo[]>
     /** 读草稿内容。 */
-    read(键: string): Promise<string | null>
+    read(key: string): Promise<string | null>
     /** 丢弃一份草稿。 */
-    discard(键: string): Promise<void>
+    discard(key: string): Promise<void>
     /** 需要提示用户恢复的草稿。 */
-    pending(): Promise<草稿信息[]>
+    pending(): Promise<DraftInfo[]>
     /** 文档保存成功后清掉它的草稿。 */
-    clearFor(原路径: string | null, 内容: string): Promise<void>
+    clearFor(rawPath: string | null, content: string): Promise<void>
   }
   recent: {
     list(): Promise<RecentEntry[]>
@@ -544,16 +544,16 @@ export interface SelfMdApi {
     /** 读取剪贴板，判定是位图、文件还是空。 */
     readClipboard(): Promise<ClipboardContent>
     /** 把 base64 数据写成文件，返回最终路径（重名时自动避让）。 */
-    saveBytes(dir: string, 名称: string, 数据: string): Promise<{ 路径: string } | null>
+    saveBytes(dir: string, displayName: string, data: string): Promise<{ filePath: string } | null>
     /** 下载远程图片到目录，返回最终路径。 */
-    download(url: string, dir: string, 名称: string): Promise<ImageDownloadResult>
+    download(url: string, dir: string, displayName: string): Promise<ImageDownloadResult>
     /**
      * 把本地图片复制进目标目录，重名时自动避让。
      *
      * 做成一个原子动作而不是"先查是否存在、再复制"：后者在某张图被并发插入时
      * 会两边都判定"不存在"，然后后写的覆盖先写的。
      */
-    import(from: string, dir: string, 名称?: string): Promise<{ 路径: string } | null>
+    import(from: string, dir: string, displayName?: string): Promise<{ filePath: string } | null>
     /** 判断文件是否存在。 */
     exists(path: string): Promise<boolean>
     /**
@@ -562,9 +562,9 @@ export interface SelfMdApi {
      * 返回一一对应的「原路径 → 远程地址」；回填文档由渲染层负责——
      * 主进程不该去改用户的 Markdown。
      */
-    upload(路径们: string[]): Promise<{
-      成功: { 原路径: string; 地址: string }[]
-      失败: { 原路径: string; 原因: string }[]
+    upload(paths: string[]): Promise<{
+      success: { rawPath: string; url: string }[]
+      failure: { rawPath: string; 原因: string }[]
     }>
     /** 当前上传器是否配置完整。 */
     uploaderStatus(): Promise<{ 可用: boolean; 原因: string | null }>
@@ -587,7 +587,7 @@ export interface SelfMdExtraApi {
     dirname(path: string): Promise<string>
     basename(path: string): Promise<string>
     /** 拼接路径片段。在主进程用 node:path 做，避免手写切分踩到盘符与 UNC 路径。 */
-    join(...段: string[]): Promise<string>
+    join(...segment: string[]): Promise<string>
   }
   file: {
     /** 复制文件。目标已存在时**直接失败**，绝不覆盖。 */
@@ -599,10 +599,10 @@ export interface SelfMdExtraApi {
      * 带上限：宁可索引不全，也不能让界面失去响应。
      */
     walk(
-      根: string,
-      选项?: { 上限?: number; 深度?: number }
+      root: string,
+      options?: { 上限?: number; 深度?: number }
     ): Promise<{
-      文件: { 路径: string; 名字: string; 修改时间: number; 大小: number }[]
+      file: { filePath: string; 名字: string; 修改时间: number; 大小: number }[]
       已截断: boolean
     }>
   }

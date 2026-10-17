@@ -63,8 +63,8 @@ export function decodeLocalToken(token: string): string | null {
 export function 主题文件Url(相对路径: string): string {
   const 安全 = 相对路径
     .split('/')
-    .filter((段) => 段.length > 0 && 段 !== '.' && 段 !== '..')
-    .map((段) => encodeURIComponent(段))
+    .filter((segment) => segment.length > 0 && segment !== '.' && segment !== '..')
+    .map((segment) => encodeURIComponent(segment))
     .join('/')
   return `${PROTOCOL_SCHEME}://theme/${安全}`
 }

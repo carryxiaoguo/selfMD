@@ -2,7 +2,7 @@ import { syntaxTree } from '@codemirror/language'
 import type { EditorState, Extension } from '@codemirror/state'
 import { EditorView } from '@codemirror/view'
 import type { Settings } from '@shared/types'
-import type { 语法节点 } from './syntax-node'
+import type { SyntaxNode } from './syntax-node'
 
 /**
  * 智能标点。
@@ -26,11 +26,11 @@ import type { 语法节点 } from './syntax-node'
 // ---------------------------------------------------------------------------
 
 /** 光标是否位于"字面文本"之外——代码块、行内代码、URL、注释里都不该做标点转换。 */
-export function 在代码上下文(状态: EditorState, 位置: number): boolean {
+export function 在代码上下文(state: EditorState, position: number): boolean {
   // 显式标注可空：向上遍历父节点时类型必须允许 null 作为终点。
-  let 当前: 语法节点 | null = syntaxTree(状态).resolveInner(位置, -1)
-  for (; 当前; 当前 = 当前.parent) {
-    switch (当前.name) {
+  let current: SyntaxNode | null = syntaxTree(state).resolveInner(position, -1)
+  for (; current; current = current.parent) {
+    switch (current.name) {
       case 'FencedCode':
       case 'CodeBlock':
       case 'CodeText':
@@ -48,9 +48,9 @@ export function 在代码上下文(状态: EditorState, 位置: number): boolean
 }
 
 /** 光标所在行、光标之前的文本。 */
-export function 本行前文(状态: EditorState, 位置: number): string {
-  const 行 = 状态.doc.lineAt(位置)
-  return 状态.sliceDoc(行.from, 位置)
+export function 本行前文(state: EditorState, position: number): string {
+  const line = state.doc.lineAt(position)
+  return state.sliceDoc(line.from, position)
 }
 
 // ---------------------------------------------------------------------------
@@ -74,11 +74,11 @@ const 开引号前导 = /[\s([{<（【《「『〔〈“‘’”‘’—–-]/
  * @param 字符 用户刚敲下的字符，`"` 或 `'`
  * @param 前文 光标之前的本行文本
  */
-export function 换引号(字符: '"' | "'", 前文: string): string {
+export function 换引号(ch: '"' | "'", 前文: string): string {
   const 前一个 = 前文.slice(-1)
   const 是开头 = 前文.length === 0 || 开引号前导.test(前一个)
 
-  if (字符 === '"') {
+  if (ch === '"') {
     return 是开头 ? '“' : '”'
   }
 
@@ -98,7 +98,7 @@ export interface 渲染标点段 {
   /** 屏幕上显示的字符。 */
   显示: string
   /** 文档里实际存的字符。 */
-  原文: string
+  originalText: string
 }
 
 /**
@@ -113,22 +113,22 @@ export interface 渲染标点段 {
  * 扫描是**逐字符推进**而非逐个正则匹配：`---` 必须优先于 `--` 匹配，
  * 用正则轮流试会先命中 `--`，把破折号拆成"连接号 + 连字符"。
  */
-export function 扫描渲染标点(文本: string, 基准: number): 渲染标点段[] {
-  const 结果: 渲染标点段[] = []
+export function 扫描渲染标点(docText: string, 基准: number): 渲染标点段[] {
+  const result: 渲染标点段[] = []
   let i = 0
 
-  while (i < 文本.length) {
-    const 字符 = 文本[i]
+  while (i < docText.length) {
+    const ch = docText[i]
 
     // --- 破折号：先试三连，再试两连 ---
-    if (字符 === '-') {
-      if (文本.startsWith('---', i)) {
-        结果.push({ from: 基准 + i, to: 基准 + i + 3, 显示: '—', 原文: '---' })
+    if (ch === '-') {
+      if (docText.startsWith('---', i)) {
+        result.push({ from: 基准 + i, to: 基准 + i + 3, 显示: '—', originalText: '---' })
         i += 3
         continue
       }
-      if (文本.startsWith('--', i)) {
-        结果.push({ from: 基准 + i, to: 基准 + i + 2, 显示: '–', 原文: '--' })
+      if (docText.startsWith('--', i)) {
+        result.push({ from: 基准 + i, to: 基准 + i + 2, 显示: '–', originalText: '--' })
         i += 2
         continue
       }
@@ -137,18 +137,18 @@ export function 扫描渲染标点(文本: string, 基准: number): 渲染标点
     }
 
     // --- 省略号 ---
-    if (字符 === '.' && 文本.startsWith('...', i)) {
-      结果.push({ from: 基准 + i, to: 基准 + i + 3, 显示: '…', 原文: '...' })
+    if (ch === '.' && docText.startsWith('...', i)) {
+      result.push({ from: 基准 + i, to: 基准 + i + 3, 显示: '…', originalText: '...' })
       i += 3
       continue
     }
 
     // --- 引号 ---
-    if (字符 === '"' || 字符 === "'") {
+    if (ch === '"' || ch === "'") {
       // 用扫描到当前位置为止的文本作为"前文"，与输入时的判断依据一致
-      const 显示 = 换引号(字符, 文本.slice(0, i))
-      if (显示 !== 字符) {
-        结果.push({ from: 基准 + i, to: 基准 + i + 1, 显示, 原文: 字符 })
+      const 显示 = 换引号(ch, docText.slice(0, i))
+      if (显示 !== ch) {
+        result.push({ from: 基准 + i, to: 基准 + i + 1, 显示, originalText: ch })
       }
       i++
       continue
@@ -157,7 +157,7 @@ export function 扫描渲染标点(文本: string, 基准: number): 渲染标点
     i++
   }
 
-  return 结果
+  return result
 }
 
 
@@ -226,24 +226,24 @@ export interface 智能标点选项 {
  * 挂在 `EditorView.inputHandler` 上，只在用户**逐字键入**时触发；粘贴、
  * 程序化编辑、输入法提交多字符都不经过这里，因此不会破坏这些路径。
  */
-export function 智能标点(选项: 智能标点选项): Extension {
-  if (!选项.引号 && !选项.破折号) return []
+export function 智能标点(options: 智能标点选项): Extension {
+  if (!options.引号 && !options.破折号) return []
 
-  return EditorView.inputHandler.of((视图, 从, 到, 输入) => {
+  return EditorView.inputHandler.of((view, 从, 到, input) => {
     // 只处理单字符键入。多字符意味着输入法或粘贴，不该插手。
-    if (输入.length !== 1) return false
+    if (input.length !== 1) return false
     // 有选区时是"替换"，与标点转换无关。
     if (从 !== 到) return false
 
-    const 状态 = 视图.state
-    if (在代码上下文(状态, 从)) return false
-    const 前文 = 本行前文(状态, 从)
+    const state = view.state
+    if (在代码上下文(state, 从)) return false
+    const 前文 = 本行前文(state, 从)
 
     let 方案: { 回退: number; 插入: string } | null = null
 
-    if (选项.引号 && (输入 === '"' || 输入 === "'")) {
-      方案 = { 回退: 0, 插入: 换引号(输入, 前文) }
-    } else if (选项.破折号 && 输入 === '-') {
+    if (options.引号 && (input === '"' || input === "'")) {
+      方案 = { 回退: 0, 插入: 换引号(input, 前文) }
+    } else if (options.破折号 && input === '-') {
       方案 = 换破折号(前文)
     }
 
@@ -251,10 +251,10 @@ export function 智能标点(选项: 智能标点选项): Extension {
 
     // 转换结果与原字符相同就没必要接管，让默认行为处理，
     // 这样中文输入法的候选、自动补全等附加行为不受影响。
-    if (方案.回退 === 0 && 方案.插入 === 输入) return false
+    if (方案.回退 === 0 && 方案.插入 === input) return false
 
     const 起点 = 从 - 方案.回退
-    视图.dispatch({
+    view.dispatch({
       changes: { from: 起点, to: 从, insert: 方案.插入 },
       selection: { anchor: 起点 + 方案.插入.length },
       userEvent: 'input.type',
@@ -265,8 +265,8 @@ export function 智能标点(选项: 智能标点选项): Extension {
 }
 
 /** 依据设置决定是否启用，以及转换哪些字符。 */
-export function 按设置构建智能标点(设置: Settings): Extension {
+export function 按设置构建智能标点(settings: Settings): Extension {
   // '渲染时转换' 尚未实现，此时不做输入期转换——否则两种模式会同时生效。
-  if (设置.smartPunctuationMode !== 'input') return []
-  return 智能标点({ 引号: 设置.smartQuotes, 破折号: 设置.smartDashes })
+  if (settings.smartPunctuationMode !== 'input') return []
+  return 智能标点({ 引号: settings.smartQuotes, 破折号: settings.smartDashes })
 }

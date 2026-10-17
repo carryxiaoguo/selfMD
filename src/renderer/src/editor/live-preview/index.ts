@@ -12,7 +12,7 @@ import { 扫描手工块, 处理块级 } from './block'
 import { 处理行内 } from './inline'
 import { 数学字段 } from './数学字段'
 import { 建立图表字段 } from './图表字段'
-import type { 构建上下文, 装饰条目, 语法节点 } from './types'
+import type { 构建上下文, 装饰条目, SyntaxNode } from './types'
 
 /**
  * 实时预览装饰层——对应渲染层里那套"brush / styler"。
@@ -36,15 +36,15 @@ import type { 构建上下文, 装饰条目, 语法节点 } from './types'
  *
  * 只读状态直接返回空集：只读时没有光标，全部按渲染态显示。
  */
-function 计算活动行(状态: EditorState): Set<number> {
+function 计算活动行(state: EditorState): Set<number> {
   const 行集合 = new Set<number>()
-  if (状态.readOnly) return 行集合
-  for (const 选区 of 状态.selection.ranges) {
-    const 首行 = 状态.doc.lineAt(选区.from).number
-    const 末行 = 状态.doc.lineAt(选区.to).number
+  if (state.readOnly) return 行集合
+  for (const selection of state.selection.ranges) {
+    const firstLine = state.doc.lineAt(selection.from).number
+    const lastLine = state.doc.lineAt(selection.to).number
     // 选区可能跨越成千上万行，设一个上限避免全量展开。
-    const 跨度 = Math.min(末行 - 首行, 200)
-    for (let n = 首行; n <= 首行 + 跨度; n++) 行集合.add(n)
+    const 跨度 = Math.min(lastLine - firstLine, 200)
+    for (let n = firstLine; n <= firstLine + 跨度; n++) 行集合.add(n)
   }
   return 行集合
 }
@@ -54,28 +54,28 @@ function 计算活动行(状态: EditorState): Set<number> {
 // ---------------------------------------------------------------------------
 
 function 构建装饰(view: EditorView): DecorationSet {
-  const 状态 = view.state
-  const 上下文: 构建上下文 = {
-    活动行: 计算活动行(状态),
+  const state = view.state
+  const context: 构建上下文 = {
+    活动行: 计算活动行(state),
     行装饰已用: new Set<number>(),
     已换头部栏: new Set<number>(),
-    条目: [] as 装饰条目[]
+    entry: [] as 装饰条目[]
   }
 
   // 第一遍：语法树里不存在的块（YAML 前置元数据、`$$` 数学块）。
-  const 手工 = 扫描手工块(状态, 上下文)
+  const 手工 = 扫描手工块(state, context)
 
   // 第二遍：按语法树分派。只遍历可视范围——CodeMirror 会虚拟化长文档，
   // 视口外的内容根本没有 DOM，为其构建装饰纯属浪费。
-  const 树 = syntaxTree(状态)
-  for (const 范围 of view.visibleRanges) {
+  const 树 = syntaxTree(state)
+  for (const rangeBounds of view.visibleRanges) {
     树.iterate({
-      from: 范围.from,
-      to: 范围.to,
-      enter: (引用) => {
-        const 节点 = 引用.node as unknown as 语法节点
-        处理块级(节点, 状态, 上下文, 手工)
-        处理行内(节点, 状态, 上下文)
+      from: rangeBounds.from,
+      to: rangeBounds.to,
+      enter: (quote) => {
+        const node = quote.node as unknown as SyntaxNode
+        处理块级(node, state, context, 手工)
+        处理行内(node, state, context)
         // 始终返回 true：需要继续下沉到子节点，否则标记折叠不会生效。
         return true
       }
@@ -83,18 +83,18 @@ function 构建装饰(view: EditorView): DecorationSet {
   }
 
   // 排序：先按起点，同起点按 rank（行装饰必须最先），最后按终点。
-  上下文.条目.sort((甲, 乙) => 甲.from - 乙.from || 甲.rank - 乙.rank || 甲.to - 乙.to)
+  context.entry.sort((alpha, beta) => alpha.from - beta.from || alpha.rank - beta.rank || alpha.to - beta.to)
 
   // 去重：同一位置、同一 rank 的零宽装饰只保留一条，避免 widget 重复渲染。
   const 已见 = new Set<string>()
-  const 区间: Range<Decoration>[] = []
-  for (const 条目 of 上下文.条目) {
-    if (条目.from === 条目.to) {
-      const 键 = `${条目.from}:${条目.to}:${条目.rank}`
-      if (已见.has(键)) continue
-      已见.add(键)
+  const range: Range<Decoration>[] = []
+  for (const entry of context.entry) {
+    if (entry.from === entry.to) {
+      const key = `${entry.from}:${entry.to}:${entry.rank}`
+      if (已见.has(key)) continue
+      已见.add(key)
     }
-    区间.push(条目.deco.range(条目.from, 条目.to))
+    range.push(entry.deco.range(entry.from, entry.to))
   }
 
   // 必须用 RangeSet.of 而不是 RangeSetBuilder。
@@ -104,7 +104,7 @@ function 构建装饰(view: EditorView): DecorationSet {
   // 而嵌套是这里的常态：`**加粗里的 *斜体***` 就是 StrongEmphasis 套着
   // Emphasis，两者区间天然重叠。RangeSet.of(..., true) 会自行排序，
   // 既允许嵌套，也免去手工维护顺序。
-  return RangeSet.of(区间, true)
+  return RangeSet.of(range, true)
 }
 
 // ---------------------------------------------------------------------------
@@ -129,12 +129,12 @@ class 实时预览 implements PluginValue {
     try {
       this.上次出错 = ''
       return 构建装饰(view)
-    } catch (错误) {
-      const 文本 = 错误 instanceof Error ? 错误.message : String(错误)
+    } catch (error) {
+      const docText = error instanceof Error ? error.message : String(error)
       // 同一条错误只打印一次，避免每次按键刷屏。
-      if (文本 !== this.上次出错) {
-        this.上次出错 = 文本
-        console.error('[实时预览] 装饰构建失败，已降级为纯文本显示：', 错误)
+      if (docText !== this.上次出错) {
+        this.上次出错 = docText
+        console.error('[实时预览] 装饰构建失败，已降级为纯文本显示：', error)
       }
       return Decoration.none
     }

@@ -2,7 +2,7 @@ import { isolateHistory } from '@codemirror/commands'
 import { syntaxTree } from '@codemirror/language'
 import { EditorSelection, type ChangeSpec, type EditorState } from '@codemirror/state'
 import type { EditorView } from '@codemirror/view'
-import type { 语法节点 } from './syntax-node'
+import type { SyntaxNode } from './syntax-node'
 
 /**
  * 段落与格式编辑命令。
@@ -23,36 +23,36 @@ import type { 语法节点 } from './syntax-node'
  * "撤掉加粗"，不是"撤掉一段"。`isolateHistory` 是 @codemirror/commands
  * 导出的注解类型（不是 TransactionSpec 字段），必须走 `annotations`。
  */
-const 独立撤销 = isolateHistory.of('full')
+const isolatedUndo = isolateHistory.of('full')
 
 // ---------------------------------------------------------------------------
 // 选区工具
 // ---------------------------------------------------------------------------
 
 /** 选区覆盖到的行号区间（1 基，含首尾）。 */
-function 涉及行(状态: EditorState): { 首: number; 末: number } {
-  const 主 = 状态.selection.main
+function 涉及行(state: EditorState): { head: number; tail: number } {
+  const main = state.selection.main
   return {
-    首: 状态.doc.lineAt(主.from).number,
-    末: 状态.doc.lineAt(主.to).number
+    head: state.doc.lineAt(main.from).number,
+    tail: state.doc.lineAt(main.to).number
   }
 }
 
 /** 生成"整行替换"的变更集，用于块级命令。 */
 function 整行变更(
-  状态: EditorState,
-  转换: (行文本: string, 行号: number) => string
+  state: EditorState,
+  转换: (lineText: string, lineNo: number) => string
 ): ChangeSpec[] {
-  const { 首, 末 } = 涉及行(状态)
-  const 变更: ChangeSpec[] = []
-  for (let 号 = 首; 号 <= 末; 号++) {
-    const 行 = 状态.doc.line(号)
-    const 新文本 = 转换(行.text, 号)
-    if (新文本 !== 行.text) {
-      变更.push({ from: 行.from, to: 行.to, insert: 新文本 })
+  const { head, tail } = 涉及行(state)
+  const changes: ChangeSpec[] = []
+  for (let no = head; no <= tail; no++) {
+    const line = state.doc.line(no)
+    const 新文本 = 转换(line.text, no)
+    if (新文本 !== line.text) {
+      changes.push({ from: line.from, to: line.to, insert: 新文本 })
     }
   }
-  return 变更
+  return changes
 }
 
 // ---------------------------------------------------------------------------
@@ -68,37 +68,37 @@ const 标题正则 = /^(#{1,6})(\s+)/
  *             对已经是该级别的行再执行一次，同样取消——这就是"切换"。
  */
 export function 设置标题级别(view: EditorView, 级别: number): boolean {
-  const 状态 = view.state
-  const { 首, 末 } = 涉及行(状态)
+  const state = view.state
+  const { head, tail } = 涉及行(state)
 
   // 判断当前是否全都是目标级别，用于决定是"设置"还是"取消"。
   let 全是目标 = true
-  for (let 号 = 首; 号 <= 末; 号++) {
-    const 匹配 = 标题正则.exec(状态.doc.line(号).text)
-    if (!匹配 || 匹配[1].length !== 级别) {
+  for (let no = head; no <= tail; no++) {
+    const match = 标题正则.exec(state.doc.line(no).text)
+    if (!match || match[1].length !== 级别) {
       全是目标 = false
       break
     }
   }
-  const 目标 = 全是目标 ? 0 : 级别
+  const target = 全是目标 ? 0 : 级别
 
-  const 变更 = 整行变更(状态, (文本) => {
-    const 去标题 = 文本.replace(标题正则, '')
-    return 目标 === 0 ? 去标题 : '#'.repeat(目标) + ' ' + 去标题
+  const changes = 整行变更(state, (docText) => {
+    const 去标题 = docText.replace(标题正则, '')
+    return target === 0 ? 去标题 : '#'.repeat(target) + ' ' + 去标题
   })
-  if (变更.length === 0) return false
-  view.dispatch({ changes: 变更, userEvent: 'input.setHeading', annotations: 独立撤销 })
+  if (changes.length === 0) return false
+  view.dispatch({ changes: changes, userEvent: 'input.setHeading', annotations: isolatedUndo })
   return true
 }
 
 /** 提升/降低标题级别；普通段落执行"提升"会变成一级标题。 */
 export function 调整标题级别(view: EditorView, 方向: 1 | -1): boolean {
-  const 状态 = view.state
-  const { 首 } = 涉及行(状态)
-  const 匹配 = 标题正则.exec(状态.doc.line(首).text)
-  const 当前 = 匹配 ? 匹配[1].length : 0
-  const 下级 = Math.min(6, Math.max(0, 当前 + 方向))
-  if (下级 === 当前) return false
+  const state = view.state
+  const { head } = 涉及行(state)
+  const match = 标题正则.exec(state.doc.line(head).text)
+  const current = match ? match[1].length : 0
+  const 下级 = Math.min(6, Math.max(0, current + 方向))
+  if (下级 === current) return false
   return 设置标题级别(view, 下级)
 }
 
@@ -109,22 +109,22 @@ export function 调整标题级别(view: EditorView, 方向: 1 | -1): boolean {
 const 引用正则 = /^>\s?/
 
 export function 切换引用(view: EditorView): boolean {
-  const 状态 = view.state
-  const { 首, 末 } = 涉及行(状态)
+  const state = view.state
+  const { head, tail } = 涉及行(state)
 
   let 全是引用 = true
-  for (let 号 = 首; 号 <= 末; 号++) {
-    if (!引用正则.test(状态.doc.line(号).text)) {
+  for (let no = head; no <= tail; no++) {
+    if (!引用正则.test(state.doc.line(no).text)) {
       全是引用 = false
       break
     }
   }
 
-  const 变更 = 整行变更(状态, (文本) =>
-    全是引用 ? 文本.replace(引用正则, '') : '> ' + 文本
+  const changes = 整行变更(state, (docText) =>
+    全是引用 ? docText.replace(引用正则, '') : '> ' + docText
   )
-  if (变更.length === 0) return false
-  view.dispatch({ changes: 变更, userEvent: 'input.toggleQuote', annotations: 独立撤销 })
+  if (changes.length === 0) return false
+  view.dispatch({ changes: changes, userEvent: 'input.toggleQuote', annotations: isolatedUndo })
   return true
 }
 
@@ -138,59 +138,59 @@ const 任务正则 = /^(\s*)[-*+]\s+\[[ xX]\]\s+/
 
 export type 列表类型 = '无序' | '有序' | '任务'
 
-export function 切换列表(view: EditorView, 类型: 列表类型): boolean {
-  const 状态 = view.state
-  const { 首, 末 } = 涉及行(状态)
+export function 切换列表(view: EditorView, kind: 列表类型): boolean {
+  const state = view.state
+  const { head, tail } = 涉及行(state)
 
   // 已经全是该类型则取消。
   const 匹配器 =
-    类型 === '无序' ? 无序正则 : 类型 === '有序' ? 有序正则 : 任务正则
+    kind === '无序' ? 无序正则 : kind === '有序' ? 有序正则 : 任务正则
   let 全是目标 = true
-  for (let 号 = 首; 号 <= 末; 号++) {
-    if (!匹配器.test(状态.doc.line(号).text)) {
+  for (let no = head; no <= tail; no++) {
+    if (!匹配器.test(state.doc.line(no).text)) {
       全是目标 = false
       break
     }
   }
 
-  let 序号 = 1
-  const 变更 = 整行变更(状态, (文本) => {
+  let index = 1
+  const changes = 整行变更(state, (docText) => {
     // 先剥掉任何已有的列表标记，避免 `- 1. 内容` 这种叠加。
-    const 缩进 = /^(\s*)/.exec(文本)?.[1] ?? ''
-    let 正文 = 文本.slice(缩进.length)
-    正文 = 正文.replace(任务正则, '').replace(无序正则, '').replace(有序正则, '')
+    const indent = /^(\s*)/.exec(docText)?.[1] ?? ''
+    let body = docText.slice(indent.length)
+    body = body.replace(任务正则, '').replace(无序正则, '').replace(有序正则, '')
 
-    if (全是目标) return 缩进 + 正文
+    if (全是目标) return indent + body
 
-    switch (类型) {
+    switch (kind) {
       case '无序':
-        return `${缩进}- ${正文}`
+        return `${indent}- ${body}`
       case '有序':
-        return `${缩进}${序号++}. ${正文}`
+        return `${indent}${index++}. ${body}`
       case '任务':
-        return `${缩进}- [ ] ${正文}`
+        return `${indent}- [ ] ${body}`
     }
   })
 
-  if (变更.length === 0) return false
-  view.dispatch({ changes: 变更, userEvent: 'input.toggleList', annotations: 独立撤销 })
+  if (changes.length === 0) return false
+  view.dispatch({ changes: changes, userEvent: 'input.toggleList', annotations: isolatedUndo })
   return true
 }
 
 /** 缩进 / 反缩进：块级命令按 2 个空格一层。 */
 export function 调整缩进(view: EditorView, 方向: 1 | -1): boolean {
-  const 状态 = view.state
-  const 单位 = ' '.repeat(Math.max(1, Math.min(8, 状态.tabSize)))
-  const 变更 = 整行变更(状态, (文本) => {
-    if (方向 === 1) return 单位 + 文本
+  const state = view.state
+  const 单位 = ' '.repeat(Math.max(1, Math.min(8, state.tabSize)))
+  const changes = 整行变更(state, (docText) => {
+    if (方向 === 1) return 单位 + docText
     // 反缩进：优先吃掉一个制表符，否则最多吃掉一个单位的空格。
-    if (文本.startsWith('\t')) return 文本.slice(1)
-    const 前导 = /^ +/.exec(文本)?.[0] ?? ''
-    if (前导.length === 0) return 文本
-    return 文本.slice(Math.min(单位.length, 前导.length))
+    if (docText.startsWith('\t')) return docText.slice(1)
+    const 前导 = /^ +/.exec(docText)?.[0] ?? ''
+    if (前导.length === 0) return docText
+    return docText.slice(Math.min(单位.length, 前导.length))
   })
-  if (变更.length === 0) return false
-  view.dispatch({ changes: 变更, userEvent: 'input.indent', annotations: 独立撤销 })
+  if (changes.length === 0) return false
+  view.dispatch({ changes: changes, userEvent: 'input.indent', annotations: isolatedUndo })
   return true
 }
 
@@ -199,32 +199,32 @@ export function 调整缩进(view: EditorView, 方向: 1 | -1): boolean {
 // ---------------------------------------------------------------------------
 
 /** 在光标处插入一段文本，并把光标放到指定偏移。 */
-function 插入块(view: EditorView, 文本: string, 光标偏移: number): boolean {
-  const 主 = view.state.selection.main
+function 插入块(view: EditorView, docText: string, 光标偏移: number): boolean {
+  const main = view.state.selection.main
   // 保证块级语法前后各有一个空行，否则会与相邻块粘连。
-  const 前 = 主.from > 0 && view.state.sliceDoc(主.from - 1, 主.from) !== '\n' ? '\n' : ''
-  const 内容 = 前 + 文本
+  const before = main.from > 0 && view.state.sliceDoc(main.from - 1, main.from) !== '\n' ? '\n' : ''
+  const content = before + docText
   view.dispatch({
-    changes: { from: 主.from, to: 主.to, insert: 内容 },
-    selection: EditorSelection.cursor(主.from + 前.length + 光标偏移),
+    changes: { from: main.from, to: main.to, insert: content },
+    selection: EditorSelection.cursor(main.from + before.length + 光标偏移),
     userEvent: 'input.insertBlock',
-    annotations: 独立撤销
+    annotations: isolatedUndo
   })
   return true
 }
 
 export function 插入代码围栏(view: EditorView): boolean {
-  const 状态 = view.state
-  const 主 = 状态.selection.main
+  const state = view.state
+  const main = state.selection.main
   // 有选区就把它包成围栏；没有就插入空围栏。
-  if (!主.empty) {
-    const 原文 = 状态.sliceDoc(主.from, 主.to)
-    const 内容 = '```\n' + 原文 + '\n```'
+  if (!main.empty) {
+    const originalText = state.sliceDoc(main.from, main.to)
+    const content = '```\n' + originalText + '\n```'
     view.dispatch({
-      changes: { from: 主.from, to: 主.to, insert: 内容 },
-      selection: EditorSelection.range(主.from, 主.from + 内容.length),
+      changes: { from: main.from, to: main.to, insert: content },
+      selection: EditorSelection.range(main.from, main.from + content.length),
       userEvent: 'input.codeFence',
-      annotations: 独立撤销
+      annotations: isolatedUndo
     })
     return true
   }
@@ -232,16 +232,16 @@ export function 插入代码围栏(view: EditorView): boolean {
 }
 
 export function 插入数学块(view: EditorView): boolean {
-  const 状态 = view.state
-  const 主 = 状态.selection.main
-  if (!主.empty) {
-    const 原文 = 状态.sliceDoc(主.from, 主.to)
-    const 内容 = '$$\n' + 原文 + '\n$$'
+  const state = view.state
+  const main = state.selection.main
+  if (!main.empty) {
+    const originalText = state.sliceDoc(main.from, main.to)
+    const content = '$$\n' + originalText + '\n$$'
     view.dispatch({
-      changes: { from: 主.from, to: 主.to, insert: 内容 },
-      selection: EditorSelection.range(主.from, 主.from + 内容.length),
+      changes: { from: main.from, to: main.to, insert: content },
+      selection: EditorSelection.range(main.from, main.from + content.length),
       userEvent: 'input.mathBlock',
-      annotations: 独立撤销
+      annotations: isolatedUndo
     })
     return true
   }
@@ -265,8 +265,8 @@ export function 插入表格(view: EditorView): boolean {
 }
 
 export function 插入前置元数据(view: EditorView): boolean {
-  const 状态 = view.state
-  if (状态.doc.lines > 1 || 状态.doc.length > 0) {
+  const state = view.state
+  if (state.doc.lines > 1 || state.doc.length > 0) {
     // 前置元数据只能位于文档最开头。
     return false
   }
@@ -275,7 +275,7 @@ export function 插入前置元数据(view: EditorView): boolean {
     changes: { from: 0, to: 0, insert: 骨架 },
     selection: EditorSelection.cursor(11),
     userEvent: 'input.frontMatter',
-    annotations: 独立撤销
+    annotations: isolatedUndo
   })
   return true
 }
@@ -290,73 +290,73 @@ export function 插入前置元数据(view: EditorView): boolean {
  * 空选区时插入一对标记并把光标放到中间，符合"点一下加粗，然后开始打字"
  * 的直觉。
  */
-export function 包裹行内(view: EditorView, 前: string, 后: string = 前): boolean {
-  const 状态 = view.state
-  const 变更: ChangeSpec[] = []
+export function 包裹行内(view: EditorView, before: string, 后: string = before): boolean {
+  const state = view.state
+  const changes: ChangeSpec[] = []
   const 新选区: { anchor: number; head: number }[] = []
 
   // 多个选区时从后往前处理，避免前面的改动影响后面的偏移。
-  const 选区们 = [...状态.selection.ranges].sort((甲, 乙) => 乙.from - 甲.from)
+  const 选区们 = [...state.selection.ranges].sort((alpha, beta) => beta.from - alpha.from)
 
-  for (const 选区 of 选区们) {
-    if (选区.empty) {
-      变更.push({ from: 选区.from, to: 选区.to, insert: 前 + 后 })
-      新选区.push({ anchor: 选区.from + 前.length, head: 选区.from + 前.length })
+  for (const selection of 选区们) {
+    if (selection.empty) {
+      changes.push({ from: selection.from, to: selection.to, insert: before + 后 })
+      新选区.push({ anchor: selection.from + before.length, head: selection.from + before.length })
       continue
     }
 
-    const 原文 = 状态.sliceDoc(选区.from, 选区.to)
-    const 外前 = 状态.sliceDoc(Math.max(0, 选区.from - 前.length), 选区.from)
-    const 外后 = 状态.sliceDoc(选区.to, Math.min(状态.doc.length, 选区.to + 后.length))
+    const originalText = state.sliceDoc(selection.from, selection.to)
+    const 外前 = state.sliceDoc(Math.max(0, selection.from - before.length), selection.from)
+    const 外后 = state.sliceDoc(selection.to, Math.min(state.doc.length, selection.to + 后.length))
 
-    if (外前 === 前 && 外后 === 后) {
+    if (外前 === before && 外后 === 后) {
       // 标记在选区外侧：连同标记一起替换掉
-      变更.push({
-        from: 选区.from - 前.length,
-        to: 选区.to + 后.length,
-        insert: 原文
+      changes.push({
+        from: selection.from - before.length,
+        to: selection.to + 后.length,
+        insert: originalText
       })
-      新选区.push({ anchor: 选区.from - 前.length, head: 选区.to - 前.length })
+      新选区.push({ anchor: selection.from - before.length, head: selection.to - before.length })
     } else if (
-      原文.length > 前.length + 后.length &&
-      原文.startsWith(前) &&
-      原文.endsWith(后)
+      originalText.length > before.length + 后.length &&
+      originalText.startsWith(before) &&
+      originalText.endsWith(后)
     ) {
       // 标记在选区内侧
-      const 内容 = 原文.slice(前.length, 原文.length - 后.length)
-      变更.push({ from: 选区.from, to: 选区.to, insert: 内容 })
-      新选区.push({ anchor: 选区.from, head: 选区.from + 内容.length })
+      const content = originalText.slice(before.length, originalText.length - 后.length)
+      changes.push({ from: selection.from, to: selection.to, insert: content })
+      新选区.push({ anchor: selection.from, head: selection.from + content.length })
     } else {
-      变更.push({ from: 选区.from, to: 选区.to, insert: 前 + 原文 + 后 })
-      新选区.push({ anchor: 选区.from + 前.length, head: 选区.to + 前.length })
+      changes.push({ from: selection.from, to: selection.to, insert: before + originalText + 后 })
+      新选区.push({ anchor: selection.from + before.length, head: selection.to + before.length })
     }
   }
 
-  if (变更.length === 0) return false
-  新选区.sort((甲, 乙) => 甲.anchor - 乙.anchor)
+  if (changes.length === 0) return false
+  新选区.sort((alpha, beta) => alpha.anchor - beta.anchor)
   view.dispatch({
-    changes: 变更,
+    changes: changes,
     selection: EditorSelection.create(
-      新选区.map((区) => EditorSelection.range(区.anchor, 区.head))
+      新选区.map((sel) => EditorSelection.range(sel.anchor, sel.head))
     ),
     userEvent: 'input.inlineFormat',
-    annotations: 独立撤销
+    annotations: isolatedUndo
   })
   return true
 }
 
 /** 插入或编辑链接：选中文字时包裹为 `[文字](地址)` 并选中地址占位。 */
 export function 插入链接(view: EditorView): boolean {
-  const 状态 = view.state
-  const 主 = 状态.selection.main
-  const 文字 = 主.empty ? '' : 状态.sliceDoc(主.from, 主.to)
-  const 内容 = `[${文字}](地址)`
-  const 地址起 = 主.from + 1 + 文字.length + 2
+  const state = view.state
+  const main = state.selection.main
+  const text = main.empty ? '' : state.sliceDoc(main.from, main.to)
+  const content = `[${text}](地址)`
+  const 地址起 = main.from + 1 + text.length + 2
   view.dispatch({
-    changes: { from: 主.from, to: 主.to, insert: 内容 },
+    changes: { from: main.from, to: main.to, insert: content },
     selection: EditorSelection.range(地址起, 地址起 + 2),
     userEvent: 'input.insertLink',
-    annotations: 独立撤销
+    annotations: isolatedUndo
   })
   return true
 }
@@ -381,30 +381,30 @@ const 可清除标记 = [
  * 的标记片段（例如只选中了 `**加粗` 的一部分），语法树此时并不完整，
  * 而文本替换在任何情况下都能给出可预期的结果。
  */
-export function 清除格式(view: EditorView): boolean {
-  const 状态 = view.state
-  const 变更: ChangeSpec[] = []
+export function clearFormat(view: EditorView): boolean {
+  const state = view.state
+  const changes: ChangeSpec[] = []
 
-  for (const 选区 of 状态.selection.ranges) {
-    if (选区.empty) continue
-    const 原文 = 状态.sliceDoc(选区.from, 选区.to)
-    let 文本 = 原文
+  for (const selection of state.selection.ranges) {
+    if (selection.empty) continue
+    const originalText = state.sliceDoc(selection.from, selection.to)
+    let docText = originalText
 
     // 用 split/join 做字面量剥离：标记里含 `*` `[` `\` 等正则元字符，
     // 走正则反而要逐个转义，容易出错。
-    for (const [前, 后] of 可清除标记) {
-      文本 = 文本.split(前).join('').split(后).join('')
+    for (const [before, 后] of 可清除标记) {
+      docText = docText.split(before).join('').split(后).join('')
     }
     // 链接保留可见文字，丢弃地址。
-    文本 = 文本.replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+    docText = docText.replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
 
-    if (文本 !== 原文) {
-      变更.push({ from: 选区.from, to: 选区.to, insert: 文本 })
+    if (docText !== originalText) {
+      changes.push({ from: selection.from, to: selection.to, insert: docText })
     }
   }
 
-  if (变更.length === 0) return false
-  view.dispatch({ changes: 变更, userEvent: 'input.clearFormat', annotations: 独立撤销 })
+  if (changes.length === 0) return false
+  view.dispatch({ changes: changes, userEvent: 'input.clearFormat', annotations: isolatedUndo })
   return true
 }
 
@@ -424,24 +424,24 @@ export function 清除格式(view: EditorView): boolean {
  * @returns 不在引用行上时返回 false，回车照常交给别的处理器
  */
 export function 继续引用块(view: EditorView): boolean {
-  const 状态 = view.state
-  const 选区 = 状态.selection.main
-  if (!选区.empty) return false
+  const state = view.state
+  const selection = state.selection.main
+  if (!selection.empty) return false
 
-  const 行 = 状态.doc.lineAt(选区.head)
+  const line = state.doc.lineAt(selection.head)
   // 光标不在行尾：是在改这一行的内容，不是要开新行
-  if (选区.head !== 行.to) return false
+  if (selection.head !== line.to) return false
   // 光标之前的部分得**以引用前缀开头**：缩进 + 一层或多层 `>`。
   // 注意这里**不能**用 `$` 锚定行尾——正文行是 `> 有字的一行`，
   // 只匹配前缀即可，锚了 `$` 就永远匹配不上，命令等于没用。
-  const 匹配 = /^([ \t]*)((?:>[ \t]?)+)/.exec(状态.sliceDoc(行.from, 选区.head))
-  if (!匹配) return false
+  const match = /^([ \t]*)((?:>[ \t]?)+)/.exec(state.sliceDoc(line.from, selection.head))
+  if (!match) return false
 
   // 新行的前缀沿用原行：缩进 + 同样层数的 `>`，嵌套引用不会被压平
-  const 前缀 = 匹配[1] + 匹配[2]
+  const 前缀 = match[1] + match[2]
   view.dispatch({
-    changes: { from: 选区.head, insert: `\n${前缀}` },
-    selection: { anchor: 选区.head + 1 + 前缀.length },
+    changes: { from: selection.head, insert: `\n${前缀}` },
+    selection: { anchor: selection.head + 1 + 前缀.length },
     scrollIntoView: true,
     userEvent: 'input'
   })
@@ -471,43 +471,43 @@ export function 继续引用块(view: EditorView): boolean {
  * @returns 条件不满足时返回 false，把回车让给别的处理器
  */
 export function 继续代码围栏(view: EditorView): boolean {
-  const 状态 = view.state
-  const 选区 = 状态.selection.main
-  if (!选区.empty) return false
+  const state = view.state
+  const selection = state.selection.main
+  if (!selection.empty) return false
 
-  const 行 = 状态.doc.lineAt(选区.head)
-  const 行文本 = 状态.sliceDoc(行.from, 行.to)
+  const line = state.doc.lineAt(selection.head)
+  const lineText = state.sliceDoc(line.from, line.to)
   // 光标不在行尾：用户是在改已有内容，不是在开新块
-  if (选区.head !== 行.to) return false
+  if (selection.head !== line.to) return false
   // 这一行得像围栏首行（反引号或波浪线，后面可以跟语言）
-  if (!/^\s*(`{3,}|~{3,})/.test(行文本)) return false
+  if (!/^\s*(`{3,}|~{3,})/.test(lineText)) return false
 
   // 找包含这一行的 FencedCode
-  let 围栏: 语法节点 | null = null
-  let 节点: 语法节点 | null = syntaxTree(状态).resolveInner(行.from, 1) as unknown as 语法节点
-  while (节点) {
-    if (节点.name === 'FencedCode') {
-      围栏 = 节点
+  let fence: SyntaxNode | null = null
+  let node: SyntaxNode | null = syntaxTree(state).resolveInner(line.from, 1) as unknown as SyntaxNode
+  while (node) {
+    if (node.name === 'FencedCode') {
+      fence = node
       break
     }
-    节点 = 节点.parent
+    node = node.parent
   }
-  if (!围栏) return false
+  if (!fence) return false
   // 必须是**首行**：在块中间按回车不该又补一个围栏
-  if (状态.doc.lineAt(围栏.from).from !== 行.from) return false
+  if (state.doc.lineAt(fence.from).from !== line.from) return false
 
   // 已经有闭合围栏就不补。块内每按一次回车都补一个围栏，
   // 比不补更烦人——那是在替用户"纠正"他并没有犯的错。
-  const 余下 = 状态.sliceDoc(行.to, Math.min(围栏.to, 状态.doc.length))
+  const 余下 = state.sliceDoc(line.to, Math.min(fence.to, state.doc.length))
   if (/\n\s*(`{3,}|~{3,})\s*$/.test(余下)) return false
 
-  const 缩进 = /^\s*/.exec(行文本)?.[0] ?? ''
-  const 围栏符 = 行文本.trim().startsWith('~') ? '~~~' : '```'
+  const indent = /^\s*/.exec(lineText)?.[0] ?? ''
+  const fenceMark = lineText.trim().startsWith('~') ? '~~~' : '```'
 
   view.dispatch({
-    changes: { from: 行.to, insert: `\n\n${缩进}${围栏符}` },
+    changes: { from: line.to, insert: `\n\n${indent}${fenceMark}` },
     // 光标落在中间那个空行上——用户接下来要写的是代码，不是围栏
-    selection: { anchor: 行.to + 1 },
+    selection: { anchor: line.to + 1 },
     scrollIntoView: true,
     userEvent: 'input'
   })
@@ -532,28 +532,28 @@ export function 继续代码围栏(view: EditorView): boolean {
  *          （关面板、清选区、退出全屏……）。
  */
 export function 跳出代码块(view: EditorView): boolean {
-  const 状态 = view.state
-  const 光标 = 状态.selection.main
+  const state = view.state
+  const cursor = state.selection.main
 
   // 找包含光标的最内层围栏。`resolveInner` 给的是最深的节点，
   // 沿 parent 往上找，第一个 FencedCode 就是它。
-  let 围栏: 语法节点 | null = null
-  let 节点: 语法节点 | null = syntaxTree(状态).resolveInner(光标.head, -1) as unknown as 语法节点
-  while (节点) {
-    if (节点.name === 'FencedCode') {
-      围栏 = 节点
+  let fence: SyntaxNode | null = null
+  let node: SyntaxNode | null = syntaxTree(state).resolveInner(cursor.head, -1) as unknown as SyntaxNode
+  while (node) {
+    if (node.name === 'FencedCode') {
+      fence = node
       break
     }
-    节点 = 节点.parent
+    node = node.parent
   }
-  if (!围栏) return false
+  if (!fence) return false
 
-  const 末行 = 状态.doc.lineAt(围栏.to)
+  const lastLine = state.doc.lineAt(fence.to)
 
   // 围栏已经是最后一行：补一个空行再落上去。
   // 不补的话光标无处可去，用户会觉得"退不出去"——那比原来更糟。
-  if (末行.number >= 状态.doc.lines) {
-    const 末尾 = 状态.doc.length
+  if (lastLine.number >= state.doc.lines) {
+    const 末尾 = state.doc.length
     view.dispatch({
       changes: { from: 末尾, insert: '\n' },
       selection: { anchor: 末尾 + 1 },
@@ -563,7 +563,7 @@ export function 跳出代码块(view: EditorView): boolean {
     return true
   }
 
-  const 下一行 = 状态.doc.line(末行.number + 1)
+  const 下一行 = state.doc.line(lastLine.number + 1)
   view.dispatch({
     selection: { anchor: 下一行.from },
     scrollIntoView: true,

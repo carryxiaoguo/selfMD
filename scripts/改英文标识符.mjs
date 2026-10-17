@@ -87,6 +87,22 @@ function 收集文件(目录, 结果 = []) {
 
 const 文件们 = 收集文件(join(根, 'src'))
 
+/**
+ * 跳过清单：路径里含这些子串的文件**整份不动**。
+ *
+ * 用来**隔离破坏**：某组改名把功能弄坏、又定位不到是哪一处时，
+ * 先把整份文件排除在外，其余全改，验证功能恢复——这样问题就被锁进这几个文件里。
+ */
+const 跳过的子串 = (process.argv.find((a) => a.startsWith('--跳过=')) ?? '')
+  .replace('--跳过=', '')
+  .split(',')
+  .map((s) => s.trim())
+  .filter(Boolean)
+
+function 该跳过(全路径) {
+  return 跳过的子串.some((子) => 全路径.includes(子))
+}
+
 /** 一个文件里需要做的替换：位置 + 长度 + 新名。 */
 function 收集替换(全路径) {
   const 源 = readFileSync(全路径, 'utf8')
@@ -104,6 +120,30 @@ function 收集替换(全路径) {
         }
       } else {
         未映射.set(节点.text, (未映射.get(节点.text) ?? 0) + 1)
+      }
+    }
+
+    // **字符串里的 `data-<中文>` 也要跟着改。**
+    //
+    // `dataset.状态 = …` 里的 `状态` 是标识符，会被改；
+    // 而 `'.cm-w-diagram[data-状态="完成"]'` 里的 `data-状态` 是**字符串**，
+    // AST 碰不到。两边就此错开——元素属性变成了 `data-state`，
+    // 选择器还在找 `data-状态`，于是一个都匹配不上。
+    //
+    // 这个坑的症状特别迷惑：功能明明是好的（实测三个图表都在，
+    // 两个出了 SVG、一个出了失败占位），只有计数全是 0。
+    // 所以这里只针对 `data-` 前缀做替换，范围窄、不会误伤界面文案。
+    if (ts.isStringLiteral(节点)) {
+      const 原文 = 节点.text
+      const 新文 = 原文.replace(/data-([\u4e00-\u9fff][\u4e00-\u9fff\w]*)/g, (整个, 中名) =>
+        对照[中名] ? `data-${对照[中名]}` : 整个
+      )
+      if (新文 !== 原文) {
+        替换.push({
+          起: 节点.getStart(树) + 1,
+          长: 节点.getWidth(树) - 2,
+          新名: 新文
+        })
       }
     }
 
@@ -143,6 +183,7 @@ const 全局未映射 = new Map()
 const 待写 = []
 
 for (const 全路径 of 文件们) {
+  if (该跳过(全路径)) continue
   const { 源, 替换, 未映射 } = 收集替换(全路径)
   for (const [k, v] of 未映射) 全局未映射.set(k, (全局未映射.get(k) ?? 0) + v)
   if (替换.length === 0) continue

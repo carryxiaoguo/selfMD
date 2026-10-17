@@ -322,9 +322,9 @@ export interface ThemeInfo {
  * 由「是否深色模式」与「是否使用独立深色主题」共同决定。主进程与渲染层都要用，
  * 所以放在共享层——两边各写一份，迟早会在某个分支上分叉。
  */
-export function 生效主题(设置: Settings): string {
-  if (设置.isDarkMode && 设置.useSeparateDarkTheme) return 设置.darkTheme
-  return 设置.theme
+export function 生效主题(settings: Settings): string {
+  if (settings.isDarkMode && settings.useSeparateDarkTheme) return settings.darkTheme
+  return settings.theme
 }
 
 /**
@@ -334,15 +334,15 @@ export function 生效主题(设置: Settings): string {
  * 任何一处漏掉模式判断，就会出现"设了始终显示、某个入口还是能关掉它"
  * 这种自相矛盾的状态。所有需要判断的地方都调这个函数。
  */
-export function 侧边栏可见(设置: Settings): boolean {
-  if (设置.sidebarMode === 'always') return true
-  if (设置.sidebarMode === 'never') return false
-  return 设置.sidebarVisible
+export function 侧边栏可见(settings: Settings): boolean {
+  if (settings.sidebarMode === 'always') return true
+  if (settings.sidebarMode === 'never') return false
+  return settings.sidebarVisible
 }
 
 /** 侧边栏是否被策略锁住（锁住时切换命令应当说明原因，而不是默默无效）。 */
-export function 侧边栏被锁定(设置: Settings): boolean {
-  return 设置.sidebarMode !== 'toggle'
+export function 侧边栏被锁定(settings: Settings): boolean {
+  return settings.sidebarMode !== 'toggle'
 }
 
 /**
@@ -351,11 +351,11 @@ export function 侧边栏被锁定(设置: Settings): boolean {
  * 恢复界面靠这些字段判断"要不要提示用户"：草稿比原文件新才提示；
  * 内容长度一致则视为没改动——纯粹时间戳造成的差异不值得打扰用户。
  */
-export interface 草稿信息 {
+export interface DraftInfo {
   /** 草稿键，用于定位与删除。 */
-  键: string
+  key: string
   /** 原文档路径；未保存的文档为 null。 */
-  原路径: string | null
+  rawPath: string | null
   /** 草稿写入时间（毫秒）。 */
   保存时间: number
   /** 原文件最后修改时间；文件不存在时为 null。 */

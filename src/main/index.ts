@@ -7,7 +7,7 @@ import { iconPath } from './util/resource-path'
 import { registerIpc } from './ipc'
 import { whenDocumentOpened, whenRendererReady } from './ipc/app'
 import { registerPrivilegedSchemes, registerProtocolHandlers } from './protocol'
-import { rebuildMenu, 菜单摘要, 设置Pandoc可用 } from './menu'
+import { rebuildMenu, menuSummary, setPandocAvailability } from './menu'
 import { detectPandoc, runExport } from './export'
 import { getAssocStatus } from './services/file-association'
 import {
@@ -125,7 +125,7 @@ if (!gotLock) {
     // Pandoc 探测要跑子进程，会拖慢启动，所以放到窗口创建之后。
     // 结果回来再重建菜单，把 Word 等格式点亮。
     void detectPandoc().then((filePath: string | null) => {
-      设置Pandoc可用(filePath !== null)
+      setPandocAvailability(filePath !== null)
       rebuildMenu()
     })
 
@@ -293,8 +293,8 @@ async function 运行草稿测试(): Promise<boolean> {
   // 而"删除后应当没有无名草稿"这条断言看的是全局列表，
   // 不先打扫就会因为别人的残渣而失败——表现为单独跑能过、
   // 放进完整流水线就挂，这类顺序依赖最难排查。
-  for (const 旧 of listDrafts()) {
-    if (旧.rawPath === null) deleteDraft(旧.key)
+  for (const oldValue of listDrafts()) {
+    if (oldValue.rawPath === null) deleteDraft(oldValue.key)
   }
 
   // 1) 写一份比原文件新的草稿
@@ -339,8 +339,8 @@ async function 运行草稿测试(): Promise<boolean> {
     '原文件缺失时提示恢复',
     recoverableDraft().some((c) => c.rawPath === ghost)
   )
-  const 幽灵条目 = listDrafts().find((c) => c.rawPath === ghost)
-  if (幽灵条目) deleteDraft(幽灵条目.key)
+  const ghostEntry = listDrafts().find((c) => c.rawPath === ghost)
+  if (ghostEntry) deleteDraft(ghostEntry.key)
 
   const failure = check.filter(([, okFlag]) => !okFlag)
   console.log(`[selfMD] 草稿与恢复：${check.length - failure.length}/${check.length} 项通过`)
@@ -456,7 +456,7 @@ async function 运行全屏自测(): Promise<string> {
 }
 
 async function runSmokeTest(): Promise<void> {  const target = smokeOpenPath()
-  const 等文档 = target !== null || SMOKE_IMAGE
+  const awaitDoc = target !== null || SMOKE_IMAGE
 
   // 图标是否真的能解码，而不是"文件存在"就算数：路径写错、PNG 损坏、
   // 分辨率不对，都只有实际加载一次才知道。
@@ -484,7 +484,7 @@ async function runSmokeTest(): Promise<void> {  const target = smokeOpenPath()
   const timeoutMs = 25_000
   const timer = setTimeout(() => {
     console.error(
-      `[selfMD] 冒烟测试失败：${等文档 ? '文档未能加载' : '渲染进程未上报就绪'}`
+      `[selfMD] 冒烟测试失败：${awaitDoc ? '文档未能加载' : '渲染进程未上报就绪'}`
     )
     app.exit(1)
   }, timeoutMs)
@@ -492,12 +492,12 @@ async function runSmokeTest(): Promise<void> {  const target = smokeOpenPath()
   // 原生菜单由操作系统绘制，无头测试截不到图。导出成文本，
   // 中文化与"哪些命令已实现"才有可断言的证据。
   console.log('[selfMD] 应用菜单：')
-  for (const line of 菜单摘要()) console.log('  ' + line)
+  for (const line of menuSummary()) console.log('  ' + line)
 
   await whenRendererReady()
   console.log('[selfMD] 冒烟：渲染进程已就绪')
 
-  if (等文档) {
+  if (awaitDoc) {
     await whenDocumentOpened()
     console.log('[selfMD] 冒烟：文档已加载')
   }

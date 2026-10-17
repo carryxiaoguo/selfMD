@@ -18,7 +18,7 @@ import { getAppPaths } from '../util/paths'
  */
 
 /** 草稿键：文件名（去掉扩展名）+ 路径哈希前 8 位。 */
-function 计算键(rawPath: string | null): string {
+function computeKey(rawPath: string | null): string {
   if (!rawPath) return '未命名'
   const name = basename(rawPath, extname(rawPath)).replace(/[\\/:*?"<>|]/g, '_').slice(0, 60)
   const 哈希 = createHash('sha1').update(rawPath.toLowerCase()).digest('hex').slice(0, 8)
@@ -29,7 +29,7 @@ function contentFile(key: string): string {
   return join(getAppPaths().drafts, `${key}.md`)
 }
 
-function 元数据文件(key: string): string {
+function metaFile(key: string): string {
   return join(getAppPaths().drafts, `${key}.json`)
 }
 
@@ -40,12 +40,12 @@ function 元数据文件(key: string): string {
  * 而不是弹一个错误打断用户打字。失败就是这一次没存上，下一次改动还会再试。
  */
 export function writeDraft(rawPath: string | null, content: string): boolean {
-  const key = 计算键(rawPath)
+  const key = computeKey(rawPath)
   try {
     mkdirSync(getAppPaths().drafts, { recursive: true })
     writeFileSync(contentFile(key), content, 'utf8')
     writeFileSync(
-      元数据文件(key),
+      metaFile(key),
       JSON.stringify({ rawPath, savedAt: Date.now() }, null, 2),
       'utf8'
     )
@@ -116,7 +116,7 @@ export function readDraft(key: string): string | null {
 }
 
 export function deleteDraft(key: string): void {
-  for (const filePath of [contentFile(key), 元数据文件(key)]) {
+  for (const filePath of [contentFile(key), metaFile(key)]) {
     try {
       rmSync(filePath, { force: true })
     } catch {
@@ -127,7 +127,7 @@ export function deleteDraft(key: string): void {
 
 /** 文档保存成功后清掉它的草稿——已经落盘了，草稿就没有意义。 */
 export function clearDocDraft(rawPath: string | null, content: string): void {
-  const key = 计算键(rawPath)
+  const key = computeKey(rawPath)
   // 只有当草稿内容与刚保存的内容一致时才删：
   // 保存是异步的，期间用户可能又敲了几个字，那部分还没落盘。
   const existing = readDraft(key)

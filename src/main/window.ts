@@ -36,8 +36,8 @@ export function applySpellDict(settings: Settings): void {
     const available = new Set(browserSession.availableSpellCheckerLanguages)
     const request = settings.spellCheckLanguages.filter((langCode) => available.has(langCode))
     // 一个都不匹配时回退到英语：有检查总比静默失效好，而且这是最常见的用法。
-    const 最终 = request.length > 0 ? request : ['en-US'].filter((langCode) => available.has(langCode))
-    if (最终.length > 0) browserSession.setSpellCheckerLanguages(最终)
+    const finalValue = request.length > 0 ? request : ['en-US'].filter((langCode) => available.has(langCode))
+    if (finalValue.length > 0) browserSession.setSpellCheckerLanguages(finalValue)
   } catch (error) {
     // 拿不到会话时静默跳过：拼写检查是锦上添花，不该影响启动。
     console.error('[拼写检查] 设置词典失败：', error)
@@ -82,14 +82,14 @@ export function createWindow(options: WindowOptions = {}): BrowserWindow {
   // 冒烟测试用一个很高的窗口：CodeMirror 只渲染视口内的行，窗口太矮就会
   // 把文档下半部分"虚拟化"掉，装饰无从统计。加高之后，紧凑的验证样本
   // 可以整篇落在一屏内，DOM 计数与解析树计数就能逐项对账。
-  const 冒烟测试 = process.argv.includes('--smoke-test')
+  const smokeTest = process.argv.includes('--smoke-test')
 
   const win = new BrowserWindow({
     width: 1100,
-    height: 冒烟测试 ? 1600 : 760,
+    height: smokeTest ? 1600 : 760,
     minWidth: 480,
     minHeight: 320,
-    show: !冒烟测试 ? true : false,
+    show: !smokeTest ? true : false,
     backgroundColor: settings.isDarkMode ? '#0d1117' : '#ffffff',
     autoHideMenuBar: false,
     title: 'selfMD',
@@ -142,11 +142,11 @@ export function createWindow(options: WindowOptions = {}): BrowserWindow {
   // 2. **菜单勾选要跟着实际状态走。**
   //    `全屏` 是个 checkbox，但之前没给 `checked`，也没在状态变化时重建菜单，
   //    于是全屏时菜单里那一项仍显示未勾选——用户会以为功能没生效。
-  const 同步菜单 = (): void => {
+  const syncMenu = (): void => {
     if (!win.isDestroyed()) rebuildMenu()
   }
-  win.on('enter-full-screen', 同步菜单)
-  win.on('leave-full-screen', 同步菜单)
+  win.on('enter-full-screen', syncMenu)
+  win.on('leave-full-screen', syncMenu)
 
 
   // 把渲染进程的日志输出到 main 进程的 stdout。否则从终端启动应用时，

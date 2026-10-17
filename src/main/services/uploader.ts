@@ -34,33 +34,33 @@ const run = promisify(exec)
 const 输出上限 = 2097152
 
 /** app 模式的重试等待。应用启动需要时间，立刻重试必然失败。 */
-const 启动等待 = 5000
+const startupWait = 5000
 
 export interface 上传成功项 {
   rawPath: string
   url: string
 }
 
-export interface 上传失败项 {
+export interface uploadFailure {
   rawPath: string
   reason: string
 }
 
 export interface uploadResult {
   success: 上传成功项[]
-  failure: 上传失败项[]
+  failure: uploadFailure[]
 }
 
 /** PicGo / PicList 的本地端点。 */
 const localEndpoint = 'http://127.0.0.1:36677/upload'
 
 /** 走 HTTP 的两种上传器。 */
-function 是应用模式(uploader: uploaderType): boolean {
+function isAppMode(uploader: uploaderType): boolean {
   return uploader === 'picgo-app' || uploader === 'piclist-app'
 }
 
 /** 一次 HTTP 上传尝试。连不上时返回 null 而不是抛异常。 */
-async function 试HTTP上传(paths: string[]): Promise<string | null> {
+async function tryHttpUpload(paths: string[]): Promise<string | null> {
   try {
     const response = await net.fetch(localEndpoint, {
       method: 'POST',
@@ -94,9 +94,9 @@ async function 启动应用(program: string): Promise<void> {
 async function 应用模式上传(paths: string[]): Promise<{ url: string[]; error: string | null }> {
   const settings = getSettings()
 
-  const 首次 = await 试HTTP上传(paths)
-  if (首次 !== null) {
-    return parseUploadResult(首次, settings.imageUploader, paths.length)
+  const firstTime = await tryHttpUpload(paths)
+  if (firstTime !== null) {
+    return parseUploadResult(firstTime, settings.imageUploader, paths.length)
   }
 
   // 没连上：需要知道去哪儿找这个应用才能把它拉起来
@@ -117,13 +117,13 @@ async function 应用模式上传(paths: string[]): Promise<{ url: string[]; err
   }
 
   await 启动应用(program)
-  await new Promise((done) => setTimeout(done, 启动等待))
+  await new Promise((done) => setTimeout(done, startupWait))
 
-  const retryCount = await 试HTTP上传(paths)
+  const retryCount = await tryHttpUpload(paths)
   if (retryCount === null) {
     return {
       url: [],
-      error: `已尝试启动 ${program}，但等待 ${启动等待 / 1000} 秒后仍未连上 ${localEndpoint}。`
+      error: `已尝试启动 ${program}，但等待 ${startupWait / 1000} 秒后仍未连上 ${localEndpoint}。`
     }
   }
   return parseUploadResult(retryCount, settings.imageUploader, paths.length)
@@ -175,7 +175,7 @@ async function 命令行上传(
  *
  * 返回一一对应的「原路径 → 远程地址」。上层据此改写文档里的引用。
  */
-export async function 上传图片(文件路径们: string[]): Promise<uploadResult> {
+export async function uploadImage(文件路径们: string[]): Promise<uploadResult> {
   const settings = getSettings()
   const pendingUpload = 文件路径们.filter((filePath) => filePath.length > 0)
 
@@ -193,14 +193,14 @@ export async function 上传图片(文件路径们: string[]): Promise<uploadRes
 
   const 缺失 = pendingUpload.filter((filePath) => !existsSync(filePath))
   const exists = pendingUpload.filter((filePath) => existsSync(filePath))
-  const failure: 上传失败项[] = 缺失.map((rawPath) => ({
+  const failure: uploadFailure[] = 缺失.map((rawPath) => ({
     rawPath,
     reason: '文件不存在（可能已被移动或删除）'
   }))
 
   if (exists.length === 0) return { success: [], failure }
 
-  const reply = 是应用模式(settings.imageUploader)
+  const reply = isAppMode(settings.imageUploader)
     ? await 应用模式上传(exists)
     : await 命令行上传(settings.imageUploader, exists)
 
@@ -218,12 +218,12 @@ export async function 上传图片(文件路径们: string[]): Promise<uploadRes
 }
 
 /** 当前上传器是否配置完整（供菜单置灰与提示使用）。 */
-export function 上传器可用(): { available: boolean; reason: string | null } {
+export function uploaderAvailable(): { available: boolean; reason: string | null } {
   const settings = getSettings()
   if (settings.imageUploader === 'none') {
     return { available: false, reason: '尚未选择图床上传器' }
   }
-  if (是应用模式(settings.imageUploader)) {
+  if (isAppMode(settings.imageUploader)) {
     // app 模式即使没填路径也可能成功——PicGo 可能已经在运行
     return { available: true, reason: null }
   }

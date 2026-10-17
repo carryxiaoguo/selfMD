@@ -3,15 +3,15 @@ import { scanInlineMath } from '@shared/math'
 import { scanPunct } from '../smart-punctuation'
 import {
   blockLineStyles,
-  代码块行装饰,
+  codeBlockLineDeco,
   headingLineDeco,
   hidden,
   insert,
   replaceWith,
-  渲染标点装饰
+  typographyDeco
 } from './decorations'
 import type { BuildContext, SyntaxNode } from './types'
-import { addLineDeco, 行内公式已启用, 渲染标点已启用 } from './types'
+import { addLineDeco, inlineMathEnabled, typographyEnabled } from './types'
 import {
   列表圆点,
   水平线,
@@ -21,7 +21,7 @@ import {
   语言标签,
   代码块头部,
   calloutHint,
-  计算层级
+  computeLevel
 } from './widgets'
 import { BUILTIN_FONTS, infoRoundTrips, parseFenceFirstLine } from '@shared/code-block-info'
 
@@ -100,11 +100,11 @@ export function detectMathBlock(state: EditorState): manualBlock[] {
       continue
     }
     for (let endNo = no + 1; endNo <= state.doc.lines; endNo++) {
-      const 终行 = state.doc.line(endNo)
-      if (!终行.text.trim().endsWith('$$')) continue
+      const endLineNo = state.doc.line(endNo)
+      if (!endLineNo.text.trim().endsWith('$$')) continue
       const lineNoSet = new Set<number>()
       for (let n = no; n <= endNo; n++) lineNoSet.add(n)
-      result.push({ from: line.from, to: 终行.to, lineNoSet })
+      result.push({ from: line.from, to: endLineNo.to, lineNoSet })
       no = endNo
       break
     }
@@ -123,14 +123,14 @@ function 落在手工块内(position: number, 手工块列表: manualBlock[]): b
 // 块级入口
 // ---------------------------------------------------------------------------
 
-export interface 手工扫描结果 {
+export interface ManualScanResult {
   frontMatter: manualBlock | null
   mathBlock: manualBlock[]
   allBlocks: manualBlock[]
 }
 
 /** 第一遍：处理语法树里不存在的两类块，并把它们占用的行登记好。 */
-export function 扫描手工块(state: EditorState, context: BuildContext): 手工扫描结果 {
+export function scanManualBlocks(state: EditorState, context: BuildContext): ManualScanResult {
   const frontMatter = 检测前置元数据(state)
   const mathBlock = detectMathBlock(state)
 
@@ -159,11 +159,11 @@ export function 扫描手工块(state: EditorState, context: BuildContext): 手�
 }
 
 /** 第二遍：按语法树节点名分派块级装饰。返回是否已处理该节点。 */
-export function 处理块级(
+export function handleBlock(
   node: SyntaxNode,
   state: EditorState,
   context: BuildContext,
-  manualScan: 手工扫描结果
+  manualScan: ManualScanResult
 ): boolean {
   // 落在手工块内部的节点交给手工扫描处理（主要是别把 `---` 画成水平线）。
   if (落在手工块内(node.from, manualScan.allBlocks)) return true
@@ -178,10 +178,10 @@ export function 处理块级(
       // 段落是语法树里唯一承载普通文本的块级节点，从这里扫天然排除了
       // 代码块、围栏、表格单元格里的 `$`——那些地方不该出现公式。
       const cursor = state.selection.main
-      const 段落起 = node.from
+      const paragraphStart = node.from
       const originalText = state.sliceDoc(node.from, node.to)
       if (originalText.includes('$')) {
-        for (const range of scanInlineMath(originalText, 段落起, 行内公式已启用())) {
+        for (const range of scanInlineMath(originalText, paragraphStart, inlineMathEnabled())) {
           // 光标落在公式内部时露出源码，方便修改
           if (cursor.from >= range.from && cursor.to <= range.to + 1) continue
           context.entry.push({
@@ -198,15 +198,15 @@ export function 处理块级(
       // 只在**非活动行**生效——正在编辑的那一行必须显示真正的字符，
       // 否则用户敲下 `"` 却看到 `“`，会以为文档里存的就是弯引号。
       // 这与行内标记"活动行露出源码"是同一条规则。
-      if (渲染标点已启用() && !onActiveLine) {
+      if (typographyEnabled() && !onActiveLine) {
         const 代码区间 = 收集行内代码区间(node)
-        for (const segment of scanPunct(originalText, 段落起)) {
+        for (const segment of scanPunct(originalText, paragraphStart)) {
           // 行内代码里的引号与连字符是内容，不能替换
           if (代码区间.some((sel) => segment.from >= sel.from && segment.to <= sel.to)) continue
           context.entry.push({
             from: segment.from,
             to: segment.to,
-            deco: 渲染标点装饰(segment.show),
+            deco: typographyDeco(segment.show),
             rank: 0
           })
         }
@@ -320,7 +320,7 @@ export function 处理块级(
           context.entry.push({
             from: node.from,
             to: node.to,
-            deco: replaceWith(new 列表圆点(计算层级(state, node.from))),
+            deco: replaceWith(new 列表圆点(computeLevel(state, node.from))),
             rank: 1
           })
         }
@@ -345,7 +345,7 @@ export function 处理块级(
         addLineDeco(
           context,
           state.doc.line(n).from,
-          代码块行装饰(
+          codeBlockLineDeco(
             blockInfo.style,
             n === firstLine.number ? '首' : n === lastLine.number ? '末' : '中',
             isBody ? bodyIndex : null,

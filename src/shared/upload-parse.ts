@@ -139,17 +139,17 @@ export function parseUploadResult(
  */
 export function buildUploadCmd(
   uploader: uploaderType,
-  文件路径: string,
+  filePathValue: string,
   config: {
     customCommand: string
     userDataDir: string
     platform: 'win32' | 'darwin' | 'linux'
   }
 ): string | null {
-  const name = 文件路径.split(/[\\/]/).pop() ?? 文件路径
+  const name = filePathValue.split(/[\\/]/).pop() ?? filePathValue
   // 命令里一律用正斜杠：反斜杠在 shell 里是转义符，
   // `C:\我的文档\a.png` 会被拆得面目全非。
-  const filePath = 文件路径.replace(/\\/g, '/')
+  const filePath = filePathValue.replace(/\\/g, '/')
 
   switch (uploader) {
     case 'upic':

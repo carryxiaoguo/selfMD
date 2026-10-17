@@ -32,7 +32,7 @@ const extension = '.md'
 const 本程序ProgId = 'selfMD.md'
 
 /** 读一个注册表值；不存在或读不到时返回空串。 */
-function 读注册表(key: string, value: string): string {
+function readRegistry(key: string, value: string): string {
   if (process.platform !== 'win32') return ''
   try {
     const output = execFileSync('reg', ['query', key, '/v', value], {
@@ -76,8 +76,8 @@ function 键存在(key: string): boolean {
  * `Classes\.md` 可能还指着 selfMD。
  */
 export function getAssocStatus(): 关联状态 {
-  const 用户选择 = 读注册表(`HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\FileExts\\${extension}\\UserChoice`, 'ProgId')
-  const 类默认 = 读注册表(`HKCU\\Software\\Classes\\${extension}`, '(默认)')
+  const 用户选择 = readRegistry(`HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\FileExts\\${extension}\\UserChoice`, 'ProgId')
+  const 类默认 = readRegistry(`HKCU\\Software\\Classes\\${extension}`, '(默认)')
   const current = 用户选择 || 类默认
 
   return {
@@ -88,7 +88,7 @@ export function getAssocStatus(): 关联状态 {
 }
 
 /** 打开系统的"默认应用"设置页。 */
-export async function 打开默认应用设置(): Promise<void> {
+export async function openDefaultAppsSetting(): Promise<void> {
   if (process.platform !== 'win32') return
   // 这是 Windows 自己的 URI scheme，会拉起「设置 → 应用 → 默认应用」。
   // 不给更深的锚点：那个页面的锚点在不同 Windows 版本上不一样，
@@ -118,6 +118,6 @@ export function 通知外壳刷新(): void {
 }
 
 /** 本程序可执行文件的路径，供界面显示"关联到哪个程序"。 */
-export function 本程序路径(): string {
+export function exePathString(): string {
   return app.getPath('exe')
 }

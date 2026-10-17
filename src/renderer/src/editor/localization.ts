@@ -47,4 +47,4 @@ export const 中文短语: Record<string, string> = {
 }
 
 /** 注册中文界面文案。放在编辑器扩展里即可全局生效。 */
-export const 界面中文化 = EditorState.phrases.of(中文短语)
+export const uiLocalization = EditorState.phrases.of(中文短语)

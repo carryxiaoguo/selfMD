@@ -22,7 +22,7 @@ export interface frontMatter {
   endOffset: number
 }
 
-const 空结果: frontMatter = { exists: false, attr: {}, endOffset: 0 }
+const emptyResult: frontMatter = { exists: false, attr: {}, endOffset: 0 }
 
 /**
  * 读取前置元数据。
@@ -31,10 +31,10 @@ const 空结果: frontMatter = { exists: false, attr: {}, endOffset: 0 }
  * 文档中间出现的 `---` 是水平分割线，不是元数据围栏。
  */
 export function readFrontMatter(docText: string): frontMatter {
-  if (!docText.startsWith('---')) return 空结果
+  if (!docText.startsWith('---')) return emptyResult
 
   const lineList = docText.split('\n')
-  if (lineList[0].trim() !== '---') return 空结果
+  if (lineList[0].trim() !== '---') return emptyResult
 
   let endLine = -1
   for (let i = 1; i < lineList.length; i++) {
@@ -44,7 +44,7 @@ export function readFrontMatter(docText: string): frontMatter {
       break
     }
   }
-  if (endLine < 0) return 空结果
+  if (endLine < 0) return emptyResult
 
   const attr: Record<string, string> = {}
   for (let i = 1; i < endLine; i++) {

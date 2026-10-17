@@ -28,7 +28,7 @@ import { 数学公式 } from './widgets'
  * 扫 `$$` 是逐行 `startsWith` 判断，很便宜；真正贵的是那份**公式的渲染**，
  * 而它只在公式进入视口时才发生。
  */
-function 构建公式(state: EditorState): DecorationSet {
+function buildFormula(state: EditorState): DecorationSet {
   const range: ReturnType<Decoration['range']>[] = []
   const cursor = state.selection.main
 
@@ -59,12 +59,12 @@ function 构建公式(state: EditorState): DecorationSet {
   return range.length === 0 ? Decoration.none : RangeSet.of(range, true)
 }
 
-export const 数学字段 = StateField.define<DecorationSet>({
-  create: (state) => 构建公式(state),
+export const mathFieldExt = StateField.define<DecorationSet>({
+  create: (state) => buildFormula(state),
   update: (prevValue, txn) => {
     // 文档变了要重扫；光标挪出/挪进公式也要重算（决定显示源码还是排版结果）。
     if (!txn.docChanged && !txn.selection) return prevValue
-    return 构建公式(txn.state)
+    return buildFormula(txn.state)
   },
   provide: (fieldName) => EditorView.decorations.from(fieldName)
 })

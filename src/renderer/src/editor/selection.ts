@@ -27,7 +27,7 @@ function 是英文句点(lineText: string, position: number): boolean {
   return after === undefined || /\s/.test(after)
 }
 
-function 是终止符(lineText: string, position: number): boolean {
+function isTerminator(lineText: string, position: number): boolean {
   return 硬终止符.test(lineText[position]) || 是英文句点(lineText, position)
 }
 
@@ -40,7 +40,7 @@ function 是终止符(lineText: string, position: number): boolean {
 export function sentenceRange(lineText: string, offset: number): { start: number; end: number } {
   let start = 0
   for (let i = Math.min(offset, lineText.length) - 1; i >= 0; i--) {
-    if (是终止符(lineText, i)) {
+    if (isTerminator(lineText, i)) {
       start = i + 1
       break
     }
@@ -48,7 +48,7 @@ export function sentenceRange(lineText: string, offset: number): { start: number
 
   let end = lineText.length
   for (let i = Math.max(0, Math.min(offset, lineText.length)); i < lineText.length; i++) {
-    if (是终止符(lineText, i)) {
+    if (isTerminator(lineText, i)) {
       end = i + 1
       break
     }
@@ -64,7 +64,7 @@ export function sentenceRange(lineText: string, offset: number): { start: number
 // 词
 // ---------------------------------------------------------------------------
 
-const 中日韩 = /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uac00-\ud7af]/
+const cjkChar = /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uac00-\ud7af]/
 const latinWordChar = /[A-Za-z0-9_\u00c0-\u024f]/
 
 /**
@@ -73,13 +73,13 @@ const latinWordChar = /[A-Za-z0-9_\u00c0-\u024f]/
  * 中日韩文字按**单字成词**处理。没有分词器的情况下这是唯一诚实的选择：
  * 按标点切会把"选中当前词"变成"选中整句"，反而更糟。
  */
-export function 词区间(lineText: string, offset: number): { start: number; end: number } | null {
+export function wordSpan(lineText: string, offset: number): { start: number; end: number } | null {
   const atCursor = lineText[offset]
-  const 光标前 = offset > 0 ? lineText[offset - 1] : undefined
+  const beforeCursor = offset > 0 ? lineText[offset - 1] : undefined
 
   // 中日韩：单字
-  if (atCursor !== undefined && 中日韩.test(atCursor)) return { start: offset, end: offset + 1 }
-  if (光标前 !== undefined && 中日韩.test(光标前)) return { start: offset - 1, end: offset }
+  if (atCursor !== undefined && cjkChar.test(atCursor)) return { start: offset, end: offset + 1 }
+  if (beforeCursor !== undefined && cjkChar.test(beforeCursor)) return { start: offset - 1, end: offset }
 
   // 拉丁词：向两侧扩展到非词字符
   const fromPos = atCursor !== undefined && latinWordChar.test(atCursor) ? offset : offset - 1
@@ -97,7 +97,7 @@ export function 词区间(lineText: string, offset: number): { start: number; en
 // ---------------------------------------------------------------------------
 
 /** 把行内区间映射为文档选区。 */
-function 行内选区(state: EditorState, position: number, range: { start: number; end: number }): EditorSelection {
+function inlineSelection(state: EditorState, position: number, range: { start: number; end: number }): EditorSelection {
   const line = state.doc.lineAt(position)
   // EditorSelection.range() 返回的是单个 SelectionRange，不是 EditorSelection；
   // 单区间要用 single()。
@@ -110,7 +110,7 @@ function 行内选区(state: EditorState, position: number, range: { start: numb
  * 与通行取舍一致：**优先按句选**。光标停在一句中间时选中整句；
  * 该行只有一句（或没有终止符）时，效果就等于选中整行。
  */
-export function 选中当前行或句(view: EditorView): boolean {
+export function selectLineOrSentence(view: EditorView): boolean {
   const state = view.state
   const main = state.selection.main
   const line = state.doc.lineAt(main.head)
@@ -120,21 +120,21 @@ export function 选中当前行或句(view: EditorView): boolean {
   const 当前已满 = main.from === line.from + range.start && main.to === line.from + range.end
   const target = 当前已满
     ? EditorSelection.single(line.from, line.to)
-    : 行内选区(state, main.head, range)
+    : inlineSelection(state, main.head, range)
 
   view.dispatch({ selection: target, userEvent: 'select' })
   return true
 }
 
 /** 选中光标所在或紧邻的词。 */
-export function 选中当前词(view: EditorView): boolean {
+export function selectWord(view: EditorView): boolean {
   const state = view.state
   const main = state.selection.main
   const line = state.doc.lineAt(main.head)
-  const range = 词区间(line.text, main.head - line.from)
+  const range = wordSpan(line.text, main.head - line.from)
   if (!range) return false
   view.dispatch({
-    selection: 行内选区(state, main.head, range),
+    selection: inlineSelection(state, main.head, range),
     userEvent: 'select'
   })
   return true
@@ -146,7 +146,7 @@ export function 选中当前词(view: EditorView): boolean {
  * 块的范围直接取自语法树顶层节点，因此"选中这段引用"、"选中这个表格"
  * 这类操作对任何块级语法都自动成立，不需要逐个语法写规则。
  */
-export function 选中当前块(view: EditorView): boolean {
+export function selectBlock(view: EditorView): boolean {
   const state = view.state
   const position = state.selection.main.head
   const tree = syntaxTree(state)
@@ -169,7 +169,7 @@ export function 选中当前块(view: EditorView): boolean {
  * 有选区时删选区；无选区时按句删。行内容被删空后连同换行一并吃掉，
  * 避免留下一个空行——这与"删除当前行"的常见观感一致。
  */
-export function 删除当前行或句(view: EditorView): boolean {
+export function deleteLineOrSentence(view: EditorView): boolean {
   const state = view.state
   const main = state.selection.main
 

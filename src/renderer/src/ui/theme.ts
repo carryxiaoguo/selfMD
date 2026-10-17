@@ -1,4 +1,4 @@
-import { themeCssUrl, 全局自定义样式Url, 主题自定义样式Url } from '@shared/url'
+import { themeCssUrl, baseUserCssUrl, themeUserCssUrl } from '@shared/url'
 import { activeTheme, type Settings } from '@shared/types'
 
 /**
@@ -68,8 +68,8 @@ export function 重新加载主题(settings: Settings): void {
   const id = activeThemeId(settings)
   for (const [el, href] of [
     ['theme-css', themeCssUrl(id)],
-    ['base-user-css', 全局自定义样式Url()],
-    ['theme-user-css', 主题自定义样式Url(id)]
+    ['base-user-css', baseUserCssUrl()],
+    ['theme-user-css', themeUserCssUrl(id)]
   ] as const) {
     // 清空再设：同一个 URL 不会触发重新拉取，必须先断开
     取链接(el).setAttribute('href', '')
@@ -80,8 +80,8 @@ export function 重新加载主题(settings: Settings): void {
 export function applyTheme(settings: Settings): void {
   const id = activeThemeId(settings)
   setLink('theme-css', themeCssUrl(id))
-  setLink('base-user-css', 全局自定义样式Url())
-  setLink('theme-user-css', 主题自定义样式Url(id))
+  setLink('base-user-css', baseUserCssUrl())
+  setLink('theme-user-css', themeUserCssUrl(id))
 
   document.body.classList.toggle('dark', settings.isDarkMode)
   document.body.classList.toggle('live-preview', settings.livePreview)

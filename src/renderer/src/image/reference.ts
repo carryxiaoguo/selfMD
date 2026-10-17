@@ -10,7 +10,7 @@ import { stripExt, takeFileName, isAbsolute, normalizePath } from '@shared/image
  * 找到图。
  */
 
-export interface 引用选项 {
+export interface quoteOptions {
   /** 尽量用相对文档目录的路径。 */
   useRelativePath: boolean
   /** 相对路径是否加 `./` 前缀（`relativePathWithDot`）。 */
@@ -75,7 +75,7 @@ const 需转义: Record<string, string> = {
  * 直觉的做法是 `encodeURI`，这里有意偏离：
  * 现代 Markdown 渲染器与浏览器都能正确处理 UTF-8 路径，可读性更重要。
  */
-export function 转义图片地址(filePath: string): string {
+export function escapeImageUrl(filePath: string): string {
   let result = ''
   // 逐字符处理：输出不再参与匹配，因此 `%` 只会被编码一次。
   for (const ch of filePath) result += 需转义[ch] ?? ch
@@ -90,7 +90,7 @@ export function 转义图片地址(filePath: string): string {
 export function buildRefUrl(
   图片绝对路径: string,
   docDir: string | null,
-  options: 引用选项
+  options: quoteOptions
 ): string {
   const image = normalizePath(图片绝对路径)
 
@@ -104,7 +104,7 @@ export function buildRefUrl(
     }
   }
 
-  return options.escapeUrl ? 转义图片地址(result) : result
+  return options.escapeUrl ? escapeImageUrl(result) : result
 }
 
 /** 由图片路径推断 alt 文本：取文件名去掉扩展名。 */
@@ -112,7 +112,7 @@ export function 生成替代文本(imagePath: string): string {
   return stripExt(takeFileName(imagePath))
 }
 
-export type 图片语法 = 'markdown' | 'html'
+export type imageSyntax = 'markdown' | 'html'
 
 /**
  * 生成完整的图片 Markdown。
@@ -123,9 +123,9 @@ export type 图片语法 = 'markdown' | 'html'
 export function buildImageSyntax(
   url: string,
   替代文本: string,
-  语法: 图片语法 = 'markdown'
+  syntax: imageSyntax = 'markdown'
 ): string {
-  if (语法 === 'html') {
+  if (syntax === 'html') {
     const escaped = 替代文本.replace(/"/g, '&quot;')
     return `<img src="${url}" alt="${escaped}" />`
   }

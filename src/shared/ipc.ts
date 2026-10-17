@@ -435,7 +435,7 @@ export interface SelfMdApi {
   }
   export: {
     /** 各格式是否可用；Word 等需要 Pandoc。 */
-    formats(): Promise<{ format: Record<string, boolean>; pandoc版本: string | null }>
+    formats(): Promise<{ format: Record<string, boolean>; pandocVersion: string | null }>
     /**
      * 导出当前文档：弹保存对话框，然后按格式执行。
      *

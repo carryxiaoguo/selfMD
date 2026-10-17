@@ -73,7 +73,7 @@ function 取当前块(state: EditorState): { from: number; to: number } | null {
 
 const 专注行 = Decoration.line({ class: 'md-focus' })
 
-function 计算专注(state: EditorState): DecorationSet {
+function computeFocus(state: EditorState): DecorationSet {
   const block = 取当前块(state)
   if (!block) return Decoration.none
 
@@ -91,13 +91,13 @@ const 专注插件 = ViewPlugin.fromClass(
   class {
     decorations: DecorationSet
     constructor(查看: EditorView) {
-      this.decorations = 计算专注(查看.state)
+      this.decorations = computeFocus(查看.state)
     }
     update(update: ViewUpdate): void {
       // 文档、选区、视口任一变化都要重算：视口变化时新进入视野的行
       // 也需要带上（或去掉）`md-focus`，否则滚动后高亮会停在旧位置。
       if (update.docChanged || update.selectionSet || update.viewportChanged) {
-        this.decorations = 计算专注(update.state)
+        this.decorations = computeFocus(update.state)
       }
     }
   },
@@ -105,7 +105,7 @@ const 专注插件 = ViewPlugin.fromClass(
 )
 
 /** 专注模式的编辑器扩展。是否启用由 body 类控制显示，所以扩展常驻即可。 */
-export function 专注模式扩展(): Extension {
+export function focusModeExtension(): Extension {
   return 专注插件
 }
 

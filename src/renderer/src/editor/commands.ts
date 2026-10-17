@@ -47,9 +47,9 @@ function wholeLineChange(
   const changes: ChangeSpec[] = []
   for (let no = head; no <= tail; no++) {
     const line = state.doc.line(no)
-    const 新文本 = 转换(line.text, no)
-    if (新文本 !== line.text) {
-      changes.push({ from: line.from, to: line.to, insert: 新文本 })
+    const nextTextValue = 转换(line.text, no)
+    if (nextTextValue !== line.text) {
+      changes.push({ from: line.from, to: line.to, insert: nextTextValue })
     }
   }
   return changes
@@ -83,8 +83,8 @@ export function setHeadingLevel(view: EditorView, level: number): boolean {
   const target = allAreTarget ? 0 : level
 
   const changes = wholeLineChange(state, (docText) => {
-    const 去标题 = docText.replace(headingRegex, '')
-    return target === 0 ? 去标题 : '#'.repeat(target) + ' ' + 去标题
+    const stripHeading = docText.replace(headingRegex, '')
+    return target === 0 ? stripHeading : '#'.repeat(target) + ' ' + stripHeading
   })
   if (changes.length === 0) return false
   view.dispatch({ changes: changes, userEvent: 'input.setHeading', annotations: isolatedUndo })
@@ -97,31 +97,31 @@ export function adjustHeadingLevel(view: EditorView, direction: 1 | -1): boolean
   const { head } = affectedLines(state)
   const match = headingRegex.exec(state.doc.line(head).text)
   const current = match ? match[1].length : 0
-  const 下级 = Math.min(6, Math.max(0, current + direction))
-  if (下级 === current) return false
-  return setHeadingLevel(view, 下级)
+  const lowerLevel = Math.min(6, Math.max(0, current + direction))
+  if (lowerLevel === current) return false
+  return setHeadingLevel(view, lowerLevel)
 }
 
 // ---------------------------------------------------------------------------
 // 引用
 // ---------------------------------------------------------------------------
 
-const 引用正则 = /^>\s?/
+const quoteRegex = /^>\s?/
 
 export function toggleQuote(view: EditorView): boolean {
   const state = view.state
   const { head, tail } = affectedLines(state)
 
-  let 全是引用 = true
+  let allQuotes = true
   for (let no = head; no <= tail; no++) {
-    if (!引用正则.test(state.doc.line(no).text)) {
-      全是引用 = false
+    if (!quoteRegex.test(state.doc.line(no).text)) {
+      allQuotes = false
       break
     }
   }
 
   const changes = wholeLineChange(state, (docText) =>
-    全是引用 ? docText.replace(引用正则, '') : '> ' + docText
+    allQuotes ? docText.replace(quoteRegex, '') : '> ' + docText
   )
   if (changes.length === 0) return false
   view.dispatch({ changes: changes, userEvent: 'input.toggleQuote', annotations: isolatedUndo })
@@ -132,9 +132,9 @@ export function toggleQuote(view: EditorView): boolean {
 // 列表
 // ---------------------------------------------------------------------------
 
-const 无序正则 = /^(\s*)[-*+]\s+/
-const 有序正则 = /^(\s*)\d+[.)]\s+/
-const 任务正则 = /^(\s*)[-*+]\s+\[[ xX]\]\s+/
+const bulletRegex = /^(\s*)[-*+]\s+/
+const orderedRegex = /^(\s*)\d+[.)]\s+/
+const taskRegex = /^(\s*)[-*+]\s+\[[ xX]\]\s+/
 
 export type 列表类型 = '无序' | '有序' | '任务'
 
@@ -144,7 +144,7 @@ export function toggleList(view: EditorView, kind: 列表类型): boolean {
 
   // 已经全是该类型则取消。
   const 匹配器 =
-    kind === '无序' ? 无序正则 : kind === '有序' ? 有序正则 : 任务正则
+    kind === '无序' ? bulletRegex : kind === '有序' ? orderedRegex : taskRegex
   let allAreTarget = true
   for (let no = head; no <= tail; no++) {
     if (!匹配器.test(state.doc.line(no).text)) {
@@ -158,7 +158,7 @@ export function toggleList(view: EditorView, kind: 列表类型): boolean {
     // 先剥掉任何已有的列表标记，避免 `- 1. 内容` 这种叠加。
     const indent = /^(\s*)/.exec(docText)?.[1] ?? ''
     let body = docText.slice(indent.length)
-    body = body.replace(任务正则, '').replace(无序正则, '').replace(有序正则, '')
+    body = body.replace(taskRegex, '').replace(bulletRegex, '').replace(orderedRegex, '')
 
     if (allAreTarget) return indent + body
 
@@ -185,9 +185,9 @@ export function adjustIndent(view: EditorView, direction: 1 | -1): boolean {
     if (direction === 1) return unit + docText
     // 反缩进：优先吃掉一个制表符，否则最多吃掉一个单位的空格。
     if (docText.startsWith('\t')) return docText.slice(1)
-    const 前导 = /^ +/.exec(docText)?.[0] ?? ''
-    if (前导.length === 0) return docText
-    return docText.slice(Math.min(unit.length, 前导.length))
+    const leadingPart = /^ +/.exec(docText)?.[0] ?? ''
+    if (leadingPart.length === 0) return docText
+    return docText.slice(Math.min(unit.length, leadingPart.length))
   })
   if (changes.length === 0) return false
   view.dispatch({ changes: changes, userEvent: 'input.indent', annotations: isolatedUndo })
@@ -213,7 +213,7 @@ function insertBlock(view: EditorView, docText: string, 光标偏移: number): b
   return true
 }
 
-export function 插入代码围栏(view: EditorView): boolean {
+export function insertCodeFence(view: EditorView): boolean {
   const state = view.state
   const main = state.selection.main
   // 有选区就把它包成围栏；没有就插入空围栏。
@@ -231,7 +231,7 @@ export function 插入代码围栏(view: EditorView): boolean {
   return insertBlock(view, '```\n\n```\n', 4)
 }
 
-export function 插入数学块(view: EditorView): boolean {
+export function insertMathBlock(view: EditorView): boolean {
   const state = view.state
   const main = state.selection.main
   if (!main.empty) {
@@ -248,7 +248,7 @@ export function 插入数学块(view: EditorView): boolean {
   return insertBlock(view, '$$\n\n$$\n', 3)
 }
 
-export function 插入水平线(view: EditorView): boolean {
+export function insertHorizontalRule(view: EditorView): boolean {
   return insertBlock(view, '---\n', 4)
 }
 
@@ -264,7 +264,7 @@ export function insertTable(view: EditorView): boolean {
   return insertBlock(view, skeleton, 2)
 }
 
-export function 插入前置元数据(view: EditorView): boolean {
+export function insertFrontMatter(view: EditorView): boolean {
   const state = view.state
   if (state.doc.lines > 1 || state.doc.length > 0) {
     // 前置元数据只能位于文档最开头。
@@ -351,10 +351,10 @@ export function insertLink(view: EditorView): boolean {
   const main = state.selection.main
   const text = main.empty ? '' : state.sliceDoc(main.from, main.to)
   const content = `[${text}](地址)`
-  const 地址起 = main.from + 1 + text.length + 2
+  const urlStart = main.from + 1 + text.length + 2
   view.dispatch({
     changes: { from: main.from, to: main.to, insert: content },
-    selection: EditorSelection.range(地址起, 地址起 + 2),
+    selection: EditorSelection.range(urlStart, urlStart + 2),
     userEvent: 'input.insertLink',
     annotations: isolatedUndo
   })

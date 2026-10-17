@@ -29,14 +29,14 @@
 export type codeBlockStyleName = 'follow' | 'light' | 'dark'
 
 /** 样式的显示名。改显示名不用动文档里的值。 */
-export const 样式显示名: Record<codeBlockStyleName, string> = {
+export const styleLabels: Record<codeBlockStyleName, string> = {
   follow: '跟随主题',
   light: '明亮',
   dark: '暗色'
 }
 
 /** 下拉里的顺序：默认项排第一。 */
-export const 样式顺序: codeBlockStyleName[] = ['follow', 'light', 'dark']
+export const styleOrder: codeBlockStyleName[] = ['follow', 'light', 'dark']
 
 // ---------------------------------------------------------------------------
 // 字体
@@ -117,8 +117,8 @@ function 是样式名(value: string): value is codeBlockStyleName {
  * ```` ```python style= ````。渲染层任何一处抛异常，界面上都只表现为
  * "这个块没渲染出来"，很难反查。所以这里不抛，一律给合理默认值。
  */
-export function 解析围栏信息(原始: string): FenceInfo {
-  const parts = tidy(原始).split(' ').filter(Boolean)
+export function parseFenceInfo(rawValue: string): FenceInfo {
+  const parts = tidy(rawValue).split(' ').filter(Boolean)
   const language = parts.shift() ?? ''
 
   const 名称片段: string[] = []
@@ -126,10 +126,10 @@ export function 解析围栏信息(原始: string): FenceInfo {
   let font = 'follow'
 
   for (const piece of parts) {
-    const 等号 = piece.indexOf('=')
-    if (等号 > 0) {
-      const key = piece.slice(0, 等号).toLowerCase()
-      const value = piece.slice(等号 + 1)
+    const eqSign = piece.indexOf('=')
+    if (eqSign > 0) {
+      const key = piece.slice(0, eqSign).toLowerCase()
+      const value = piece.slice(eqSign + 1)
       if (key === 'style') {
         if (是样式名(value)) style = value
         // 认不出的样式值直接忽略，而不是把它当成名称的一部分——
@@ -154,7 +154,7 @@ export function 解析围栏信息(原始: string): FenceInfo {
  * `follow` 不写进文档：它是默认值，写上去只会让每一行围栏都变长，
  * 而且用户看不出"写了 follow"和"什么都没写"有什么区别。
  */
-export function 构建围栏信息(info: FenceInfo): string {
+export function buildFenceInfo(info: FenceInfo): string {
   const parts: string[] = []
   if (info.language) parts.push(info.language)
   if (info.displayName) parts.push(info.displayName)
@@ -195,7 +195,7 @@ export function infoSpan(firstLineText: string): { start: number; end: number } 
 export function parseFenceFirstLine(firstLineText: string): FenceInfo {
   const range = infoSpan(firstLineText)
   if (!range) return { language: '', displayName: '', style: 'follow', font: 'follow' }
-  return 解析围栏信息(firstLineText.slice(range.start, range.end))
+  return parseFenceInfo(firstLineText.slice(range.start, range.end))
 }
 
 /**
@@ -212,5 +212,5 @@ export function parseFenceFirstLine(firstLineText: string): FenceInfo {
 export function infoRoundTrips(firstLineText: string, info: FenceInfo): boolean {
   const range = infoSpan(firstLineText)
   if (!range) return false
-  return 构建围栏信息(info) === firstLineText.slice(range.start, range.end).trim()
+  return buildFenceInfo(info) === firstLineText.slice(range.start, range.end).trim()
 }

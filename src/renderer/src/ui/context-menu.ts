@@ -21,7 +21,7 @@ export interface menuItem {
   /** 右侧显示的快捷键提示，纯展示。 */
   hint?: string
   /** 在文字前显示一个勾。 */
-  勾选?: boolean
+  checked?: boolean
   /** 危险操作（删除类），文字用警示色。 */
   dangerFlag?: boolean
   /**
@@ -35,13 +35,13 @@ export interface menuItem {
 
 let currentMenu: HTMLElement | null = null
 let activeSubmenu: HTMLElement | null = null
-let 清理函数: (() => void) | null = null
+let cleanupFn: (() => void) | null = null
 
 /** 关掉当前菜单；没有菜单时什么也不做。 */
 export function closeMenu(): void {
   closeSubmenu()
-  清理函数?.()
-  清理函数 = null
+  cleanupFn?.()
+  cleanupFn = null
   currentMenu?.remove()
   currentMenu = null
 }
@@ -85,20 +85,20 @@ function 建立菜单(items: menuItem[], 是子菜单 = false): HTMLElement {
     const 有子项 = Boolean(item.children && item.children.length > 0) && !item.disabled
     // 没有动作的一律当标题处理，视觉上也区分开。
     // 有子项的行不执行动作，但它**是可点的**——置灰会让人以为整族都不可用。
-    const 可点 = (Boolean(item.action) || 有子项) && !item.disabled
-    if (!可点) line.classList.add('disabled')
+    const clickable = (Boolean(item.action) || 有子项) && !item.disabled
+    if (!clickable) line.classList.add('disabled')
     if (item.dangerFlag) line.classList.add('danger')
-    line.disabled = !可点
+    line.disabled = !clickable
 
-    const 勾 = document.createElement('span')
-    勾.className = 'selfmd-menu-check'
-    勾.textContent = item.勾选 ? '✓' : ''
+    const checkMark = document.createElement('span')
+    checkMark.className = 'selfmd-menu-check'
+    checkMark.textContent = item.checked ? '✓' : ''
 
     const txt = document.createElement('span')
     txt.className = 'selfmd-menu-label'
     txt.textContent = item.text ?? ''
 
-    line.append(勾, txt)
+    line.append(checkMark, txt)
 
     if (item.hint) {
       const hint = document.createElement('span')
@@ -108,10 +108,10 @@ function 建立菜单(items: menuItem[], 是子菜单 = false): HTMLElement {
     }
 
     if (有子项) {
-      const 箭头 = document.createElement('span')
-      箭头.className = 'selfmd-menu-arrow'
-      箭头.textContent = '▸'
-      line.append(箭头)
+      const arrowGlyph = document.createElement('span')
+      arrowGlyph.className = 'selfmd-menu-arrow'
+      arrowGlyph.textContent = '▸'
+      line.append(arrowGlyph)
       line.classList.add('has-submenu')
 
       // 用 hover 展开而不是 click：菜单的惯例是"指过去就开"，
@@ -133,7 +133,7 @@ function 建立菜单(items: menuItem[], 是子菜单 = false): HTMLElement {
     // 旧的那个必须先消失，否则屏幕上会同时挂两层。
     line.addEventListener('mouseenter', closeSubmenu)
 
-    if (可点) {
+    if (clickable) {
       line.addEventListener('click', (event) => {
         event.preventDefault()
         event.stopPropagation()
@@ -155,14 +155,14 @@ function 展开子菜单(宿主行: HTMLElement, items: menuItem[]): void {
   const child = 建立菜单(items, true)
   document.body.append(child)
 
-  const 行框 = 宿主行.getBoundingClientRect()
+  const rowRect = 宿主行.getBoundingClientRect()
   const width = child.offsetWidth
 
   // 优先右侧；右边塞不下就翻到左侧。窄窗口下这是唯一能看全的办法。
-  const rightward = 行框.right
-  const leftward = rightward + width > window.innerWidth - 6 ? 行框.left - width : rightward
+  const rightward = rowRect.right
+  const leftward = rightward + width > window.innerWidth - 6 ? rowRect.left - width : rightward
   child.style.left = `${Math.max(6, leftward)}px`
-  child.style.top = `${Math.min(行框.top, window.innerHeight - child.offsetHeight - 6)}px`
+  child.style.top = `${Math.min(rowRect.top, window.innerHeight - child.offsetHeight - 6)}px`
 
   // 指针从宿主行移进子菜单的途中会经过这里，所以子菜单也要接管
   child.addEventListener('mouseleave', (event) => {
@@ -222,7 +222,7 @@ export function popupMenu(position: { x: number; y: number }, items: menuItem[])
   // `scroll` 不冒泡，但捕获阶段能收到任意滚动容器的滚动
   document.addEventListener('scroll', scroll, true)
 
-  清理函数 = (): void => {
+  cleanupFn = (): void => {
     document.removeEventListener('mousedown', 按下别处, true)
     document.removeEventListener('keydown', 按键, true)
     window.removeEventListener('resize', scroll)

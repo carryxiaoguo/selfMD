@@ -217,8 +217,8 @@ function 处理(node: any, context: context): void {
     case 'Task': {
       // 任务项：`- [x] 内容`。复选框是禁用状态，导出后不可交互。
       const mark = 找任务标记(node, context)
-      const 勾选 = /\[[xX]\]/.test(mark)
-      output.push(`<input type="checkbox" disabled${勾选 ? ' checked' : ''}> `)
+      const checked = /\[[xX]\]/.test(mark)
+      output.push(`<input type="checkbox" disabled${checked ? ' checked' : ''}> `)
       recursive(node, context)
       return
     }
@@ -277,11 +277,11 @@ function 处理(node: any, context: context): void {
   // "子节点之间的空隙"里，直接输出会得到 `<h1> 标题一</h1>`。
   // Setext 标题更麻烦——它的下划线是末尾的 HeaderMark，正文前后还各有一个换行。
   // 所以先把内容渲染到临时缓冲，再整体去掉首尾空白。
-  const 标题匹配 = 标题模式.exec(name)
-  if (标题匹配) {
+  const headingMatch = 标题模式.exec(name)
+  if (headingMatch) {
     const 子缓冲: string[] = []
     recursive(node, { ...context, output: 子缓冲 })
-    output.push(`<h${标题匹配[1]}>${子缓冲.join('').trim()}</h${标题匹配[1]}>\n`)
+    output.push(`<h${headingMatch[1]}>${子缓冲.join('').trim()}</h${headingMatch[1]}>\n`)
     return
   }
 
@@ -461,7 +461,7 @@ const 大纲标题模式 = /^(?:ATX|Setext)Heading(\d)$/
  * 导出侧与编辑器侧共用这一份：两处各写一遍，迟早会在
  * "收尾井号算不算正文"这类细节上分叉，而症状是导出的大纲与侧边栏不一致。
  */
-export function 清理标题文本(originalText: string, 是ATX: boolean): string {
+export function cleanHeadingText(originalText: string, 是ATX: boolean): string {
   let docText = originalText
   if (是ATX) {
     // `## 标题` → `标题`
@@ -476,7 +476,7 @@ export function 清理标题文本(originalText: string, 是ATX: boolean): strin
 }
 
 /** 从 Markdown 文本里提取标题。用于导出时生成侧边目录。 */
-export function 提取大纲(source: string): outlineEntry[] {
+export function extractOutline(source: string): outlineEntry[] {
   const tree = 解析器.parse(source)
   const result: outlineEntry[] = []
 
@@ -486,7 +486,7 @@ export function 提取大纲(source: string): outlineEntry[] {
       if (!match) return true
       result.push({
         level: Number(match[1]),
-        docText: 清理标题文本(source.slice(node.from, node.to), node.name.startsWith('ATX')),
+        docText: cleanHeadingText(source.slice(node.from, node.to), node.name.startsWith('ATX')),
         position: node.from
       })
       // 标题内部不会再有标题

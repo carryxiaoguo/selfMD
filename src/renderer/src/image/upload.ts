@@ -2,8 +2,8 @@ import { syntaxTree } from '@codemirror/language'
 import { EditorSelection, type EditorState } from '@codemirror/state'
 import type { EditorView } from '@codemirror/view'
 import { isolatedUndo } from '../editor/isolated-undo'
-import { takeDocDir, 是本地图片地址 } from './display-src'
-import { 转义图片地址 } from './reference'
+import { takeDocDir, isLocalImageUrl } from './display-src'
+import { escapeImageUrl } from './reference'
 
 /**
  * 上传本地图片并把文档里的引用换成远程地址。
@@ -28,7 +28,7 @@ export interface docImages {
 }
 
 /** 图片在文档中的地址区间（只覆盖 `(...)` 里的部分）。 */
-interface 地址区间 {
+interface urlSpan {
   from: number
   to: number
 }
@@ -36,7 +36,7 @@ interface 地址区间 {
 /** 从 Image 节点里取出 URL 的精确区间。 */
 function 取地址区间(node: {
   firstChild: unknown
-}): 地址区间 | null {
+}): urlSpan | null {
   // 结构：LinkMark(![) → 文字 → LinkMark(]) → LinkMark(() → URL → [LinkTitle] → LinkMark())
   let child = node.firstChild as { name: string; from: number; to: number; nextSibling: unknown } | null
   while (child) {
@@ -51,7 +51,7 @@ function 取地址区间(node: {
  *
  * @param 只本地 为 true 时跳过远程地址——上传本地图时才用得上。
  */
-export function 收集文档图片(state: EditorState, 只本地 = false): docImages[] {
+export function collectDocImages(state: EditorState, localOnly = false): docImages[] {
   const result: docImages[] = []
   const dir = takeDocDir()
 
@@ -61,7 +61,7 @@ export function 收集文档图片(state: EditorState, 只本地 = false): docIm
     if (!range) return
 
     const url = state.sliceDoc(range.from, range.to).trim()
-    if (只本地 && !是本地图片地址(url)) return
+    if (localOnly && !isLocalImageUrl(url)) return
 
     let filePath = url
     try {
@@ -71,7 +71,7 @@ export function 收集文档图片(state: EditorState, 只本地 = false): docIm
     }
     const 是绝对 = /^[a-zA-Z]:[\\/]/.test(filePath) || filePath.startsWith('/')
     const localPath =
-      是本地图片地址(url) && (是绝对 || dir)
+      isLocalImageUrl(url) && (是绝对 || dir)
         ? 是绝对
           ? filePath
           : `${(dir as string).replace(/\\/g, '/').replace(/\/+$/, '')}/${filePath.replace(/^\.\//, '')}`
@@ -106,7 +106,7 @@ function 语法Tree遍历(
   })
 }
 
-export interface 回填结果 {
+export interface fillResult {
   /** 实际改写的引用数量。 */
   changedCount: number
   /** 上传失败的数量。 */
@@ -121,10 +121,10 @@ export interface 回填结果 {
  * 全部改动汇入**一次** dispatch，于是 Ctrl+Z 能一次性撤回整批替换——
  * 逐张图各撤一次的话，用户传了十张图就要按十次撤销。
  */
-export async function 上传并回填(
+export async function uploadAndFill(
   view: EditorView,
   images: docImages[]
-): Promise<回填结果> {
+): Promise<fillResult> {
   const uploadable = images.filter((img) => img.localPath !== null)
   if (uploadable.length === 0) {
     return { changedCount: 0, failCount: 0, failureSummary: '文档里没有本地图片，无需上传。' }
@@ -150,7 +150,7 @@ export async function 上传并回填(
     // 整段替换会丢掉替代文字——那是用户写的，不该被上传动作改掉。
     const range = 取地址区间InDoc(view.state, img)
     if (!range) continue
-    diffCount.push({ from: range.from, to: range.to, insert: 转义图片地址(url) })
+    diffCount.push({ from: range.from, to: range.to, insert: escapeImageUrl(url) })
   }
 
   if (diffCount.length === 0) {
@@ -179,8 +179,8 @@ export async function 上传并回填(
 }
 
 /** 在文档里重新定位某张图片的 URL 区间。 */
-function 取地址区间InDoc(state: EditorState, img: docImages): 地址区间 | null {
-  let result: 地址区间 | null = null
+function 取地址区间InDoc(state: EditorState, img: docImages): urlSpan | null {
+  let result: urlSpan | null = null
   语法Tree遍历(state, (node) => {
     if (result || node.name !== 'Image') return
     if (node.from !== img.from) return

@@ -2,7 +2,7 @@ import { net, protocol } from 'electron'
 import { existsSync } from 'node:fs'
 import { pathToFileURL } from 'node:url'
 import { PROTOCOL_SCHEME, decodeLocalToken } from '@shared/url'
-import { 主题目录文件 } from './services/themes'
+import { themeFileList } from './services/themes'
 
 /**
  * 注册 `selfmd://` scheme。
@@ -52,7 +52,7 @@ export function registerProtocolHandlers(): void {
         // 主题旁边的同名资源目录里放着字体、图片、光标，深色子样式表也用相对
         // `@import` 引入。只服务 .css 本身会让这些引用
         // 全部 404，症状是"主题加载了但字体不对"。
-        const path = 主题目录文件(url.pathname.replace(/^\//, ''))
+        const path = themeFileList(url.pathname.replace(/^\//, ''))
         if (!path) return notFound()
         return serveFile(path)
       }

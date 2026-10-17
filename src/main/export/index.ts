@@ -3,7 +3,7 @@ import { spawn } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { basename, dirname, extname, isAbsolute, join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { 提取大纲, renderMarkdownToHtml } from '@shared/markdown-html'
+import { extractOutline, renderMarkdownToHtml } from '@shared/markdown-html'
 import { activeTheme } from '@shared/types'
 import { getAppPaths } from '../util/paths'
 import { getSettings } from '../services/settings'
@@ -141,7 +141,7 @@ body.selfmd-export * { -webkit-print-color-adjust: exact; print-color-adjust: ex
 
 /** 生成导出时的侧边目录 HTML。 */
 function 构建目录(source: string): string {
-  const headings = 提取大纲(source)
+  const headings = extractOutline(source)
   if (headings.length === 0) return ''
   const shallowest = Math.min(...headings.map((t) => t.level))
   const line = headings
@@ -290,7 +290,7 @@ export async function buildExportHtml(options: ExportOptions): Promise<string> {
 <html lang="zh-Hans">
 <head>
 <meta charset="utf-8">
-<title>${转义标题(options.docPath)}</title>
+<title>${escapeHeading(options.docPath)}</title>
 </head>
 <body>
 <div id="write">
@@ -310,7 +310,7 @@ ${body}</div>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="generator" content="selfMD">
-<title>${转义标题(options.docPath)}</title>
+<title>${escapeHeading(options.docPath)}</title>
 <style>
 ${导出基础样式}
 ${style}
@@ -326,7 +326,7 @@ ${body}</div>
 `
 }
 
-function 转义标题(docPath: string | null): string {
+function escapeHeading(docPath: string | null): string {
   const name = docPath ? basename(docPath, extname(docPath)) : '未命名文档'
   return name.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }
@@ -420,7 +420,7 @@ export async function detectPandoc(): Promise<string | null> {
 }
 
 /** 取 Pandoc 的版本号字符串，供界面显示。 */
-export async function 取Pandoc版本(): Promise<string | null> {
+export async function takePandocVersion(): Promise<string | null> {
   const filePath = await detectPandoc()
   if (!filePath) return null
   return new Promise((done) => {
@@ -457,18 +457,18 @@ async function 导出经Pandoc(options: ExportOptions): Promise<exportResult> {
     }
   }
 
-  const 目标格式 = PANDOC格式[options.format]
-  if (!目标格式) {
+  const targetFormat = PANDOC格式[options.format]
+  if (!targetFormat) {
     return { success: false, filePath: null, error: `不支持的导出格式：${options.format}` }
   }
 
   // 先落一份 HTML 中间文件，再交给 Pandoc 转换。
   // 用 HTML 而不是 Markdown 作输入：这样图片、表格、脚注等已经由我们
   // 自己的渲染器处理过，与屏幕上看到的保持一致。
-  const 中间目录 = tempDir()
-  const 中间文件 = join(中间目录, `导出-${Date.now()}.html`)
+  const intermediateDir = tempDir()
+  const intermediateFile = join(intermediateDir, `导出-${Date.now()}.html`)
   writeFileSync(
-    中间文件,
+    intermediateFile,
     await buildExportHtml({ ...options, format: 'html', withOutline: false, embeddedImage: true }),
     'utf8'
   )
@@ -476,14 +476,14 @@ async function 导出经Pandoc(options: ExportOptions): Promise<exportResult> {
   mkdirSync(dirname(options.target), { recursive: true })
 
   return new Promise<exportResult>((done) => {
-    const params = [中间文件, '-f', 'html', '-t', 目标格式, '-o', options.target, '--standalone']
-    let 错误输出 = ''
+    const params = [intermediateFile, '-f', 'html', '-t', targetFormat, '-o', options.target, '--standalone']
+    let errorOutput = ''
     let childProc: ReturnType<typeof spawn>
     try {
       childProc = spawn(program, params, {
         windowsHide: true,
         // 以文档所在目录为工作目录，相对资源才能被 Pandoc 找到
-        cwd: options.docPath ? dirname(options.docPath) : 中间目录
+        cwd: options.docPath ? dirname(options.docPath) : intermediateDir
       })
     } catch (error) {
       done({
@@ -495,7 +495,7 @@ async function 导出经Pandoc(options: ExportOptions): Promise<exportResult> {
     }
 
     childProc.stderr?.on('data', (block) => {
-      错误输出 += String(block)
+      errorOutput += String(block)
     })
     childProc.on('error', (error) => {
       done({ success: false, filePath: null, error: `Pandoc 执行失败：${error.message}` })
@@ -506,7 +506,7 @@ async function 导出经Pandoc(options: ExportOptions): Promise<exportResult> {
         done({
           success: false,
           filePath: null,
-          error: `Pandoc 返回错误码 ${codePx}：${错误输出.trim().slice(0, 400) || '（无输出）'}`
+          error: `Pandoc 返回错误码 ${codePx}：${errorOutput.trim().slice(0, 400) || '（无输出）'}`
         })
       }
     })
@@ -518,7 +518,7 @@ async function 导出经Pandoc(options: ExportOptions): Promise<exportResult> {
 // ---------------------------------------------------------------------------
 
 /** 各格式是否可用（供菜单决定是否置灰）。 */
-export async function 可用格式(): Promise<Record<exportFormat, boolean>> {
+export async function availableFormats(): Promise<Record<exportFormat, boolean>> {
   const hasPandoc = (await detectPandoc()) !== null
   return {
     html: true,

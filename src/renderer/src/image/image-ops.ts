@@ -20,8 +20,8 @@ export interface imageContext {
   from: number
   to: number
   /** URL 那一段的区间。 */
-  地址from: number
-  地址to: number
+  urlFrom: number
+  urlTo: number
   /** 文档里写的原始地址。 */
   url: string
   /** 替代文字。 */
@@ -104,11 +104,11 @@ export function 取当前图片(state: EditorState, position: number): imageCont
       result = {
         from: node.from,
         to: node.to,
-        地址from: range.from,
-        地址to: range.to,
+        urlFrom: range.from,
+        urlTo: range.to,
         url,
         substitute: 取替代(node, state),
-        localPath: 本地绝对路径(url)
+        localPath: localAbsolutePath(url)
       }
       return false
     }
@@ -118,7 +118,7 @@ export function 取当前图片(state: EditorState, position: number): imageCont
 }
 
 /** 把文档里写的地址解析成磁盘绝对路径；远程地址返回 null。 */
-export function 本地绝对路径(url: string): string | null {
+export function localAbsolutePath(url: string): string | null {
   if (/^(https?:|data:|blob:)/i.test(url.trim())) return null
   let filePath = url.trim()
   try {
@@ -127,7 +127,7 @@ export function 本地绝对路径(url: string): string | null {
     // 编码损坏就按原样试
   }
   if (/^[a-zA-Z]:[\\/]/.test(filePath) || filePath.startsWith('/')) return filePath
-  const dir = 当前目录()
+  const dir = currentDir()
   if (!dir) return null
   return `${dir.replace(/\\/g, '/').replace(/\/+$/, '')}/${filePath.replace(/^\.\//, '')}`
 }
@@ -137,7 +137,7 @@ let 目录提供者: (() => string | null) | null = null
 export function 设置目录提供者(提供者: () => string | null): void {
   目录提供者 = 提供者
 }
-function 当前目录(): string | null {
+function currentDir(): string | null {
   return 目录提供者?.() ?? null
 }
 
@@ -209,7 +209,7 @@ export async function 重命名或移动图片(
 
   // 新地址尽量写成相对于文档的路径，这样文档连同图片一起搬家时引用不会断
   let nextSrc = nextPath
-  const dir = 当前目录()
+  const dir = currentDir()
   if (dir) {
     try {
       const relativePath = await window.selfmd.file.relative(dir, nextPath)
@@ -220,7 +220,7 @@ export async function 重命名或移动图片(
   }
 
   view.dispatch({
-    changes: { from: image.地址from, to: image.地址to, insert: nextSrc },
+    changes: { from: image.urlFrom, to: image.urlTo, insert: nextSrc },
     annotations: isolatedUndo,
     userEvent: 'input.moveImage'
   })
@@ -248,7 +248,7 @@ export async function 复制图片到(
     if (!result) return { success: false, error: '复制失败。', nextSrc: null }
 
     let nextSrc = result.filePath
-    const dir = 当前目录()
+    const dir = currentDir()
     if (dir) {
       try {
         nextSrc = (await window.selfmd.file.relative(dir, result.filePath)).replace(/\\/g, '/')
@@ -258,7 +258,7 @@ export async function 复制图片到(
     }
 
     view.dispatch({
-      changes: { from: image.地址from, to: image.地址to, insert: nextSrc },
+      changes: { from: image.urlFrom, to: image.urlTo, insert: nextSrc },
       annotations: isolatedUndo,
       userEvent: 'input.copyImage'
     })
@@ -301,6 +301,6 @@ export async function 删除图片文件(image: imageContext): Promise<{ success
 }
 
 /** 图片文件名，供对话框预填。 */
-export function 建议文件名(image: imageContext): string {
+export function suggestedFileName(image: imageContext): string {
   return image.localPath ? takeFileName(image.localPath) : image.substitute || 'image.png'
 }

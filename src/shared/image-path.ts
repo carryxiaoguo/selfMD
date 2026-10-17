@@ -38,9 +38,9 @@ export function concat(...segment: (string | null | undefined)[]): string {
   if (valid.length === 0) return ''
   let result = valid[0].replace(/[\\/]+$/, '')
   for (let i = 1; i < valid.length; i++) {
-    const 段值 = valid[i].replace(/^[\\/]+/, '').replace(/[\\/]+$/, '')
-    if (段值.length === 0) continue
-    result = result.length === 0 ? 段值 : `${result}/${段值}`
+    const segValue = valid[i].replace(/^[\\/]+/, '').replace(/[\\/]+$/, '')
+    if (segValue.length === 0) continue
+    result = result.length === 0 ? segValue : `${result}/${segValue}`
   }
   return normalizePath(result)
 }

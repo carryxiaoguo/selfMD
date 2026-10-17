@@ -97,7 +97,7 @@ const api: SelfMdApi = {
   },
   export: {
     formats: () =>
-      invoke<{ format: Record<string, boolean>; pandoc版本: string | null }>(CH.exportFormats),
+      invoke<{ format: Record<string, boolean>; pandocVersion: string | null }>(CH.exportFormats),
     run: (request) =>
       invoke<{ filePath: string | null; error: string | null }>(CH.exportDoc, request)
   },

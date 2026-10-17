@@ -34,9 +34,9 @@ const 默认宽度 = 900
  * 8000px 已经够放下几万字的长文；再高就有驱动相关的失败风险，
  * 所以宁可截断并如实告知，也不要赌一张可能全白的图。
  */
-const 最大高度 = 8000
+const maxHeight = 8000
 
-export interface 图片结果 {
+export interface imageResult {
   success: boolean
   /** 实际截取的像素尺寸，供调用方如实反馈。 */
   width: number
@@ -46,12 +46,12 @@ export interface 图片结果 {
   error: string | null
 }
 
-export async function 复制为图片(
+export async function copyAsImage(
   options: ExportOptions,
   /** 目标宽度；省略时用默认值。 */
   width = 默认宽度
-): Promise<图片结果> {
-  const failure = (error: string): 图片结果 => ({
+): Promise<imageResult> {
+  const failure = (error: string): imageResult => ({
     success: false,
     width: 0,
     height: 0,
@@ -115,8 +115,8 @@ export async function 复制为图片(
     const measuredHeight = await win.webContents.executeJavaScript(
       'Math.max(document.body.scrollHeight, document.documentElement.scrollHeight)'
     )
-    const 内容高 = typeof measuredHeight === 'number' && measuredHeight > 0 ? Math.ceil(measuredHeight) : 1200
-    const 目标高 = Math.min(内容高, 最大高度)
+    const contentHeight = typeof measuredHeight === 'number' && measuredHeight > 0 ? Math.ceil(measuredHeight) : 1200
+    const 目标高 = Math.min(contentHeight, maxHeight)
 
     win.setContentSize(width, 目标高)
     // 改尺寸之后要再等一帧，布局才会按新高度重排
@@ -131,7 +131,7 @@ export async function 复制为图片(
       success: true,
       width: size.width,
       height: size.height,
-      truncated: 内容高 > 最大高度,
+      truncated: contentHeight > maxHeight,
       error: null
     }
   } catch (error) {

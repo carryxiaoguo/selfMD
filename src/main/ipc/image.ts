@@ -2,7 +2,7 @@ import { clipboard, ipcMain, net } from 'electron'
 import { copyFileSync, existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { CH, type ClipboardContent, type ImageDownloadResult } from '@shared/ipc'
-import { 上传图片, 上传器可用 } from '../services/uploader'
+import { uploadImage, uploaderAvailable } from '../services/uploader'
 import {
   stripExt,
   takeFileName,
@@ -21,7 +21,7 @@ import {
  */
 
 /** 单张图片的下载上限。防止一个手滑的链接把内存吃满。 */
-const 下载上限字节 = 50 * 1024 * 1024
+const maxDownloadBytes = 50 * 1024 * 1024
 
 // ---------------------------------------------------------------------------
 // 剪贴板
@@ -127,10 +127,10 @@ export function registerImageIpc(): void {
 
   ipcMain.handle(
     CH.imageUpload,
-    (_e, paths: string[]) => 上传图片(paths)
+    (_e, paths: string[]) => uploadImage(paths)
   )
 
-  ipcMain.handle(CH.imageUploaderStatus, () => 上传器可用())
+  ipcMain.handle(CH.imageUploaderStatus, () => uploaderAvailable())
 
   ipcMain.handle(
     CH.imageDownload,
@@ -150,15 +150,15 @@ export function registerImageIpc(): void {
         const response = await net.fetch(url, { redirect: 'follow' })
         if (!response.ok) return failure(`服务端返回 ${response.status}`)
 
-        const 声明长度 = Number(response.headers.get('content-length') ?? '0')
-        if (声明长度 > 下载上限字节) {
-          return failure(`图片过大（${Math.round(声明长度 / 1024 / 1024)} MB）`)
+        const declaredLength = Number(response.headers.get('content-length') ?? '0')
+        if (declaredLength > maxDownloadBytes) {
+          return failure(`图片过大（${Math.round(declaredLength / 1024 / 1024)} MB）`)
         }
 
         const kind = response.headers.get('content-type')
         const buffer = Buffer.from(await response.arrayBuffer())
         if (buffer.length === 0) return failure('下载内容为空')
-        if (buffer.length > 下载上限字节) return failure('图片过大')
+        if (buffer.length > maxDownloadBytes) return failure('图片过大')
 
         const filePath = arrangePath(dir, 校正扩展名(displayName, kind))
         writeFileSync(filePath, buffer)

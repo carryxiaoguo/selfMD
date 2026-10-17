@@ -57,8 +57,8 @@ function concat(dir: string, relativePath: string): string {
  * 解析不了时返回空串——调用方据此显示"图片无法显示"占位，
  * 而不是留一个破图图标让人以为是文件坏了。
  */
-export function parseImageUrl(原始: string): string {
-  const url = 原始.trim()
+export function parseImageUrl(rawValue: string): string {
+  const url = rawValue.trim()
   if (url.length === 0) return ''
 
   if (是外部地址(url)) return url
@@ -91,6 +91,6 @@ export function parseImageUrl(原始: string): string {
  * 上传后回填时要用它做查找替换——文档里存的是相对路径，
  * 不是解析后的 URL。
  */
-export function 是本地图片地址(url: string): boolean {
+export function isLocalImageUrl(url: string): boolean {
   return !是外部地址(url)
 }

@@ -29,7 +29,7 @@ export interface BuildContext {
   /** 光标所在行（1 基）。这些行上的语法标记保持可见。 */
   activeLines: Set<number>
   /** 已经加过行装饰的位置，避免同一行被重复加类。 */
-  行装饰已用: Set<number>
+  usedDecoLanes: Set<number>
   /**
    * 已经被"整行替换成代码块头部栏"的围栏首行行首偏移。
    *
@@ -48,8 +48,8 @@ export function addLineDeco(
   lineStart: number,
   deco: Decoration
 ): void {
-  if (context.行装饰已用.has(lineStart)) return
-  context.行装饰已用.add(lineStart)
+  if (context.usedDecoLanes.has(lineStart)) return
+  context.usedDecoLanes.add(lineStart)
   context.entry.push({ from: lineStart, to: lineStart, deco: deco, rank: -1 })
 }
 
@@ -67,14 +67,14 @@ export function addLineDeco(
  *
  * 改这个值之后要**手动重绘**（`view.dispatch({})`），装饰不会自己更新。
  */
-let 行内公式启用 = true
+let inlineMathOn = true
 
 export function setInlineMathEnabled(enable: boolean): void {
-  行内公式启用 = enable
+  inlineMathOn = enable
 }
 
-export function 行内公式已启用(): boolean {
-  return 行内公式启用
+export function inlineMathEnabled(): boolean {
+  return inlineMathOn
 }
 
 /**
@@ -83,12 +83,12 @@ export function 行内公式已启用(): boolean {
  * 与行内公式同理：它决定的是"装饰怎么建"而不是"怎么显示"，
  * 改完必须重绘（`view.dispatch({})`）才会生效。
  */
-let 渲染标点启用 = false
+let typographyOn = false
 
 export function setPunctuationRenderingEnabled(enable: boolean): void {
-  渲染标点启用 = enable
+  typographyOn = enable
 }
 
-export function 渲染标点已启用(): boolean {
-  return 渲染标点启用
+export function typographyEnabled(): boolean {
+  return typographyOn
 }

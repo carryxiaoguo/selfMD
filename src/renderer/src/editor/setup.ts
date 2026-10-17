@@ -18,7 +18,7 @@ import {
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown'
 import { languages } from '@codemirror/language-data'
 import { highlightSelectionMatches, search, searchKeymap } from '@codemirror/search'
-import { 界面中文化 } from './localization'
+import { uiLocalization } from './localization'
 import { EditorState, type Extension } from '@codemirror/state'
 import {
   EditorView,
@@ -244,7 +244,7 @@ export function baseExtensions(options: EditorOptions): Extension[] {
     syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
     editorTheme,
     // 面板文案中文化（走 CodeMirror 官方的 phrases Facet）
-    界面中文化,
+    uiLocalization,
     EditorState.tabSize.of(Math.max(1, Math.min(12, settings.tabSize))),
     // 内容容器挂上 `#write`——这是通用的内容容器锚点。
     // 基于 `#write …` 的规则因此有机会命中；但针对真实标签的

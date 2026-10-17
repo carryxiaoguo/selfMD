@@ -1,6 +1,6 @@
 import { syntaxTree } from '@codemirror/language'
 import type { EditorState } from '@codemirror/state'
-import { 清理标题文本 } from '@shared/markdown-html'
+import { cleanHeadingText } from '@shared/markdown-html'
 import type { SyntaxNode } from '../editor/syntax-node'
 
 /**
@@ -48,7 +48,7 @@ export function extractHeadings(state: EditorState): headingItem[] {
       const originalText = state.sliceDoc(node.from, node.to)
       result.push({
         level: Number(match[1]),
-        docText: 清理标题文本(originalText, node.name.startsWith('ATX')),
+        docText: cleanHeadingText(originalText, node.name.startsWith('ATX')),
         position: node.from,
         lineNo: state.doc.lineAt(node.from).number
       })

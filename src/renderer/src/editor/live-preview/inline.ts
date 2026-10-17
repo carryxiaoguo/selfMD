@@ -37,7 +37,7 @@ function 是否行内标记(node: SyntaxNode): boolean {
   }
 }
 
-export function 处理行内(
+export function handleInline(
   node: SyntaxNode,
   state: EditorState,
   context: BuildContext
@@ -130,7 +130,7 @@ export function 处理行内(
       context.entry.push({
         from: node.from,
         to: node.to,
-        deco: replaceWith(new image(show, url, substitute, 本地绝对路径(url))),
+        deco: replaceWith(new image(show, url, substitute, localAbsolutePath(url))),
         rank: 1
       })
       return true
@@ -179,7 +179,7 @@ function 取图片信息(node: SyntaxNode, state: EditorState): { url: string; s
 }
 
 /** 本地图片在磁盘上的绝对路径；远程或无法解析时为 null。 */
-function 本地绝对路径(url: string): string | null {
+function localAbsolutePath(url: string): string | null {
   if (/^(https?:|data:|blob:)/i.test(url.trim())) return null
   const dir = takeDocDir()
   let filePath = url.trim()

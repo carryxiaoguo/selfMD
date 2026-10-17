@@ -173,7 +173,7 @@ export function tableAddRow(view: EditorView): boolean {
 }
 
 /** 删除光标所在的行。表头与对齐行不动——删掉它们整张表就散了。 */
-export function 表格删行(view: EditorView): boolean {
+export function tableDeleteRow(view: EditorView): boolean {
   const state = view.state
   const line = state.doc.lineAt(state.selection.main.head)
   if (!isTableRow(line.text)) return false
@@ -194,7 +194,7 @@ export function 表格删行(view: EditorView): boolean {
 }
 
 /** 在每行的第 N 列插入一个空单元格（含对齐行，否则表格结构会错位）。 */
-export function 表格增列(view: EditorView): boolean {
+export function tableAddCol(view: EditorView): boolean {
   const state = view.state
   const line = state.doc.lineAt(state.selection.main.head)
   if (!isTableRow(line.text)) return false
@@ -224,7 +224,7 @@ export function 表格增列(view: EditorView): boolean {
 }
 
 /** 删除光标所在的列（含对齐行）。最后一列删不掉。 */
-export function 表格删列(view: EditorView): boolean {
+export function tableDeleteCol(view: EditorView): boolean {
   const state = view.state
   const line = state.doc.lineAt(state.selection.main.head)
   if (!isTableRow(line.text)) return false

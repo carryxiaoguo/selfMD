@@ -56,16 +56,16 @@ export function insert(widget: WidgetType, side: number): Decoration {
  * 装饰按显示字符缓存：一段文字里重复的标点很多，
  * 每次新建 Decoration 会让 CodeMirror 的装饰比较失去意义。
  */
-const 标点装饰缓存 = new Map<string, Decoration>()
+const punctDecoCache = new Map<string, Decoration>()
 
-export function 渲染标点装饰(show: string): Decoration {
-  let deco = 标点装饰缓存.get(show)
+export function typographyDeco(show: string): Decoration {
+  let deco = punctDecoCache.get(show)
   if (!deco) {
     deco = Decoration.mark({
       class: 'cm-typo-punct',
       attributes: { 'data-typo': show }
     })
-    标点装饰缓存.set(show, deco)
+    punctDecoCache.set(show, deco)
   }
   return deco
 }
@@ -155,9 +155,9 @@ export const blockLineStyles = {
  * 复制代码时不会把行号带出去。行号是给眼睛看的，一旦混进剪贴板，
  * 粘到别处就全是垃圾。
  */
-const 代码块行缓存 = new Map<string, Decoration>()
+const codeLineCache = new Map<string, Decoration>()
 
-export function 代码块行装饰(
+export function codeBlockLineDeco(
   colorScheme: string,
   position: '首' | '中' | '末',
   lineNo: number | null,
@@ -178,10 +178,10 @@ export function 代码块行装饰(
   if (lineNo !== null) return Decoration.line({ class: className.join(' '), attributes: attr })
 
   const key = `${colorScheme}|${fontStack}|${position}`
-  let deco = 代码块行缓存.get(key)
+  let deco = codeLineCache.get(key)
   if (!deco) {
     deco = Decoration.line({ class: className.join(' '), attributes: attr })
-    代码块行缓存.set(key, deco)
+    codeLineCache.set(key, deco)
   }
   return deco
 }

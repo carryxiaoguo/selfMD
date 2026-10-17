@@ -37,7 +37,7 @@ export function themePath(id: string): string | null {
  *   1. 显式拒绝含 `..` 的路径
  *   2. 解析后确认结果仍落在主题目录内（防符号链接绕过）
  */
-export function 主题目录文件(relativeTo: string): string | null {
+export function themeFileList(relativeTo: string): string | null {
   let normalize: string
   try {
     normalize = decodeURIComponent(relativeTo)

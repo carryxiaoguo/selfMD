@@ -29,7 +29,7 @@ const 导入正则 = /^\s*@import\s+(url)?\s*([('"]+)([^)"']+)([)'"]+)/gim
 /** 递归深度上限。CSS 里的 @import 环路会让内联永不终止。 */
 const maxDepth = 8
 
-export interface 样式处理选项 {
+export interface styleOptions {
   /** 相对路径的解析基准（通常是主题目录）。 */
   baseDir: string;
   /** 是否内联 `@include-when-export` 指定的地址。屏幕预览时传 false。 */
@@ -37,7 +37,7 @@ export interface 样式处理选项 {
 }
 
 /** 解析一个地址：远程走网络，本地读文件。取不到时返回 null，不抛。 */
-async function 取资源(
+async function takeResource(
   url: string,
   baseDir: string
 ): Promise<{ content: string; baseline: string } | null> {
@@ -69,7 +69,7 @@ async function inlineFlag(
   docText: string,
   baseDir: string,
   depth: number,
-  options: 样式处理选项
+  options: styleOptions
 ): Promise<string> {
   if (depth >= maxDepth) return docText
 
@@ -77,12 +77,12 @@ async function inlineFlag(
 
   if (options.exportMode) {
     // --- @include-when-export ---
-    const 待替换: { originalText: string; url: string }[] = []
+    const toReplace: { originalText: string; url: string }[] = []
     for (const match of result.matchAll(exportIncludeRegex)) {
-      待替换.push({ originalText: match[0], url: match[3] })
+      toReplace.push({ originalText: match[0], url: match[3] })
     }
-    for (const { originalText, url } of 待替换) {
-      const resource = await 取资源(url, baseDir)
+    for (const { originalText, url } of toReplace) {
+      const resource = await takeResource(url, baseDir)
       // 取不到就**删掉这一行**而不是留着：这不是浏览器认识的规则，
       // 留着只会变成一条无效样式，还容易让人以为它生效了。
       const replace = resource ? await inlineFlag(resource.content, resource.baseline, depth + 1, options) : ''
@@ -93,12 +93,12 @@ async function inlineFlag(
   // --- @import ---
   // 屏幕模式下也内联 @import：主题的深色子样式表本来依赖旁边的文件，
   // 而预览协议虽能服务子目录，内联后一次请求就够。
-  const 导入项: { originalText: string; url: string }[] = []
+  const importedItem: { originalText: string; url: string }[] = []
   for (const match of result.matchAll(导入正则)) {
-    导入项.push({ originalText: match[0], url: match[3] })
+    importedItem.push({ originalText: match[0], url: match[3] })
   }
-  for (const { originalText, url } of 导入项) {
-    const resource = await 取资源(url, baseDir)
+  for (const { originalText, url } of importedItem) {
+    const resource = await takeResource(url, baseDir)
     if (!resource) continue
     const replace = await inlineFlag(resource.content, resource.baseline, depth + 1, options)
     result = result.replace(originalText, () => replace)
@@ -115,7 +115,7 @@ async function inlineFlag(
  */
 export async function processStyleSheet(
   docText: string,
-  options: 样式处理选项
+  options: styleOptions
 ): Promise<string> {
   return inlineFlag(docText, options.baseDir, 0, options)
 }
@@ -135,9 +135,9 @@ export function 绝对化本地地址(docText: string, baseDir: string): string 
 }
 
 /** 样式表在其内部用 @import 引用别的文件时，基准目录要跟着变。 */
-export function 子样式基准(当前基准: string, url: string): string {
-  if (/^https?:\/\//i.test(url)) return 当前基准
-  return dirname(isAbsolute(url) ? url : resolve(当前基准, url))
+export function 子样式基准(currentBaseline: string, url: string): string {
+  if (/^https?:\/\//i.test(url)) return currentBaseline
+  return dirname(isAbsolute(url) ? url : resolve(currentBaseline, url))
 }
 
 /** 判断一段样式里是否还有导出时才需要处理的指令。 */

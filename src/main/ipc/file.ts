@@ -204,7 +204,7 @@ export function registerFileIpc(): void {
     const result: { filePath: string; nameText: string; mtime: number; sizeBytes: number }[] = []
     let truncated = false
 
-    const 走 = (dir: string, depth: number): void => {
+    const goThrough = (dir: string, depth: number): void => {
       if (truncated || depth > maxDepth) return
       let entry
       try {
@@ -219,7 +219,7 @@ export function registerFileIpc(): void {
         if (item.isDirectory() && 跳过.has(item.name)) continue
         const fullPathArg = join(dir, item.name)
         if (item.isDirectory()) {
-          走(fullPathArg, depth + 1)
+          goThrough(fullPathArg, depth + 1)
           continue
         }
         if (!item.isFile()) continue
@@ -242,7 +242,7 @@ export function registerFileIpc(): void {
       }
     }
 
-    走(root, 0)
+    goThrough(root, 0)
     return { file: result, truncated }
   })
 

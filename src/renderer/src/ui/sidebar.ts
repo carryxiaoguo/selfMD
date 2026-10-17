@@ -53,7 +53,7 @@ export class sidebar {
   /** 已打开的文档列表。由外层在多文档变化时推送。 */
   private docList: 文档列表项[] = []
   private 标签按钮 = new Map<sidebarTabName, HTMLButtonElement>()
-  private 当前高亮下标 = -1
+  private highlightIndex = -1
   /** 已展开的目录路径。文件树每次重绘都读它，折叠状态才不会丢。 */
   private expanded = new Set<string>()
 
@@ -70,8 +70,8 @@ export class sidebar {
     this.host.hidden = true
     this.host.textContent = ''
 
-    const 标签栏 = document.createElement('div')
-    标签栏.className = 'sidebar-tabs'
+    const tabBar = document.createElement('div')
+    tabBar.className = 'sidebar-tabs'
 
     for (const [value, text] of [
       ['outline', '大纲'],
@@ -83,12 +83,12 @@ export class sidebar {
       button.type = 'button'
       button.textContent = text
       button.addEventListener('click', () => this.setTab(value))
-      标签栏.append(button)
+      tabBar.append(button)
       this.标签按钮.set(value, button)
     }
 
-    const 主体 = document.createElement('div')
-    主体.className = 'sidebar-body'
+    const mainBody = document.createElement('div')
+    mainBody.className = 'sidebar-body'
 
     this.outlinePanel = document.createElement('div')
     this.outlinePanel.className = 'outline-content'
@@ -102,17 +102,17 @@ export class sidebar {
     this.docsPanel.className = 'article-list'
     this.docsPanel.dataset.panel = 'articles'
 
-    主体.append(this.outlinePanel, this.filesPanel, this.docsPanel)
+    mainBody.append(this.outlinePanel, this.filesPanel, this.docsPanel)
 
-    const 拖柄 = document.createElement('div')
-    拖柄.className = 'sidebar-resizer'
-    拖柄.addEventListener('mousedown', (event) => this.开始拖拽(event))
+    const dragHandle = document.createElement('div')
+    dragHandle.className = 'sidebar-resizer'
+    dragHandle.addEventListener('mousedown', (event) => this.开始拖拽(event))
 
-    this.host.append(标签栏, 主体, 拖柄)
-    this.应用标签()
+    this.host.append(tabBar, mainBody, dragHandle)
+    this.applyTab()
   }
 
-  private 应用标签(): void {
+  private applyTab(): void {
     for (const [value, button] of this.标签按钮) button.classList.toggle('active', value === this.label)
     this.outlinePanel.hidden = this.label !== 'outline'
     this.filesPanel.hidden = this.label !== 'files'
@@ -168,14 +168,14 @@ export class sidebar {
       return false
     }
     if (label) this.label = label
-    this.应用标签()
+    this.applyTab()
     this.setVisible(true)
     return true
   }
 
   setTab(label: sidebarTabName): void {
     this.label = label
-    this.应用标签()
+    this.applyTab()
     this.deps.saveState({ visibleNow: this.visibleNow, label, widthPx: this.widthPx })
   }
 
@@ -205,7 +205,7 @@ export class sidebar {
 
   private 重绘大纲(headings: headingItem[]): void {
     this.outlinePanel.textContent = ''
-    this.当前高亮下标 = -1
+    this.highlightIndex = -1
 
     if (headings.length === 0) {
       this.outlinePanel.append(this.makeHint('本文档没有标题'))
@@ -237,8 +237,8 @@ export class sidebar {
   }
 
   private 高亮大纲(subscript: number): void {
-    if (subscript === this.当前高亮下标) return
-    this.当前高亮下标 = subscript
+    if (subscript === this.highlightIndex) return
+    this.highlightIndex = subscript
     for (const item of Array.from(this.outlinePanel.querySelectorAll('.outline-item'))) {
       const isCurrentFlag = Number((item as HTMLElement).dataset.subscript) === subscript
       item.classList.toggle('active', isCurrentFlag)
@@ -250,7 +250,7 @@ export class sidebar {
   // ----------------------------------------------------------- 文件树 ----
 
   /** 文件树以"当前文档所在目录"为根。没有文档时显示提示。 */
-  private 文件树根: string | null = null
+  private fileTreeRoot: string | null = null
   /** 用户显式打开的根目录；非 null 时覆盖"跟随文档"的行为。 */
   private manualRoot: string | null = null
   private refreshSeq = 0
@@ -271,21 +271,21 @@ export class sidebar {
     if (this.manualRoot) {
       root = this.manualRoot
     } else if (!docModel) {
-      this.文件树根 = null
+      this.fileTreeRoot = null
       parts.append(this.makeHint('尚未保存的文档没有所在目录'))
-      this.提交文件树(parts, index)
+      this.commitFileTree(parts, index)
       return
     } else {
       root = await window.selfmdExtra.path.dirname(docModel)
       if (index !== this.refreshSeq) return
       if (!root) {
         parts.append(this.makeHint('无法定位所在目录'))
-        this.提交文件树(parts, index)
+        this.commitFileTree(parts, index)
         return
       }
     }
 
-    this.文件树根 = root
+    this.fileTreeRoot = root
 
     const headEl = document.createElement('div')
     headEl.className = 'file-tree-root'
@@ -295,13 +295,13 @@ export class sidebar {
 
     const list = document.createElement('div')
     parts.append(list)
-    await this.展开目录(root, list, 0)
+    await this.expandDir(root, list, 0)
     if (index !== this.refreshSeq) return
 
-    this.提交文件树(parts, index)
+    this.commitFileTree(parts, index)
   }
 
-  private 提交文件树(parts: DocumentFragment, index: number): void {
+  private commitFileTree(parts: DocumentFragment, index: number): void {
     if (index !== this.refreshSeq) return
     this.filesPanel.textContent = ''
     this.filesPanel.append(parts)
@@ -310,7 +310,7 @@ export class sidebar {
   /**
    * 文档列表的根目录；没有可用根时为 null。 */
   get rootDir(): string | null {
-    return this.文件树根
+    return this.fileTreeRoot
   }
 
   // --------------------------------------------------------- 文档列表 ----
@@ -394,7 +394,7 @@ export class sidebar {
     return hint
   }
 
-  private async 展开目录(dir: string, container: HTMLElement, depth: number): Promise<void> {
+  private async expandDir(dir: string, container: HTMLElement, depth: number): Promise<void> {
     let items: DirEntry[] = []
     try {
       items = await window.selfmd.file.listDir(dir)
@@ -450,7 +450,7 @@ export class sidebar {
         container.append(subContainer)
 
         if (this.expanded.has(item.path)) {
-          await this.展开目录(item.path, subContainer, depth + 1)
+          await this.expandDir(item.path, subContainer, depth + 1)
         }
 
         line.addEventListener('click', async () => {
@@ -462,7 +462,7 @@ export class sidebar {
             this.expanded.add(item.path)
             expandArrow.textContent = '▾'
             subContainer.textContent = ''
-            await this.展开目录(item.path, subContainer, depth + 1)
+            await this.expandDir(item.path, subContainer, depth + 1)
           }
         })
       } else {

@@ -61,7 +61,7 @@ export interface 图表字段选项 {
  * 用工厂函数而不是模块级常量：暗色与否随设置变化，字段需要能读到最新值。
  * 直接把布尔值捕进来会在切换主题后失效——图表仍用旧配色。
  */
-export function 建立图表字段(options: 图表字段选项): Extension {
+export function createDiagramField(options: 图表字段选项): Extension {
   function build(state: EditorState): DecorationSet {
     const range: ReturnType<Decoration['range']>[] = []
     const cursor = state.selection.main

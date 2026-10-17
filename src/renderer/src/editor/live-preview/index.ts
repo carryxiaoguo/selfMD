@@ -8,10 +8,10 @@ import {
   type PluginValue,
   type ViewUpdate
 } from '@codemirror/view'
-import { 扫描手工块, 处理块级 } from './block'
-import { 处理行内 } from './inline'
-import { 数学字段 } from './math-field'
-import { 建立图表字段 } from './diagram-field'
+import { scanManualBlocks, handleBlock } from './block'
+import { handleInline } from './inline'
+import { mathFieldExt } from './math-field'
+import { createDiagramField } from './diagram-field'
 import type { BuildContext, DecoEntry, SyntaxNode } from './types'
 
 /**
@@ -57,13 +57,13 @@ function 构建装饰(view: EditorView): DecorationSet {
   const state = view.state
   const context: BuildContext = {
     activeLines: 计算活动行(state),
-    行装饰已用: new Set<number>(),
+    usedDecoLanes: new Set<number>(),
     headerReplaced: new Set<number>(),
     entry: [] as DecoEntry[]
   }
 
   // 第一遍：语法树里不存在的块（YAML 前置元数据、`$$` 数学块）。
-  const manualScan = 扫描手工块(state, context)
+  const manualScan = scanManualBlocks(state, context)
 
   // 第二遍：按语法树分派。只遍历可视范围——CodeMirror 会虚拟化长文档，
   // 视口外的内容根本没有 DOM，为其构建装饰纯属浪费。
@@ -74,8 +74,8 @@ function 构建装饰(view: EditorView): DecorationSet {
       to: rangeBounds.to,
       enter: (quote) => {
         const node = quote.node as unknown as SyntaxNode
-        处理块级(node, state, context, manualScan)
-        处理行内(node, state, context)
+        handleBlock(node, state, context, manualScan)
+        handleInline(node, state, context)
         // 始终返回 true：需要继续下沉到子节点，否则标记折叠不会生效。
         return true
       }
@@ -86,13 +86,13 @@ function 构建装饰(view: EditorView): DecorationSet {
   context.entry.sort((alpha, beta) => alpha.from - beta.from || alpha.rank - beta.rank || alpha.to - beta.to)
 
   // 去重：同一位置、同一 rank 的零宽装饰只保留一条，避免 widget 重复渲染。
-  const 已见 = new Set<string>()
+  const seenSet = new Set<string>()
   const range: Range<Decoration>[] = []
   for (const entry of context.entry) {
     if (entry.from === entry.to) {
       const key = `${entry.from}:${entry.to}:${entry.rank}`
-      if (已见.has(key)) continue
-      已见.add(key)
+      if (seenSet.has(key)) continue
+      seenSet.add(key)
     }
     range.push(entry.deco.range(entry.from, entry.to))
   }
@@ -113,27 +113,27 @@ function 构建装饰(view: EditorView): DecorationSet {
 
 class 实时预览 implements PluginValue {
   decorations: DecorationSet
-  private 上次出错 = ''
+  private lastError = ''
 
   constructor(view: EditorView) {
-    this.decorations = this.安全构建(view)
+    this.decorations = this.safeBuild(view)
   }
 
   update(update: ViewUpdate): void {
     if (update.docChanged || update.selectionSet || update.viewportChanged) {
-      this.decorations = this.安全构建(update.view)
+      this.decorations = this.safeBuild(update.view)
     }
   }
 
-  private 安全构建(view: EditorView): DecorationSet {
+  private safeBuild(view: EditorView): DecorationSet {
     try {
-      this.上次出错 = ''
+      this.lastError = ''
       return 构建装饰(view)
     } catch (error) {
       const docText = error instanceof Error ? error.message : String(error)
       // 同一条错误只打印一次，避免每次按键刷屏。
-      if (docText !== this.上次出错) {
-        this.上次出错 = docText
+      if (docText !== this.lastError) {
+        this.lastError = docText
         console.error('[实时预览] 装饰构建失败，已降级为纯文本显示：', error)
       }
       return Decoration.none
@@ -157,5 +157,5 @@ export function livePreview(enable: boolean, isDarkFlag: () => boolean = () => f
   // 块级替换（数学公式、Mermaid 图表）来自 StateField——插件不能提供块级装饰；
   // 其余装饰来自插件，因为那里能拿到 view.visibleRanges 做视口虚拟化。
   // 两类都通过 EditorView.decorations 汇入，CodeMirror 会把它们合并。
-  return [实时预览插件, 数学字段, 建立图表字段({ isDarkFlag })]
+  return [实时预览插件, mathFieldExt, createDiagramField({ isDarkFlag })]
 }

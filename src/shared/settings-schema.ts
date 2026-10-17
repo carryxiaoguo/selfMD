@@ -479,7 +479,7 @@ export const PrefsSchema: 设置分区[] = [
 ]
 
 /** 扁平化后的全部设置项，供校验与遍历使用。 */
-export function 全部设置项(): SettingItem[] {
+export function allSettingItems(): SettingItem[] {
   return PrefsSchema.flatMap((section) => section.subsection.flatMap((subsection) => subsection.item))
 }
 
@@ -491,7 +491,7 @@ export function 全部设置项(): SettingItem[] {
  */
 export function validateSchema(): string[] {
   const 已知 = new Set(Object.keys(DEFAULT_SETTINGS))
-  return 全部设置项()
+  return allSettingItems()
     .map((item) => item.key as string)
     .filter((key) => !已知.has(key))
 }

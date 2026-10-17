@@ -40,7 +40,7 @@ export class 偏好设置面板 {
    *                 用户点的是"导出设置"，落在一个几十项的面板顶端
    *                 还得自己往下找，等于没定位。
    */
-  open(定位分区?: string): void {
+  open(locateSection?: string): void {
     const 问题 = validateSchema()
     if (问题.length > 0) {
       // 表里写了不存在的键：这是开发期错误，必须响亮地报出来。
@@ -53,10 +53,10 @@ export class 偏好设置面板 {
 
     // 定位分区：找不到就保持当前分区（不清零），
     // 免得名字写错时直接把用户丢回第一页却毫无提示。
-    if (定位分区) {
-      const subscript = PrefsSchema.findIndex((score) => score.title === 定位分区)
+    if (locateSection) {
+      const subscript = PrefsSchema.findIndex((score) => score.title === locateSection)
       if (subscript >= 0) this.currentSection = subscript
-      else console.warn(`[偏好设置] 没有名为「${定位分区}」的分区`)
+      else console.warn(`[偏好设置] 没有名为「${locateSection}」的分区`)
     }
 
     const overlay = document.createElement('div')
@@ -88,11 +88,11 @@ export class 偏好设置面板 {
       leftPane.append(label)
     })
 
-    const 右栏 = document.createElement('div')
-    右栏.className = 'prefs-main'
+    const rightPane = document.createElement('div')
+    rightPane.className = 'prefs-main'
 
-    const 搜索行 = document.createElement('div')
-    搜索行.className = 'prefs-search-row'
+    const searchRow = document.createElement('div')
+    searchRow.className = 'prefs-search-row'
     const search = document.createElement('input')
     search.className = 'prefs-search'
     search.type = 'search'
@@ -106,19 +106,19 @@ export class 偏好设置面板 {
     closeBtn.type = 'button'
     closeBtn.textContent = '关闭'
     closeBtn.addEventListener('click', () => this.close())
-    搜索行.append(search, closeBtn)
+    searchRow.append(search, closeBtn)
 
     const content = document.createElement('div')
     content.className = 'prefs-body'
 
-    右栏.append(搜索行, content)
-    panel.append(leftPane, 右栏)
+    rightPane.append(searchRow, content)
+    panel.append(leftPane, rightPane)
     overlay.append(panel)
     document.body.append(overlay)
 
     this.overlay = overlay
     this.contentArea = content
-    this.左栏区 = leftPane
+    this.leftPaneArea = leftPane
 
     // Esc 关闭；捕获阶段监听，避免编辑器抢先处理
     document.addEventListener('keydown', this.keyboard, true)
@@ -131,7 +131,7 @@ export class 偏好设置面板 {
   }
 
   private contentArea: HTMLElement | null = null
-  private 左栏区: HTMLElement | null = null
+  private leftPaneArea: HTMLElement | null = null
 
   private keyboard = (event: KeyboardEvent): void => {
     if (event.key === 'Escape') {
@@ -147,7 +147,7 @@ export class 偏好设置面板 {
     this.overlay.remove()
     this.overlay = null
     this.contentArea = null
-    this.左栏区 = null
+    this.leftPaneArea = null
   }
 
   /** 面板开着时设置被外部改动，需要重绘以反映新值。 */
@@ -162,7 +162,7 @@ export class 偏好设置面板 {
     if (!content) return
 
     // 左栏高亮：搜索时所有分区都不选中——结果已经跨分区平铺了
-    for (const button of Array.from(this.左栏区?.querySelectorAll('.prefs-tab') ?? [])) {
+    for (const button of Array.from(this.leftPaneArea?.querySelectorAll('.prefs-tab') ?? [])) {
       const subscript = Number((button as HTMLElement).dataset.section)
       button.classList.toggle('active', this.searchTerm === '' && subscript === this.currentSection)
     }
@@ -254,11 +254,11 @@ export class 偏好设置面板 {
       tabArea.append(description)
     }
 
-    const 控件区 = document.createElement('div')
-    控件区.className = 'prefs-control'
-    控件区.append(this.渲染控件(item))
+    const controlArea = document.createElement('div')
+    controlArea.className = 'prefs-control'
+    controlArea.append(this.渲染控件(item))
 
-    line.append(tabArea, 控件区)
+    line.append(tabArea, controlArea)
     return line
   }
 
@@ -277,10 +277,10 @@ export class 偏好设置面板 {
     if (item.kind === '下拉') {
       const pick = document.createElement('select')
       for (const options of item.options ?? []) {
-        const 条 = document.createElement('option')
-        条.value = options.value
-        条.textContent = options.text
-        pick.append(条)
+        const bar = document.createElement('option')
+        bar.value = options.value
+        bar.textContent = options.text
+        pick.append(bar)
       }
       pick.value = String(currentValue ?? '')
       pick.addEventListener('change', () => void this.commitIt(item.key, pick.value))
@@ -301,9 +301,9 @@ export class 偏好设置面板 {
       numItems.addEventListener('change', () => {
         const value = Number(numItems.value)
         if (!Number.isFinite(value)) return
-        const 夹紧 = Math.min(item.maxValue ?? value, Math.max(item.minValue ?? value, value))
-        if (夹紧 !== value) numItems.value = String(夹紧)
-        void this.commitIt(item.key, 夹紧)
+        const clampTo = Math.min(item.maxValue ?? value, Math.max(item.minValue ?? value, value))
+        if (clampTo !== value) numItems.value = String(clampTo)
+        void this.commitIt(item.key, clampTo)
       })
       box.append(numItems)
       if (item.unit) {
@@ -344,9 +344,9 @@ export class 偏好设置面板 {
     const inputText = document.createElement('input')
     inputText.type = 'text'
     inputText.value = String(currentValue ?? '')
-    const 只读值 = this.deps.取只读值?.(item.key)
-    if (只读值 !== null && 只读值 !== undefined) {
-      inputText.value = 只读值
+    const readOnlyValue = this.deps.取只读值?.(item.key)
+    if (readOnlyValue !== null && readOnlyValue !== undefined) {
+      inputText.value = readOnlyValue
       // 只读项（例如「当前主题」）在界面上不可编辑——它由别的入口决定
       inputText.readOnly = true
       inputText.classList.add('prefs-readonly')

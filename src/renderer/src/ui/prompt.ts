@@ -11,7 +11,7 @@
 export interface 询问选项 {
   title: string
   /** 初始值。 */
-  初值?: string
+  initialValue?: string
    /** 占位提示。 */
   placeholder?: string
   /** 标题下方的一段说明文字。 */
@@ -44,11 +44,11 @@ export function promptText(options: 询问选项): Promise<string | null> {
     const input = document.createElement('input')
     input.className = 'selfmd-modal-input'
     input.type = 'text'
-    input.value = options.初值 ?? ''
+    input.value = options.initialValue ?? ''
     if (options.placeholder) input.placeholder = options.placeholder
 
-    const 按钮行 = document.createElement('div')
-    按钮行.className = 'selfmd-modal-buttons'
+    const buttonRow = document.createElement('div')
+    buttonRow.className = 'selfmd-modal-buttons'
 
     const cancel = document.createElement('button')
     cancel.className = 'selfmd-btn'
@@ -88,10 +88,10 @@ export function promptText(options: 询问选项): Promise<string | null> {
       if (event.target === overlay) finalize(null)
     })
 
-    按钮行.append(cancel, confirmIt)
+    buttonRow.append(cancel, confirmIt)
     // 标题与说明已在上面按需 append，这里只补剩余部分
     if (!options.description) boxEl.append(title)
-    boxEl.append(input, 按钮行)
+    boxEl.append(input, buttonRow)
     overlay.append(boxEl)
     document.body.append(overlay)
 

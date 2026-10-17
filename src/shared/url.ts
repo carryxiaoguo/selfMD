@@ -70,11 +70,11 @@ export function 主题文件Url(relativeTo: string): string {
 }
 
 /** 全局自定义 CSS（对所有主题生效）。 */
-export function 全局自定义样式Url(): string {
+export function baseUserCssUrl(): string {
   return 主题文件Url('base.user.css')
 }
 
 /** 某个主题专属的自定义 CSS（只对该主题生效）。 */
-export function 主题自定义样式Url(themeId: string): string {
+export function themeUserCssUrl(themeId: string): string {
   return 主题文件Url(`${themeId}.user.css`)
 }

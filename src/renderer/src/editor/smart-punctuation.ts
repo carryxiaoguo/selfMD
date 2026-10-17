@@ -186,7 +186,7 @@ export interface 破折号替换 {
  *
  * @returns 需要替换时给出方案，否则返回 null 表示按原样插入
  */
-export function 换破折号(preamble: string): 破折号替换 | null {
+export function swapDashes(preamble: string): 破折号替换 | null {
   const previousOne = preamble.slice(-1)
   const 再前一个 = preamble.slice(-2, -1)
 
@@ -217,7 +217,7 @@ export interface 智能标点选项 {
   /** 转换引号。 */
   quoteChar: boolean
   /** 转换破折号。 */
-  破折号: boolean
+  dashChar: boolean
 }
 
 /**
@@ -227,7 +227,7 @@ export interface 智能标点选项 {
  * 程序化编辑、输入法提交多字符都不经过这里，因此不会破坏这些路径。
  */
 export function 智能标点(options: 智能标点选项): Extension {
-  if (!options.quoteChar && !options.破折号) return []
+  if (!options.quoteChar && !options.dashChar) return []
 
   return EditorView.inputHandler.of((view, fromSrc, toPos, input) => {
     // 只处理单字符键入。多字符意味着输入法或粘贴，不该插手。
@@ -243,8 +243,8 @@ export function 智能标点(options: 智能标点选项): Extension {
 
     if (options.quoteChar && (input === '"' || input === "'")) {
       plan = { fallback: 0, insert: swapQuotes(input, preamble) }
-    } else if (options.破折号 && input === '-') {
-      plan = 换破折号(preamble)
+    } else if (options.dashChar && input === '-') {
+      plan = swapDashes(preamble)
     }
 
     if (!plan) return false
@@ -268,5 +268,5 @@ export function 智能标点(options: 智能标点选项): Extension {
 export function 按设置构建智能标点(settings: Settings): Extension {
   // '渲染时转换' 尚未实现，此时不做输入期转换——否则两种模式会同时生效。
   if (settings.smartPunctuationMode !== 'input') return []
-  return 智能标点({ quoteChar: settings.smartQuotes, 破折号: settings.smartDashes })
+  return 智能标点({ quoteChar: settings.smartQuotes, dashChar: settings.smartDashes })
 }

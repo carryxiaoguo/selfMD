@@ -4,10 +4,10 @@ import { languages } from '@codemirror/language-data'
 import { WidgetType, type EditorView } from '@codemirror/view'
 import {
   BUILTIN_FONTS,
-  构建围栏信息,
+  buildFenceInfo,
   infoSpan,
-  样式显示名,
-  样式顺序,
+  styleLabels,
+  styleOrder,
   parseFenceFirstLine,
   type FenceInfo
 } from '@shared/code-block-info'
@@ -60,7 +60,7 @@ export class 语言标签 extends WidgetType {
  * `languages` 有上百项，原生 `<select>` 能靠首字母跳转应付长列表，
  * 所以不做裁剪——裁掉的那几个恰好是用户想用的，比列表长更让人恼火。
  */
-const 语言选项: { value: string; name: string }[] = (() => {
+const languageOptions: { value: string; name: string }[] = (() => {
   const tbl: { value: string; name: string }[] = []
   for (const item of languages) {
     const value = item.alias[0] ?? item.name.toLowerCase()
@@ -152,11 +152,11 @@ export class 代码块头部 extends WidgetType {
     })
 
     // --- 语言 -----------------------------------------------------------
-    const language = this.选单('cm-w-codehead-lang', '代码块语言')
-    for (const item of 语言选项) language.append(new Option(item.name, item.value))
+    const language = this.makeSelect('cm-w-codehead-lang', '代码块语言')
+    for (const item of languageOptions) language.append(new Option(item.name, item.value))
     // 当前语言不在表里（用户手写了冷门别名）时补一项，
     // 否则下拉会显示成第一项，用户以为语言被改掉了
-    if (this.info.language && !语言选项.some((item) => item.value === this.info.language)) {
+    if (this.info.language && !languageOptions.some((item) => item.value === this.info.language)) {
       language.prepend(new Option(this.info.language, this.info.language, true, true))
     }
     // 空值表示"没有语言"，退化成纯文本块
@@ -167,7 +167,7 @@ export class 代码块头部 extends WidgetType {
     })
 
     // --- 字体 -----------------------------------------------------------
-    const font = this.选单('cm-w-codehead-font', '代码字体')
+    const font = this.makeSelect('cm-w-codehead-font', '代码字体')
     for (const item of BUILTIN_FONTS) font.append(new Option(item.name, item.value))
     font.value = this.info.font
     font.addEventListener('change', () => {
@@ -175,8 +175,8 @@ export class 代码块头部 extends WidgetType {
     })
 
     // --- 配色 -----------------------------------------------------------
-    const style = this.选单('cm-w-codehead-style', '代码块配色')
-    for (const name of 样式顺序) style.append(new Option(样式显示名[name], name))
+    const style = this.makeSelect('cm-w-codehead-style', '代码块配色')
+    for (const name of styleOrder) style.append(new Option(styleLabels[name], name))
     style.value = this.info.style
     style.addEventListener('change', () => {
       this.patchInfo(view, { style: style.value as FenceInfo['style'] })
@@ -200,7 +200,7 @@ export class 代码块头部 extends WidgetType {
   }
 
   /** 造一个下拉；三个下拉的公共部分收在这里，免得样式类名写漏。 */
-  private 选单(className: string, 无障碍名: string): HTMLSelectElement {
+  private makeSelect(className: string, 无障碍名: string): HTMLSelectElement {
     const el = document.createElement('select')
     el.className = `cm-w-codehead-select ${className}`
     el.setAttribute('aria-label', 无障碍名)
@@ -237,7 +237,7 @@ export class 代码块头部 extends WidgetType {
     // 后者会把反引号当成语言的一部分，构建时再写回去——每改一次多三个
     // 反引号，攒到十几个才看得出来。
     const nextInfo = { ...parseFenceFirstLine(lineText), ...部分 }
-    const nextText = 构建围栏信息(nextInfo)
+    const nextText = buildFenceInfo(nextInfo)
     if (nextText === lineText.slice(range.start, range.end)) return
 
     view.dispatch({
@@ -294,7 +294,7 @@ export class calloutHint extends WidgetType {
 // ---------------------------------------------------------------------------
 
 /** 按嵌套层级给出的项目符号，与常见 Markdown 渲染器的约定一致。 */
-const 项目符号 = ['•', '◦', '▪']
+const bulletGlyph = ['•', '◦', '▪']
 
 export class 列表圆点 extends WidgetType {
   constructor(readonly layer: number) {
@@ -308,7 +308,7 @@ export class 列表圆点 extends WidgetType {
   override toDOM(): HTMLElement {
     const el = document.createElement('span')
     el.className = 'cm-w-bullet'
-    el.textContent = 项目符号[this.layer % 项目符号.length]
+    el.textContent = bulletGlyph[this.layer % bulletGlyph.length]
     el.setAttribute('aria-hidden', 'true')
     return el
   }
@@ -328,7 +328,7 @@ export class 列表圆点 extends WidgetType {
  * widget 不该直接去操作应用状态（弹菜单、改文档），所以留一个回调口子由
  * 上层注册。这样 widget 保持"只负责画"的单一职责，测试时也能不接菜单单独渲染。
  */
-export type 图片右键处理器 = (
+export type imageContextHandler = (
   event: MouseEvent,
   /** 文档里写的原始地址（相对路径形态，未解析）。 */
   originalUrl: string,
@@ -337,10 +337,10 @@ export type 图片右键处理器 = (
   el: HTMLElement
 ) => void
 
-let 图片右键: 图片右键处理器 | null = null
+let imageContextMenu: imageContextHandler | null = null
 
-export function 设置图片右键处理器(handler: 图片右键处理器 | null): void {
-  图片右键 = handler
+export function setImageContextHandler(handler: imageContextHandler | null): void {
+  imageContextMenu = handler
 }
 
 /**
@@ -387,7 +387,7 @@ export class image extends WidgetType {
       box.title =
         '无法解析图片地址。若用的是相对路径，请先保存文档——' +
         '相对路径需要一个基准目录。'
-      this.挂右键(box)
+      this.attachContextMenu(box)
       return box
     }
 
@@ -407,15 +407,15 @@ export class image extends WidgetType {
     })
 
     box.append(img)
-    this.挂右键(box)
+    this.attachContextMenu(box)
     return box
   }
 
-  private 挂右键(box: HTMLElement): void {
+  private attachContextMenu(box: HTMLElement): void {
     box.addEventListener('contextmenu', (event) => {
       event.preventDefault()
       event.stopPropagation()
-      图片右键?.(event, this.originalUrl, this.altText, box)
+      imageContextMenu?.(event, this.originalUrl, this.altText, box)
     })
   }
 
@@ -541,25 +541,25 @@ export class tableSeparatorDeco extends WidgetType {
 // ---------------------------------------------------------------------------
 
 /** Mermaid 模块只在首次遇到图表时加载。 */
-let mermaid模块: Promise<typeof import('mermaid').default> | null = null
+let mermaidModule: Promise<typeof import('mermaid').default> | null = null
 
 async function 取Mermaid(): Promise<typeof import('mermaid').default> {
-  mermaid模块 ??= import('mermaid').then((modulo) => {
+  mermaidModule ??= import('mermaid').then((modulo) => {
     const take = modulo as unknown as { default?: unknown }
     return (take.default ?? modulo) as unknown as typeof import('mermaid').default
   })
-  const mermaid = await mermaid模块
+  const mermaid = await mermaidModule
   return mermaid
 }
 
-let 已初始化 = false
-let 已初始化主题 = ''
+let initialized = false
+let themesInitialized = ''
 
 /** 初始化 Mermaid，并在主题变化时重新初始化。 */
 async function 确保初始化(theme: 'default' | 'dark'): Promise<typeof import('mermaid').default> {
   const mermaid = await 取Mermaid()
   // 主题变了必须重新 initialize，否则旧主题的配色会一直用下去
-  if (!已初始化 || 已初始化主题 !== theme) {
+  if (!initialized || themesInitialized !== theme) {
     mermaid.initialize({
       // 不自动扫描页面：我们自己控制什么时候渲染哪一个
       startOnLoad: false,
@@ -568,8 +568,8 @@ async function 确保初始化(theme: 'default' | 'dark'): Promise<typeof import
       securityLevel: 'strict',
       fontFamily: 'inherit'
     })
-    已初始化 = true
-    已初始化主题 = theme
+    initialized = true
+    themesInitialized = theme
   }
   return mermaid
 }
@@ -637,11 +637,11 @@ export class 图表 extends WidgetType {
           error instanceof Error ? error.message.split('\n')[0] : String(error)
         }`
 
-        const 源码块 = document.createElement('pre')
-        源码块.className = 'cm-w-diagram-source'
-        源码块.textContent = this.sourceCode
+        const sourceBlock = document.createElement('pre')
+        sourceBlock.className = 'cm-w-diagram-source'
+        sourceBlock.textContent = this.sourceCode
 
-        box.append(hint, 源码块)
+        box.append(hint, sourceBlock)
         box.dataset.state = '失败'
       } finally {
         this.done?.()
@@ -658,7 +658,7 @@ export class 图表 extends WidgetType {
 }
 
 /** 当前行的缩进层级，用于选择列表符号。制表符按 4 个空格计。 */
-export function 计算层级(state: EditorState, lineStart: number): number {
+export function computeLevel(state: EditorState, lineStart: number): number {
   const line = state.doc.lineAt(lineStart)
   const docText = state.sliceDoc(line.from, line.to)
   const indent = /^[\t ]*/.exec(docText)?.[0] ?? ''
@@ -672,15 +672,15 @@ export function 计算层级(state: EditorState, lineStart: number): number {
 // ---------------------------------------------------------------------------
 
 /** KaTeX 模块只在首次用到时加载。 */
-let katex模块: Promise<{ render: typeof import('katex').default.render }> | null = null
+let katexModule: Promise<{ render: typeof import('katex').default.render }> | null = null
 
 async function 取KaTeX(): Promise<{ render: typeof import('katex').default.render }> {
-  katex模块 ??= import('katex').then((modulo) => {
+  katexModule ??= import('katex').then((modulo) => {
     // Vite 对 CommonJS 的默认导出处理：有的形态挂在 `.default` 上
     const take = modulo as unknown as { default?: { render: unknown }; render?: unknown }
     return (take.default ?? modulo) as unknown as { render: typeof import('katex').default.render }
   })
-  return katex模块
+  return katexModule
 }
 
 /**

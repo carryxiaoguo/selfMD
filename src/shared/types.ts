@@ -341,7 +341,7 @@ export function sidebarShown(settings: Settings): boolean {
 }
 
 /** 侧边栏是否被策略锁住（锁住时切换命令应当说明原因，而不是默默无效）。 */
-export function 侧边栏被锁定(settings: Settings): boolean {
+export function sidebarLocked(settings: Settings): boolean {
   return settings.sidebarMode !== 'toggle'
 }
 

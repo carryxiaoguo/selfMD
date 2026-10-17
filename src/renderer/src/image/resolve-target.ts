@@ -44,7 +44,7 @@ export interface ResolveTargetInput {
   强制上传?: boolean
 }
 
-export type 目标结果 =
+export type targetResult =
   | { kind: '目录'; filePath: string; origin: '文本包' | '文档级设置' | '全局设置' }
   | { kind: '上传'; origin: '文档级设置' | '全局设置' }
   /** 策略要求"什么都不做"：图片留在原处，引用原路径。 */
@@ -72,7 +72,7 @@ function 替换文件名占位符(template: string, docName: string | null): str
  *   2. 文档级设置（YAML 前置元数据）
  *   3. 全局策略
  */
-export function resolveTargetDir(input: ResolveTargetInput): 目标结果 {
+export function resolveTargetDir(input: ResolveTargetInput): targetResult {
   // --- 1. 文本包：图片是包的内部资源，用户没有选择余地 -------------------
   if (input.isTextBundle) {
     if (!input.docDir) return { kind: '需要保存' }
@@ -150,9 +150,9 @@ export interface MoveDecisionInput {
   /** 解析出的目标目录绝对路径（`上传` 与 `不动` 不参与本判定）。 */
   targetDir: string
   /** 本地图片是否自动搬运。 */
-  搬运本地: boolean
+  moveLocal: boolean
   /** 在线图片是否自动搬运。 */
-  搬运在线: boolean
+  moveRemote: boolean
 }
 
 /**
@@ -173,6 +173,6 @@ export function 应当搬运(input: MoveDecisionInput): boolean {
   if (归一本源.startsWith(`${归一目标}/`)) return false
 
   if (是数据地址(source)) return false
-  return 是远程来源(source) ? input.搬运在线 : input.搬运本地
+  return 是远程来源(source) ? input.moveRemote : input.moveLocal
 }
 

@@ -2,7 +2,7 @@ import { markdown } from '@codemirror/lang-markdown'
 import { EditorSelection, EditorState } from '@codemirror/state'
 import type { EditorView } from '@codemirror/view'
 import { renderMarkdownToHtml } from '@shared/markdown-html'
-import { PrefsSchema, 全部设置项, validateSchema } from '@shared/settings-schema'
+import { PrefsSchema, allSettingItems, validateSchema } from '@shared/settings-schema'
 import { findBlockMath, scanInlineMath } from '@shared/math'
 import { DEFAULT_SETTINGS, type uploaderType } from '@shared/types'
 import { buildUploadCmd, parseUploadResult } from '@shared/upload-parse'
@@ -17,19 +17,19 @@ import {
   adjustIndent,
   setHeadingLevel
 } from './commands'
-import { swapQuotes, 换破折号, scanPunct } from './smart-punctuation'
+import { swapQuotes, swapDashes, scanPunct } from './smart-punctuation'
 import { fuzzyScore, fuzzyFilter, pathTail } from '@shared/fuzzy'
-import { sentenceRange, 词区间 } from './selection'
+import { sentenceRange, wordSpan } from './selection'
 import { readFrontMatter, setAttr, removeAttr } from '@shared/front-matter'
 import {
   uniqueFileName,
   应当搬运,
   resolveTargetDir,
   type ResolveTargetInput,
-  type 目标结果,
+  type targetResult,
   type MoveDecisionInput
 } from '../image/resolve-target'
-import { buildImageSyntax, buildRefUrl, type 引用选项 } from '../image/reference'
+import { buildImageSyntax, buildRefUrl, type quoteOptions } from '../image/reference'
 
 /**
  * 编辑命令自测。
@@ -209,7 +209,7 @@ export function 运行纯函数自测(): Record<string, string> {
     ['缩进后的连字符（仍属行首）', '    -']
   ]
   for (const [name, preamble] of 破折号用例) {
-    const plan = 换破折号(preamble)
+    const plan = swapDashes(preamble)
     result[`破折号·${name}`] = plan ? `回退${plan.fallback}→${plan.insert}` : '不转换'
   }
 
@@ -235,7 +235,7 @@ export function 运行纯函数自测(): Record<string, string> {
     ['空白处', '   ', 1]
   ]
   for (const [name, docText, offset] of 词用例) {
-    const range = 词区间(docText, offset)
+    const range = wordSpan(docText, offset)
     result[`词·${name}`] = range ? JSON.stringify(docText.slice(range.start, range.end)) : '无词'
   }
 
@@ -247,7 +247,7 @@ export function 运行纯函数自测(): Record<string, string> {
 // ---------------------------------------------------------------------------
 
 /** 把目标解析结果压成一行，方便断言。 */
-function 显示目标(result: 目标结果): string {
+function 显示目标(result: targetResult): string {
   return result.kind === '目录' ? `目录 ${result.filePath}（${result.origin}）` : result.kind
 }
 
@@ -292,29 +292,29 @@ export function 运行图片管线自测(): Record<string, string> {
     ['未保存文档 + 不动策略', { docDir: null, docName: null, globalPolicy: '' }],
     ['未保存文档 + 绝对自定义目录', { docDir: null, docName: null, globalPolicy: 'custom', customDir: 'D:/图' }]
   ]
-  for (const [name, 覆盖] of 目标用例) {
-    result[`目标·${name}`] = 显示目标(resolveTargetDir({ ...baseline, ...覆盖 }))
+  for (const [name, overwrite] of 目标用例) {
+    result[`目标·${name}`] = 显示目标(resolveTargetDir({ ...baseline, ...overwrite }))
   }
 
   // --- 是否搬运 ---------------------------------------------------------
   const 搬运基准: MoveDecisionInput = {
     source: 'C:/下载/照片.png',
     targetDir: 'C:/笔记/imgs',
-    搬运本地: true,
-    搬运在线: false
+    moveLocal: true,
+    moveRemote: false
   }
   const 搬运用例: [string, Partial<MoveDecisionInput>][] = [
     ['本地图片 + 开启本地搬运', {}],
-    ['已关闭本地搬运', { 搬运本地: false }],
+    ['已关闭本地搬运', { moveLocal: false }],
     ['已在目标目录内', { source: 'C:/笔记/imgs/照片.png' }],
     ['就是目标目录本身', { source: 'C:/笔记/imgs' }],
     ['data 内联图片', { source: 'data:image/png;base64,AAAA' }],
     ['在线图片 + 关闭在线搬运', { source: 'https://example.com/a.png' }],
-    ['在线图片 + 开启在线搬运', { source: 'https://example.com/a.png', 搬运在线: true }],
+    ['在线图片 + 开启在线搬运', { source: 'https://example.com/a.png', moveRemote: true }],
     ['源与目标都为空', { source: '', targetDir: '' }]
   ]
-  for (const [name, 覆盖] of 搬运用例) {
-    result[`搬运·${name}`] = 应当搬运({ ...搬运基准, ...覆盖 }) ? '搬运' : '不搬'
+  for (const [name, overwrite] of 搬运用例) {
+    result[`搬运·${name}`] = 应当搬运({ ...搬运基准, ...overwrite }) ? '搬运' : '不搬'
   }
 
   // --- 唯一文件名 -------------------------------------------------------
@@ -359,7 +359,7 @@ export function 运行图片管线自测(): Record<string, string> {
     : '残留'
 
   // --- 引用地址生成 -----------------------------------------------------
-  const 引用用例: [string, string, string | null, 引用选项][] = [
+  const 引用用例: [string, string, string | null, quoteOptions][] = [
     ['同目录相对路径', 'C:/笔记/图/甲.png', 'C:/笔记', { useRelativePath: true, addDotPrefix: false, escapeUrl: false }],
     ['加 ./ 前缀', 'C:/笔记/图/甲.png', 'C:/笔记', { useRelativePath: true, addDotPrefix: true, escapeUrl: false }],
     ['上级目录相对路径', 'C:/笔记/图/甲.png', 'C:/笔记/子', { useRelativePath: true, addDotPrefix: false, escapeUrl: false }],
@@ -470,7 +470,7 @@ export function 运行导出自测(): Record<string, string> {
  */
 export function 运行偏好设置自测(): Record<string, string> {
   const result: Record<string, string> = {}
-  const items = 全部设置项()
+  const items = allSettingItems()
 
   result['偏好设置·项目数'] = String(items.length)
   result['偏好设置·分区数'] = String(PrefsSchema.length)
@@ -505,16 +505,16 @@ export function 运行偏好设置自测(): Record<string, string> {
     无中文.length === 0 ? '均含' : `缺中文：${无中文.map((item) => String(item.key)).join('、')}`
 
   // 下拉项的当前默认值必须是合法选项之一，否则打开面板就是"选了个不存在的项"
-  const 默认越界: string[] = []
+  const defaultOutOfRange: string[] = []
   for (const item of items) {
     if (item.kind !== '下拉' || !item.options) continue
     const 默认值 = String(DEFAULT_SETTINGS[item.key] ?? '')
     if (!item.options.some((options) => options.value === 默认值)) {
-      默认越界.push(`${String(item.key)}=${默认值}`)
+      defaultOutOfRange.push(`${String(item.key)}=${默认值}`)
     }
   }
   result['偏好设置·默认值在选项内'] =
-    默认越界.length === 0 ? '在选项内' : `越界：${默认越界.join('、')}`
+    defaultOutOfRange.length === 0 ? '在选项内' : `越界：${defaultOutOfRange.join('、')}`
 
   return result
 }
@@ -531,8 +531,8 @@ export function 运行偏好设置自测(): Record<string, string> {
  */
 export function 运行上传自测(): Record<string, string> {
   const result: Record<string, string> = {}
-  const solved = (output: string, uploader: uploaderType = 'picgo-cli', 期望 = 1): string => {
-    const r = parseUploadResult(output, uploader, 期望)
+  const solved = (output: string, uploader: uploaderType = 'picgo-cli', expectedValue = 1): string => {
+    const r = parseUploadResult(output, uploader, expectedValue)
     return r.error ? `错误(${r.url.length})` : r.url.join(',')
   }
 

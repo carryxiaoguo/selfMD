@@ -124,7 +124,7 @@ function themesSubmenu(): MenuItemConstructorOptions[] {
 let hasPandoc = false
 
 /** 启动时探测到结果后调用，然后重建菜单。 */
-export function 设置Pandoc可用(available: boolean): void {
+export function setPandocAvailability(available: boolean): void {
   hasPandoc = available
 }
 
@@ -139,12 +139,12 @@ export function 设置Pandoc可用(available: boolean): void {
  */
 function 导出子菜单(): MenuItemConstructorOptions[] {
   const item = (id: string, available = true): MenuItemConstructorOptions => {
-    const 定义 = pick('File', id)
+    const definition = pick('File', id)
     return {
       // 带上命令 id，菜单摘要才能从注册表读出真实实现状态
       id,
-      label: 定义.label,
-      accelerator: 定义.accelerator,
+      label: definition.label,
+      accelerator: definition.accelerator,
       enabled: available,
       click: () => send(id)
     }
@@ -572,7 +572,7 @@ export function rebuildMenu(): void {
  * "菜单确实是中文"。把它导出成文本，冒烟测试里就能逐条对账，中文化是否真的
  * 生效不再依赖肉眼。
  */
-export function 菜单摘要(): string[] {
+export function menuSummary(): string[] {
   const line: string[] = []
   const menu = Menu.getApplicationMenu()
   if (!menu) return ['（未设置应用菜单）']
@@ -588,7 +588,7 @@ export function 菜单摘要(): string[] {
    * 一开始两者都写成"未实现"，于是"装了 Pandoc 就能用"的功能在验证日志里
    * 显示成没做——断言会因此失去意义。实现状态一律从注册表读，不看 enabled。
    */
-  const expand = (item: Electron.MenuItem, 层: number): void => {
+  const expand = (item: Electron.MenuItem, layerNo: number): void => {
     const label = item.label || item.role || '(无标题)'
     const key = item.accelerator ? `  [${item.accelerator}]` : ''
     const 是命令 = Boolean(item.id)
@@ -597,10 +597,10 @@ export function 菜单摘要(): string[] {
       if (!isImplemented(item.id)) phase = '  ← 未实现'
       else if (!item.enabled) phase = '  ← 暂不可用'
     }
-    line.push(`${' '.repeat(6 + (层 - 1) * 4)}${label}${key}${phase}`)
+    line.push(`${' '.repeat(6 + (layerNo - 1) * 4)}${label}${key}${phase}`)
     if (item.submenu) {
       for (const child of item.submenu.items) {
-        if (child.type !== 'separator') expand(child, 层 + 1)
+        if (child.type !== 'separator') expand(child, layerNo + 1)
       }
     }
   }

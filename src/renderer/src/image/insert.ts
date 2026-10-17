@@ -5,7 +5,7 @@ import type { Settings } from '@shared/types'
 import { readFrontMatter } from '@shared/front-matter'
 import { takeFileName, timestampImageName, isImageFile } from '@shared/image-path'
 import { resolveTargetDir } from './resolve-target'
-import { buildImageSyntax, buildRefUrl, 生成替代文本, type 图片语法 } from './reference'
+import { buildImageSyntax, buildRefUrl, 生成替代文本, type imageSyntax } from './reference'
 
 /**
  * 图片插入编排。
@@ -24,7 +24,7 @@ const isolatedUndo = isolateHistory.of('full')
 // 结果与请求
 // ---------------------------------------------------------------------------
 
-export interface 插入结果 {
+export interface insertResult {
   okCount: number
   /** 面向用户的失败说明；全部成功时为 null。 */
   error: string | null
@@ -68,7 +68,7 @@ function buildInput(request: InsertRequest): Parameters<typeof resolveTargetDir>
   }
 }
 
-function 语法(settings: Settings): 图片语法 {
+function syntax(settings: Settings): imageSyntax {
   return settings.preferredImageSyntax === 'html' ? 'html' : 'markdown'
 }
 
@@ -79,7 +79,7 @@ function quoteText(imagePath: string, request: InsertRequest): string {
     addDotPrefix: request.settings.relativePathWithDot,
     escapeUrl: request.settings.autoEscapeImageURL
   })
-  return buildImageSyntax(url, 生成替代文本(imagePath), 语法(request.settings))
+  return buildImageSyntax(url, 生成替代文本(imagePath), syntax(request.settings))
 }
 
 /**
@@ -117,12 +117,12 @@ async function 取默认图片目录(): Promise<string> {
 function writeRef(view: EditorView, quote: string): void {
   const state = view.state
   const main = state.selection.main
-  const 插入点 = 避开前置元数据(state, main.from)
-  const 终点 = Math.max(插入点, main.to)
+  const insertPoint = 避开前置元数据(state, main.from)
+  const 终点 = Math.max(insertPoint, main.to)
 
   view.dispatch({
-    changes: { from: 插入点, to: 终点, insert: quote },
-    selection: EditorSelection.cursor(插入点 + quote.length),
+    changes: { from: insertPoint, to: 终点, insert: quote },
+    selection: EditorSelection.cursor(insertPoint + quote.length),
     userEvent: 'input.insertImage',
     annotations: isolatedUndo,
     scrollIntoView: true
@@ -152,7 +152,7 @@ function 避开前置元数据(state: EditorState, position: number): number {
  * 把整个判别包进一个返回 `string | null` 的辅助函数，TypeScript 就无法据此收窄
  * 联合类型，后续访问 `目标.路径` 会编译失败。类型收窄必须发生在调用点。
  */
-function 失败说明(kind: '需要保存' | '上传'): string {
+function failureNote(kind: '需要保存' | '上传'): string {
   return kind === '需要保存' ? '请先保存文档，再插入图片。' : '图片上传尚未实现。'
 }
 
@@ -166,7 +166,7 @@ function 失败说明(kind: '需要保存' | '上传'): string {
  * **优先按"文件"处理。** Windows 上从资源管理器复制图片时，剪贴板同时提供
  * 原图路径与一张可能是压缩预览的位图；先取位图会让用户粘进来一张糊图。
  */
-export async function 从剪贴板插入(request: InsertRequest): Promise<插入结果> {
+export async function 从剪贴板插入(request: InsertRequest): Promise<insertResult> {
   const content = await window.selfmd.image.readClipboard()
 
   if (content.kind === '无') return { okCount: 0, error: '剪贴板里没有图片。' }
@@ -175,7 +175,7 @@ export async function 从剪贴板插入(request: InsertRequest): Promise<插入
   // --- 位图 -------------------------------------------------------------
   const target = resolveTargetDir(buildInput(request))
   if (target.kind === '需要保存' || target.kind === '上传') {
-    return { okCount: 0, error: 失败说明(target.kind) }
+    return { okCount: 0, error: failureNote(target.kind) }
   }
 
   const dir = target.kind === '目录' ? target.filePath : await 取默认图片目录()
@@ -188,13 +188,13 @@ export async function 从剪贴板插入(request: InsertRequest): Promise<插入
 }
 
 /** 从本地文件插入（对话框选图、拖放、从资源管理器复制）。 */
-export async function insertFromFile(request: InsertRequest, paths: string[]): Promise<插入结果> {
+export async function insertFromFile(request: InsertRequest, paths: string[]): Promise<insertResult> {
   const images = paths.filter(isImageFile)
   if (images.length === 0) return { okCount: 0, error: '没有可插入的图片文件。' }
 
   const target = resolveTargetDir(buildInput(request))
   if (target.kind === '需要保存' || target.kind === '上传') {
-    return { okCount: 0, error: 失败说明(target.kind) }
+    return { okCount: 0, error: failureNote(target.kind) }
   }
 
   const quoteList: string[] = []
@@ -237,7 +237,7 @@ export async function thisTargetDir(request: InsertRequest): Promise<string | nu
  * 与本地文件的差别只有一处：需要先把图下下来。若解析结果是"不动"，
  * 就直接把原始 URL 写进文档——那正是"不做特殊处理"的含义。
  */
-export async function insertFromUrl(request: InsertRequest, url: string): Promise<插入结果> {
+export async function insertFromUrl(request: InsertRequest, url: string): Promise<insertResult> {
   const afterCleanup = url.trim()
   if (!/^https?:\/\//i.test(afterCleanup)) {
     return { okCount: 0, error: '请输入以 http:// 或 https:// 开头的图片地址。' }
@@ -251,7 +251,7 @@ export async function insertFromUrl(request: InsertRequest, url: string): Promis
   // 必须写成 if 语句而不是三元表达式：只有语句形式才能让 TypeScript
   // 在后续代码里把联合类型收窄掉。
   if (target.kind === '需要保存' || target.kind === '上传') {
-    return { okCount: 0, error: 失败说明(target.kind) }
+    return { okCount: 0, error: failureNote(target.kind) }
   }
 
   const download = await window.selfmd.image.download(afterCleanup, target.filePath, takeFileName(afterCleanup) || '图片')

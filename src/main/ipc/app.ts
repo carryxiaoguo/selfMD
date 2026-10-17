@@ -4,8 +4,8 @@ import { dirname } from 'node:path'
 import type { AppInfo, AppPaths, TaskProgress } from '@shared/ipc'
 import { CH, EV } from '@shared/ipc'
 import { activeTheme, type Settings } from '@shared/types'
-import { 可用格式, runExport, 取Pandoc版本 } from '../export'
-import { 复制为图片 } from '../export/image'
+import { availableFormats, runExport, takePandocVersion } from '../export'
+import { copyAsImage } from '../export/image'
 import {
   writeDraft,
   listDrafts,
@@ -42,7 +42,7 @@ import {
 import { getAppPaths } from '../util/paths'
 import { closeWindow, createWindow, takePendingPath } from '../window'
 import { rebuildMenu } from '../menu'
-import { 打开默认应用设置, 本程序路径, getAssocStatus } from '../services/file-association'
+import { openDefaultAppsSetting, exePathString, getAssocStatus } from '../services/file-association'
 
 /** 向所有渲染进程广播事件。 */
 export function broadcast(channel: string, payload: unknown): void {
@@ -59,7 +59,7 @@ function windowOf(event: Electron.IpcMainInvokeEvent): BrowserWindow | null {
 const readyResolvers = new Set<() => void>()
 
 /** 把计数表格式化成一行，便于在日志里对齐比对。 */
-function 格式化计数(tally: Record<string, number>): string {
+function formatCount(tally: Record<string, number>): string {
   const entry = Object.entries(tally).filter(([, value]) => value > 0)
   if (entry.length === 0) return '（全部为 0）'
   return entry.map(([name, value]) => `${name}=${value}`).join('  ')
@@ -176,7 +176,7 @@ export function registerAppIpc(): void {
     if (!target) return { filePath: null }
 
     if (!existsSync(target)) {
-      const 主题名 = activeTheme(settings)
+      const themeNameValue = activeTheme(settings)
       const template =
         rangeBounds === 'base'
           ? `/* 全局自定义 CSS —— 对**所有**主题生效。\n` +
@@ -198,9 +198,9 @@ export function registerAppIpc(): void {
             ` *\n` +
             ` * 改完保存，回到编辑器执行「视图 → 主题 → 重新加载主题」即可看到效果。\n` +
             ` */\n\n:root {\n  /* 在这里覆盖变量 */\n}\n`
-          : `/* 主题「${主题名}」专属的自定义 CSS。\n` +
+          : `/* 主题「${themeNameValue}」专属的自定义 CSS。\n` +
             ` *\n` +
-            ` * 只在「${主题名}」生效；换到别的主题就不起作用。\n` +
+            ` * 只在「${themeNameValue}」生效；换到别的主题就不起作用。\n` +
             ` * 层叠顺序：主题本体 < base.user.css < 本文件 —— 本文件优先级最高。\n` +
             ` *\n` +
             ` * 适合放"只在这套配色下才成立"的微调，例如：\n` +
@@ -253,8 +253,8 @@ export function registerAppIpc(): void {
 
   // --------------------------------------------------------------- 导出 --
   ipcMain.handle(CH.exportFormats, async () => ({
-    format: await 可用格式(),
-    pandoc版本: await 取Pandoc版本()
+    format: await availableFormats(),
+    pandocVersion: await takePandocVersion()
   }))
 
   ipcMain.handle(
@@ -305,7 +305,7 @@ export function registerAppIpc(): void {
   ipcMain.handle(
     CH.editCopyAsImage,
     async (_e, request: { source: string; docPath: string | null; widthPx?: number }) => {
-      return 复制为图片(
+      return copyAsImage(
         { target: '', source: request.source, docPath: request.docPath, format: 'html' },
         request.widthPx
       )
@@ -318,11 +318,11 @@ export function registerAppIpc(): void {
   // 与其给一个注定失败的按钮，不如把当前状态如实报出来，再把人送过去。
   ipcMain.handle(CH.appFileAssoc, () => ({
     ...getAssocStatus(),
-    exePath: 本程序路径()
+    exePath: exePathString()
   }))
 
   ipcMain.handle(CH.appOpenDefaultApps, async () => {
-    await 打开默认应用设置()
+    await openDefaultAppsSetting()
   })
 
   // --------------------------------------------------------------- 打印 --
@@ -526,10 +526,10 @@ export function registerAppIpc(): void {
         `[selfMD] 已打开 ${info.path}（${info.characters} 字符，${info.lines} 行，模式=${info.mode}）`
       )
       if (info.parserCounts) {
-        console.log('[selfMD] 解析树计数： ' + 格式化计数(info.parserCounts))
+        console.log('[selfMD] 解析树计数： ' + formatCount(info.parserCounts))
       }
       if (info.domCounts) {
-        console.log('[selfMD] 渲染 DOM 计数：' + 格式化计数(info.domCounts))
+        console.log('[selfMD] 渲染 DOM 计数：' + formatCount(info.domCounts))
       }
       if (info.commandResults) {
         console.log('[selfMD] 编辑命令自测：')

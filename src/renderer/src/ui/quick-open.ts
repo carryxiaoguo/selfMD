@@ -83,11 +83,11 @@ export async function 打开快速打开面板(options: 快速打开选项): Pro
       name.className = 'quick-open-name'
       name.textContent = item.nameText
 
-      const 路径元素 = document.createElement('div')
-      路径元素.className = 'quick-open-path'
-      路径元素.textContent = item.filePath
+      const pathEl = document.createElement('div')
+      pathEl.className = 'quick-open-path'
+      pathEl.textContent = item.filePath
 
-      line.append(name, 路径元素)
+      line.append(name, pathEl)
       // 用 mousedown 而不是 click：click 触发前输入框会先失焦，
       // 有些情况下面板已经被关掉，点击就落空了。
       line.addEventListener('mousedown', (event) => {

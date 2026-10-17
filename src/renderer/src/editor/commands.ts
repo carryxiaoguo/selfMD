@@ -67,7 +67,7 @@ const 标题正则 = /^(#{1,6})(\s+)/
  * @param 级别 1..6；传 0 表示取消标题（变回普通段落）。
  *             对已经是该级别的行再执行一次，同样取消——这就是"切换"。
  */
-export function 设置标题级别(view: EditorView, level: number): boolean {
+export function setHeadingLevel(view: EditorView, level: number): boolean {
   const state = view.state
   const { head, tail } = 涉及行(state)
 
@@ -99,7 +99,7 @@ export function 调整标题级别(view: EditorView, direction: 1 | -1): boolean
   const current = match ? match[1].length : 0
   const 下级 = Math.min(6, Math.max(0, current + direction))
   if (下级 === current) return false
-  return 设置标题级别(view, 下级)
+  return setHeadingLevel(view, 下级)
 }
 
 // ---------------------------------------------------------------------------
@@ -293,7 +293,7 @@ export function 插入前置元数据(view: EditorView): boolean {
 export function wrapInline(view: EditorView, before: string, after: string = before): boolean {
   const state = view.state
   const changes: ChangeSpec[] = []
-  const 新选区: { anchor: number; head: number }[] = []
+  const nextSelection: { anchor: number; head: number }[] = []
 
   // 多个选区时从后往前处理，避免前面的改动影响后面的偏移。
   const 选区们 = [...state.selection.ranges].sort((alpha, beta) => beta.from - alpha.from)
@@ -301,7 +301,7 @@ export function wrapInline(view: EditorView, before: string, after: string = bef
   for (const selection of 选区们) {
     if (selection.empty) {
       changes.push({ from: selection.from, to: selection.to, insert: before + after })
-      新选区.push({ anchor: selection.from + before.length, head: selection.from + before.length })
+      nextSelection.push({ anchor: selection.from + before.length, head: selection.from + before.length })
       continue
     }
 
@@ -316,7 +316,7 @@ export function wrapInline(view: EditorView, before: string, after: string = bef
         to: selection.to + after.length,
         insert: originalText
       })
-      新选区.push({ anchor: selection.from - before.length, head: selection.to - before.length })
+      nextSelection.push({ anchor: selection.from - before.length, head: selection.to - before.length })
     } else if (
       originalText.length > before.length + after.length &&
       originalText.startsWith(before) &&
@@ -325,19 +325,19 @@ export function wrapInline(view: EditorView, before: string, after: string = bef
       // 标记在选区内侧
       const content = originalText.slice(before.length, originalText.length - after.length)
       changes.push({ from: selection.from, to: selection.to, insert: content })
-      新选区.push({ anchor: selection.from, head: selection.from + content.length })
+      nextSelection.push({ anchor: selection.from, head: selection.from + content.length })
     } else {
       changes.push({ from: selection.from, to: selection.to, insert: before + originalText + after })
-      新选区.push({ anchor: selection.from + before.length, head: selection.to + before.length })
+      nextSelection.push({ anchor: selection.from + before.length, head: selection.to + before.length })
     }
   }
 
   if (changes.length === 0) return false
-  新选区.sort((alpha, beta) => alpha.anchor - beta.anchor)
+  nextSelection.sort((alpha, beta) => alpha.anchor - beta.anchor)
   view.dispatch({
     changes: changes,
     selection: EditorSelection.create(
-      新选区.map((sel) => EditorSelection.range(sel.anchor, sel.head))
+      nextSelection.map((sel) => EditorSelection.range(sel.anchor, sel.head))
     ),
     userEvent: 'input.inlineFormat',
     annotations: isolatedUndo
@@ -438,10 +438,10 @@ export function 继续引用块(view: EditorView): boolean {
   if (!match) return false
 
   // 新行的前缀沿用原行：缩进 + 同样层数的 `>`，嵌套引用不会被压平
-  const 前缀 = match[1] + match[2]
+  const prefixText = match[1] + match[2]
   view.dispatch({
-    changes: { from: selection.head, insert: `\n${前缀}` },
-    selection: { anchor: selection.head + 1 + 前缀.length },
+    changes: { from: selection.head, insert: `\n${prefixText}` },
+    selection: { anchor: selection.head + 1 + prefixText.length },
     scrollIntoView: true,
     userEvent: 'input'
   })
@@ -553,10 +553,10 @@ export function 跳出代码块(view: EditorView): boolean {
   // 围栏已经是最后一行：补一个空行再落上去。
   // 不补的话光标无处可去，用户会觉得"退不出去"——那比原来更糟。
   if (lastLine.number >= state.doc.lines) {
-    const 末尾 = state.doc.length
+    const trailing = state.doc.length
     view.dispatch({
-      changes: { from: 末尾, insert: '\n' },
-      selection: { anchor: 末尾 + 1 },
+      changes: { from: trailing, insert: '\n' },
+      selection: { anchor: trailing + 1 },
       scrollIntoView: true,
       userEvent: 'select'
     })

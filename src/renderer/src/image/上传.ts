@@ -2,7 +2,7 @@ import { syntaxTree } from '@codemirror/language'
 import { EditorSelection, type EditorState } from '@codemirror/state'
 import type { EditorView } from '@codemirror/view'
 import { isolatedUndo } from '../editor/独立撤销'
-import { 取文档目录, 是本地图片地址 } from './显示地址'
+import { takeDocDir, 是本地图片地址 } from './显示地址'
 import { 转义图片地址 } from './reference'
 
 /**
@@ -17,7 +17,7 @@ import { 转义图片地址 } from './reference'
  * "同一张图被引用两次""地址是另一张图地址的子串"这些情况下出错。
  */
 
-export interface 文档图片 {
+export interface docImages {
   /** 文档里写的原始地址。 */
   url: string
   /** 解析后的本地绝对路径；远程图片为 null。 */
@@ -51,9 +51,9 @@ function 取地址区间(node: {
  *
  * @param 只本地 为 true 时跳过远程地址——上传本地图时才用得上。
  */
-export function 收集文档图片(state: EditorState, 只本地 = false): 文档图片[] {
-  const result: 文档图片[] = []
-  const dir = 取文档目录()
+export function 收集文档图片(state: EditorState, 只本地 = false): docImages[] {
+  const result: docImages[] = []
+  const dir = takeDocDir()
 
   语法Tree遍历(state, (node) => {
     if (node.name !== 'Image') return
@@ -108,11 +108,11 @@ function 语法Tree遍历(
 
 export interface 回填结果 {
   /** 实际改写的引用数量。 */
-  改写数: number
+  changedCount: number
   /** 上传失败的数量。 */
   failCount: number
   /** 失败原因摘要，供提示使用。 */
-  失败摘要: string
+  failureSummary: string
 }
 
 /**
@@ -123,18 +123,18 @@ export interface 回填结果 {
  */
 export async function 上传并回填(
   view: EditorView,
-  图片们: 文档图片[]
+  images: docImages[]
 ): Promise<回填结果> {
-  const 可传 = 图片们.filter((img) => img.localPath !== null)
+  const 可传 = images.filter((img) => img.localPath !== null)
   if (可传.length === 0) {
-    return { 改写数: 0, failCount: 0, 失败摘要: '文档里没有本地图片，无需上传。' }
+    return { changedCount: 0, failCount: 0, failureSummary: '文档里没有本地图片，无需上传。' }
   }
 
   const reply = await window.selfmd.image.upload(可传.map((img) => img.localPath as string))
 
   if (reply.success.length === 0) {
     const reason = reply.failure[0]?.reason ?? '上传失败，且没有返回原因。'
-    return { 改写数: 0, failCount: 可传.length, 失败摘要: reason }
+    return { changedCount: 0, failCount: 可传.length, failureSummary: reason }
   }
 
   // 原路径 → 远程地址。用绝对路径做键，因为同一张图可能在文档里
@@ -142,7 +142,7 @@ export async function 上传并回填(
   const map = new Map<string, string>()
   for (const item of reply.success) map.set(item.rawPath.replace(/\\/g, '/'), item.url)
 
-  const 改动: { from: number; to: number; insert: string }[] = []
+  const diffCount: { from: number; to: number; insert: string }[] = []
   for (const img of 可传) {
     const url = map.get((img.localPath as string).replace(/\\/g, '/'))
     if (!url) continue
@@ -150,36 +150,36 @@ export async function 上传并回填(
     // 整段替换会丢掉替代文字——那是用户写的，不该被上传动作改掉。
     const range = 取地址区间InDoc(view.state, img)
     if (!range) continue
-    改动.push({ from: range.from, to: range.to, insert: 转义图片地址(url) })
+    diffCount.push({ from: range.from, to: range.to, insert: 转义图片地址(url) })
   }
 
-  if (改动.length === 0) {
-    return { 改写数: 0, failCount: 0, 失败摘要: '上传成功，但没有找到可替换的引用。' }
+  if (diffCount.length === 0) {
+    return { changedCount: 0, failCount: 0, failureSummary: '上传成功，但没有找到可替换的引用。' }
   }
 
   // 从后往前改：前面的区间不会因为后面的替换而位移。
-  改动.sort((alpha, beta) => beta.from - alpha.from)
+  diffCount.sort((alpha, beta) => beta.from - alpha.from)
   const cursor = view.state.selection.main.head
 
   view.dispatch({
-    changes: 改动,
+    changes: diffCount,
     // 光标位置按"它前面插入了多少字符"平移，否则大批替换后光标会跳回文首
     selection: EditorSelection.cursor(
-      cursor + 改动.filter((改) => 改.from < cursor).reduce((和, 改) => 和 + (改.insert.length - (改.to - 改.from)), 0)
+      cursor + diffCount.filter((改) => 改.from < cursor).reduce((和, 改) => 和 + (改.insert.length - (改.to - 改.from)), 0)
     ),
     annotations: isolatedUndo,
     userEvent: 'input.uploadImage'
   })
 
   return {
-    改写数: 改动.length,
+    changedCount: diffCount.length,
     failCount: reply.failure.length,
-    失败摘要: reply.failure.map((item) => item.reason).join('；')
+    failureSummary: reply.failure.map((item) => item.reason).join('；')
   }
 }
 
 /** 在文档里重新定位某张图片的 URL 区间。 */
-function 取地址区间InDoc(state: EditorState, img: 文档图片): 地址区间 | null {
+function 取地址区间InDoc(state: EditorState, img: docImages): 地址区间 | null {
   let result: 地址区间 | null = null
   语法Tree遍历(state, (node) => {
     if (result || node.name !== 'Image') return

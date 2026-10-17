@@ -45,7 +45,7 @@ function 被转义(docText: string, position: number): boolean {
  * 块级公式的识别很宽松：整段以 `$$` 开头、以 `$$` 结尾即可（中间可以跨行）。
  * 不做"`$$` 必须独占一行"的要求——用户在段落里直接敲 `$$x$$` 也希望它渲染。
  */
-export function 识别块级公式(docText: string): string | null {
+export function findBlockMath(docText: string): string | null {
   const trimmed = docText.trim()
   if (trimmed.length < 4) return null
   if (!trimmed.startsWith('$$') || !trimmed.endsWith('$$')) return null
@@ -61,8 +61,8 @@ export function 识别块级公式(docText: string): string | null {
  * @param 基准 文本在文档中的起始偏移（返回的区间是文档坐标）
  * @param 启用 设置里是否开启了行内公式；关闭时直接返回空数组
  */
-export function 扫描行内公式(docText: string, baseline: number, 启用 = true): 数学区间[] {
-  if (!启用) return []
+export function 扫描行内公式(docText: string, baseline: number, enable = true): 数学区间[] {
+  if (!enable) return []
   const result: 数学区间[] = []
 
   let i = 0
@@ -89,30 +89,30 @@ export function 扫描行内公式(docText: string, baseline: number, 启用 = t
     }
 
     // 找配对的收尾 `$`
-    let 结束 = -1
+    let endAt = -1
     for (let j = 公式起; j < docText.length; j++) {
       if (docText[j] !== '$') continue
       if (被转义(docText, j)) continue
       // 规则 2：结尾 `$` 前面不能是空白
       if (/\s/.test(docText[j - 1] ?? '')) continue
-      结束 = j
+      endAt = j
       break
     }
 
-    if (结束 < 0) {
+    if (endAt < 0) {
       i = position + 1
       continue
     }
 
-    const formula = docText.slice(公式起, 结束)
+    const formula = docText.slice(公式起, endAt)
     // 规则 3：内容不能为空
     if (formula.length === 0) {
       i = position + 1
       continue
     }
 
-    result.push({ from: baseline + position, to: baseline + 结束, formula, blockLevel: false })
-    i = 结束 + 1
+    result.push({ from: baseline + position, to: baseline + endAt, formula, blockLevel: false })
+    i = endAt + 1
   }
 
   return result

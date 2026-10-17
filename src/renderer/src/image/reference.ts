@@ -1,4 +1,4 @@
-import { 去扩展名, takeFileName, 是绝对路径, normalizePath } from '@shared/image-path'
+import { stripExt, takeFileName, isAbsolute, normalizePath } from '@shared/image-path'
 
 /**
  * 图片引用文本生成。
@@ -25,19 +25,19 @@ export interface 引用选项 {
  * 两者根不同（盘符不一样、一个 UNC 一个本地）时无法表达相对关系，
  * 此时原样返回目标路径——回退成绝对路径永远比给出一个错误相对路径好。
  */
-export function 相对路径(从: string, 到: string): string {
-  const alpha = normalizePath(从).split('/').filter(Boolean)
-  const beta = normalizePath(到).split('/').filter(Boolean)
-  if (alpha.length === 0 || beta.length === 0) return normalizePath(到)
-  if (alpha[0].toLowerCase() !== beta[0].toLowerCase()) return normalizePath(到)
+export function 相对路径(fromSrc: string, toPos: string): string {
+  const alpha = normalizePath(fromSrc).split('/').filter(Boolean)
+  const beta = normalizePath(toPos).split('/').filter(Boolean)
+  if (alpha.length === 0 || beta.length === 0) return normalizePath(toPos)
+  if (alpha[0].toLowerCase() !== beta[0].toLowerCase()) return normalizePath(toPos)
 
-  let 共同 = 0
-  while (共同 < alpha.length && 共同 < beta.length && alpha[共同] === beta[共同]) 共同 += 1
+  let commonPart = 0
+  while (commonPart < alpha.length && commonPart < beta.length && alpha[commonPart] === beta[commonPart]) commonPart += 1
   // 只有一个根段相同时（例如 C: 对 C:），相对关系不成立。
-  if (共同 === 0) return normalizePath(到)
+  if (commonPart === 0) return normalizePath(toPos)
 
-  const 上行 = new Array(Math.max(0, alpha.length - 共同)).fill('..')
-  const 下行 = beta.slice(共同)
+  const 上行 = new Array(Math.max(0, alpha.length - commonPart)).fill('..')
+  const 下行 = beta.slice(commonPart)
   const result = [...上行, ...下行].join('/')
   return result.length > 0 ? result : '.'
 }
@@ -95,10 +95,10 @@ export function 生成引用地址(
   const image = normalizePath(图片绝对路径)
 
   let result = image
-  if (options.useRelativePath && docDir && 是绝对路径(image)) {
+  if (options.useRelativePath && docDir && isAbsolute(image)) {
     const relativePath = 相对路径(docDir, image)
     // 相对路径算不出上行、又不是平级文件时（例如跨盘），回退到绝对路径。
-    if (是绝对路径(relativePath) === false) {
+    if (isAbsolute(relativePath) === false) {
       result = relativePath
       if (options.addDotPrefix && !result.startsWith('.')) result = `./${result}`
     }
@@ -109,7 +109,7 @@ export function 生成引用地址(
 
 /** 由图片路径推断 alt 文本：取文件名去掉扩展名。 */
 export function 生成替代文本(图片路径: string): string {
-  return 去扩展名(takeFileName(图片路径))
+  return stripExt(takeFileName(图片路径))
 }
 
 export type 图片语法 = 'markdown' | 'html'
@@ -120,7 +120,7 @@ export type 图片语法 = 'markdown' | 'html'
  * 两种语法的取舍来自 通行的"首选图片语法"设置：Markdown 语法更通用，
  * HTML `<img>` 则能带上 `width`/`style` 之类的属性。默认走 Markdown。
  */
-export function 生成图片语法(
+export function buildImageSyntax(
   url: string,
   替代文本: string,
   语法: 图片语法 = 'markdown'

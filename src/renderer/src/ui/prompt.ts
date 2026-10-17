@@ -26,19 +26,19 @@ export function 询问文本(options: 询问选项): Promise<string | null> {
     const overlay = document.createElement('div')
     overlay.className = 'selfmd-modal-mask'
 
-    const 盒子 = document.createElement('div')
-    盒子.className = 'selfmd-modal'
+    const boxEl = document.createElement('div')
+    boxEl.className = 'selfmd-modal'
 
     const title = document.createElement('div')
     title.className = 'selfmd-modal-title'
     title.textContent = options.title
 
     if (options.description) {
-      盒子.append(title)
+      boxEl.append(title)
       const description = document.createElement('div')
       description.className = 'selfmd-modal-desc'
       description.textContent = options.description
-      盒子.append(description)
+      boxEl.append(description)
     }
 
     const input = document.createElement('input')
@@ -50,19 +50,19 @@ export function 询问文本(options: 询问选项): Promise<string | null> {
     const 按钮行 = document.createElement('div')
     按钮行.className = 'selfmd-modal-buttons'
 
-    const 取消 = document.createElement('button')
-    取消.className = 'selfmd-btn'
-    取消.textContent = '取消'
+    const cancel = document.createElement('button')
+    cancel.className = 'selfmd-btn'
+    cancel.textContent = '取消'
 
     const 确定 = document.createElement('button')
     确定.className = 'selfmd-btn selfmd-btn-primary'
     确定.textContent = options.确定文字 ?? '确定'
 
     /** 收尾：移除 DOM、解绑键盘、回传结果。所有出口都必须走这里。 */
-    let 已关闭 = false
+    let closed = false
     const 收尾 = (value: string | null): void => {
-      if (已关闭) return
-      已关闭 = true
+      if (closed) return
+      closed = true
       document.removeEventListener('keydown', keyboard, true)
       overlay.remove()
       done(value)
@@ -81,18 +81,18 @@ export function 询问文本(options: 询问选项): Promise<string | null> {
       }
     }
 
-    取消.addEventListener('click', () => 收尾(null))
+    cancel.addEventListener('click', () => 收尾(null))
     确定.addEventListener('click', () => 收尾(input.value.trim()))
     // 点击遮罩空白处等同取消，但不影响点击盒子内部。
     overlay.addEventListener('mousedown', (event) => {
       if (event.target === overlay) 收尾(null)
     })
 
-    按钮行.append(取消, 确定)
+    按钮行.append(cancel, 确定)
     // 标题与说明已在上面按需 append，这里只补剩余部分
-    if (!options.description) 盒子.append(title)
-    盒子.append(input, 按钮行)
-    overlay.append(盒子)
+    if (!options.description) boxEl.append(title)
+    boxEl.append(input, 按钮行)
+    overlay.append(boxEl)
     document.body.append(overlay)
 
     // 捕获阶段监听，避免编辑器抢先处理回车与 Esc。

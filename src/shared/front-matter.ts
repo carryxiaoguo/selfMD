@@ -80,7 +80,7 @@ function 序列化值(value: string): string {
  * 文档没有前置元数据时，在开头新建一个块——这正是用户点"设为图片文件夹"
  * 时该发生的事，而不是弹一句"请先手动添加 YAML 头"。
  */
-export function 写入属性(docText: string, key: string, value: string): string {
+export function setAttr(docText: string, key: string, value: string): string {
   const meta = readFrontMatter(docText)
   const newLine = `${key}: ${序列化值(value)}`
 

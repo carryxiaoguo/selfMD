@@ -93,7 +93,7 @@ export const 内置字体: 字体项[] = [
 
 const 字体值表 = new Set(内置字体.map((item) => item.value))
 
-export interface 围栏信息 {
+export interface FenceInfo {
   language: string
   displayName: string
   style: 代码块样式
@@ -117,7 +117,7 @@ function 是样式名(value: string): value is 代码块样式 {
  * ```` ```python style= ````。渲染层任何一处抛异常，界面上都只表现为
  * "这个块没渲染出来"，很难反查。所以这里不抛，一律给合理默认值。
  */
-export function 解析围栏信息(原始: string): 围栏信息 {
+export function 解析围栏信息(原始: string): FenceInfo {
   const parts = tidy(原始).split(' ').filter(Boolean)
   const language = parts.shift() ?? ''
 
@@ -154,7 +154,7 @@ export function 解析围栏信息(原始: string): 围栏信息 {
  * `follow` 不写进文档：它是默认值，写上去只会让每一行围栏都变长，
  * 而且用户看不出"写了 follow"和"什么都没写"有什么区别。
  */
-export function 构建围栏信息(info: 围栏信息): string {
+export function 构建围栏信息(info: FenceInfo): string {
   const parts: string[] = []
   if (info.language) parts.push(info.language)
   if (info.displayName) parts.push(info.displayName)
@@ -173,11 +173,11 @@ export function 构建围栏信息(info: 围栏信息): string {
  * @param 首行文本 围栏所在行的完整文本
  * @returns 相对该行行首的偏移区间；不是围栏行时返回 null
  */
-export function 信息串区间(首行文本: string): { start: number; end: number } | null {
-  const match = /^(\s*)(`{3,}|~{3,})([\s\S]*)$/.exec(首行文本)
+export function 信息串区间(firstLineText: string): { start: number; end: number } | null {
+  const match = /^(\s*)(`{3,}|~{3,})([\s\S]*)$/.exec(firstLineText)
   if (!match) return null
   const start = match[1].length + match[2].length
-  return { start, end: 首行文本.length }
+  return { start, end: firstLineText.length }
 }
 
 /**
@@ -192,10 +192,10 @@ export function 信息串区间(首行文本: string): { start: number; end: num
  * 构建与解析必须作用在同一段文本上（信息串本身，不含围栏标记），
  * 这个函数把"切出信息串"这一步收在一处，避免每个调用点各切一次。
  */
-export function 解析围栏首行(首行文本: string): 围栏信息 {
-  const range = 信息串区间(首行文本)
+export function 解析围栏首行(firstLineText: string): FenceInfo {
+  const range = 信息串区间(firstLineText)
   if (!range) return { language: '', displayName: '', style: 'follow', font: 'follow' }
-  return 解析围栏信息(首行文本.slice(range.start, range.end))
+  return 解析围栏信息(firstLineText.slice(range.start, range.end))
 }
 
 /**
@@ -209,8 +209,8 @@ export function 解析围栏首行(首行文本: string): 围栏信息 {
  * 一旦用下拉去改，那一整段就被**悄悄吃掉**了——用户的文档被改了，
  * 而界面上只表现为"我改了一下语言"。所以这类块照旧显示源码，保持可编辑。
  */
-export function infoRoundTrips(首行文本: string, info: 围栏信息): boolean {
-  const range = 信息串区间(首行文本)
+export function infoRoundTrips(firstLineText: string, info: FenceInfo): boolean {
+  const range = 信息串区间(firstLineText)
   if (!range) return false
-  return 构建围栏信息(info) === 首行文本.slice(range.start, range.end).trim()
+  return 构建围栏信息(info) === firstLineText.slice(range.start, range.end).trim()
 }

@@ -34,7 +34,7 @@ export class 标签管理器 {
   private currentIndex = -1
   private 下一个标识 = 1
   /** 最近关闭的标签，用于"重新打开关闭的文件"。后进先出。 */
-  private 已关闭: { state: DocState; content: string }[] = []
+  private closed: { state: DocState; content: string }[] = []
 
   get list(): readonly label[] {
     return this.tabs
@@ -54,7 +54,7 @@ export class 标签管理器 {
   }
 
   get 可以重开(): boolean {
-    return this.已关闭.length > 0
+    return this.closed.length > 0
   }
 
   /**
@@ -110,22 +110,22 @@ export class 标签管理器 {
    * @returns 目标标签；标识不存在时返回 null（不做任何改动）
    */
   toggle(id: number, 落盘当前: (current: label) => void): label | null {
-    const 目标下标 = this.tabs.findIndex((t) => t.id === id)
-    if (目标下标 < 0 || 目标下标 === this.currentIndex) return null
+    const targetIndex = this.tabs.findIndex((t) => t.id === id)
+    if (targetIndex < 0 || targetIndex === this.currentIndex) return null
     const current = this.tabs[this.currentIndex]
     if (current) 落盘当前(current)
-    this.currentIndex = 目标下标
-    return this.tabs[目标下标]
+    this.currentIndex = targetIndex
+    return this.tabs[targetIndex]
   }
 
   /** 按方向循环切换，用于 Ctrl+Tab。 */
   循环(direction: 1 | -1, 落盘当前: (current: label) => void): label | null {
     if (this.tabs.length < 2) return null
-    const 目标下标 = (this.currentIndex + direction + this.tabs.length) % this.tabs.length
+    const targetIndex = (this.currentIndex + direction + this.tabs.length) % this.tabs.length
     const current = this.tabs[this.currentIndex]
     if (current) 落盘当前(current)
-    this.currentIndex = 目标下标
-    return this.tabs[目标下标]
+    this.currentIndex = targetIndex
+    return this.tabs[targetIndex]
   }
 
   /**
@@ -144,9 +144,9 @@ export class 标签管理器 {
     // 关闭当前标签前先把编辑器状态写回，否则重新打开时拿到的是上一次切换时的快照
     if (subscript === this.currentIndex) 落盘当前(被关)
 
-    this.已关闭.push({ state: { ...被关.state }, content })
+    this.closed.push({ state: { ...被关.state }, content })
     // 只留最近 20 个：再多也没人会去翻，而且未保存的内容留在内存里是负担
-    if (this.已关闭.length > 20) this.已关闭.shift()
+    if (this.closed.length > 20) this.closed.shift()
 
     this.tabs.splice(subscript, 1)
     if (subscript < this.currentIndex) this.currentIndex -= 1
@@ -157,7 +157,7 @@ export class 标签管理器 {
 
   /** 取回最近关闭的一个（后进先出）。 */
   取出已关闭(): { state: DocState; content: string } | null {
-    return this.已关闭.pop() ?? null
+    return this.closed.pop() ?? null
   }
 
   /** 按路径找已经打开的标签；用于"同一个文件不要开两遍"。 */

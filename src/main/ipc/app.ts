@@ -7,12 +7,12 @@ import { activeTheme, type Settings } from '@shared/types'
 import { 可用格式, 执行导出, 取Pandoc版本 } from '../export'
 import { 复制为图片 } from '../export/图片'
 import {
-  写草稿,
+  writeDraft,
   listDrafts,
-  删除草稿,
+  deleteDraft,
   清理该文档的草稿,
   读草稿,
-  需要恢复的草稿
+  recoverableDraft
 } from '../services/drafts'
 import {
   getSettings,
@@ -342,12 +342,12 @@ export function registerAppIpc(): void {
   // 自动保存是后台行为：写失败不抛异常，也不弹窗。磁盘满或文件被占用时
   // 安静跳过即可，下一次改动还会再试——用错误框打断打字才是更糟的选择。
   ipcMain.handle(CH.draftSave, (_e, rawPath: string | null, content: string) =>
-    写草稿(rawPath, content)
+    writeDraft(rawPath, content)
   )
   ipcMain.handle(CH.draftList, () => listDrafts())
   ipcMain.handle(CH.draftRead, (_e, key: string) => 读草稿(key))
-  ipcMain.handle(CH.draftDiscard, (_e, key: string) => 删除草稿(key))
-  ipcMain.handle(CH.draftPending, () => 需要恢复的草稿())
+  ipcMain.handle(CH.draftDiscard, (_e, key: string) => deleteDraft(key))
+  ipcMain.handle(CH.draftPending, () => recoverableDraft())
   ipcMain.handle(CH.draftClearFor, (_e, rawPath: string | null, content: string) =>
     清理该文档的草稿(rawPath, content)
   )

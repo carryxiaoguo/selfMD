@@ -461,7 +461,7 @@ export interface SelfMdApi {
    */
   fileAssoc(): Promise<{
     current: string
-    是默认: boolean
+    isDefaultFlag: boolean
     有新建菜单: boolean
     程序路径: string
   }>

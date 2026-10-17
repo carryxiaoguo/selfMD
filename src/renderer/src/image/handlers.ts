@@ -1,12 +1,12 @@
 import type { Extension } from '@codemirror/state'
 import { EditorView } from '@codemirror/view'
-import { 扩展名由类型, 时间戳图片名, 是图片文件 } from '@shared/image-path'
+import { 扩展名由类型, 时间戳图片名, isImageFile } from '@shared/image-path'
 import {
   type InsertRequest,
   本次目标目录,
   从地址插入,
   从剪贴板插入,
-  从文件插入
+  insertFromFile
 } from './insert'
 
 /**
@@ -55,7 +55,7 @@ function 取磁盘路径(file: File): string {
 function 找图片文件(list: FileList | null | undefined): File | null {
   if (!list) return null
   for (const file of Array.from(list)) {
-    if (file.type.startsWith('image/') || 是图片文件(file.name)) return file
+    if (file.type.startsWith('image/') || isImageFile(file.name)) return file
   }
   return null
 }
@@ -67,8 +67,8 @@ export function 图片粘贴与拖放(deps: 图片处理依赖): Extension {
     if (!request) return
 
     const filePath = 取磁盘路径(file)
-    if (filePath && 是图片文件(filePath)) {
-      const result = await 从文件插入(request, [filePath])
+    if (filePath && isImageFile(filePath)) {
+      const result = await insertFromFile(request, [filePath])
       if (result.error) deps.hint(result.error)
       return
     }
@@ -85,14 +85,14 @@ export function 图片粘贴与拖放(deps: 图片处理依赖): Extension {
       const name = `${时间戳图片名(new Date())}${extension}`
       const dir = await 本次目标目录(request)
       if (!dir) return
-      const 写回 = await window.selfmd.image.saveBytes(dir, name, data)
-      if (!写回) {
+      const writeBack = await window.selfmd.image.saveBytes(dir, name, data)
+      if (!writeBack) {
         deps.hint('写入图片失败。')
         return
       }
       // 复用从文件插入的收尾逻辑：把写好的路径再走一遍完整流程，
       // 避免在这里重复实现一遍引用生成。
-      const result = await 从文件插入(request, [写回.filePath])
+      const result = await insertFromFile(request, [writeBack.filePath])
       if (result.error) deps.hint(result.error)
     } catch (error) {
       deps.hint(`读取图片失败：${error instanceof Error ? error.message : String(error)}`)

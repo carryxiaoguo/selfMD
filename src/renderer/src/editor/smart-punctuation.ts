@@ -229,15 +229,15 @@ export interface 智能标点选项 {
 export function 智能标点(options: 智能标点选项): Extension {
   if (!options.quoteChar && !options.破折号) return []
 
-  return EditorView.inputHandler.of((view, 从, 到, input) => {
+  return EditorView.inputHandler.of((view, fromSrc, toPos, input) => {
     // 只处理单字符键入。多字符意味着输入法或粘贴，不该插手。
     if (input.length !== 1) return false
     // 有选区时是"替换"，与标点转换无关。
-    if (从 !== 到) return false
+    if (fromSrc !== toPos) return false
 
     const state = view.state
-    if (在代码上下文(state, 从)) return false
-    const preamble = 本行前文(state, 从)
+    if (在代码上下文(state, fromSrc)) return false
+    const preamble = 本行前文(state, fromSrc)
 
     let plan: { fallback: number; insert: string } | null = null
 
@@ -253,9 +253,9 @@ export function 智能标点(options: 智能标点选项): Extension {
     // 这样中文输入法的候选、自动补全等附加行为不受影响。
     if (plan.fallback === 0 && plan.insert === input) return false
 
-    const fromPos = 从 - plan.fallback
+    const fromPos = fromSrc - plan.fallback
     view.dispatch({
-      changes: { from: fromPos, to: 从, insert: plan.insert },
+      changes: { from: fromPos, to: fromSrc, insert: plan.insert },
       selection: { anchor: fromPos + plan.insert.length },
       userEvent: 'input.type',
       scrollIntoView: true

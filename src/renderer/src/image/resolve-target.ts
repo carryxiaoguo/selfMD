@@ -1,5 +1,5 @@
 import type { ImageStoragePolicy } from '@shared/types'
-import { 去扩展名, 是绝对路径, normalizePath, 拼接 } from '@shared/image-path'
+import { stripExt, isAbsolute, normalizePath, concat } from '@shared/image-path'
 
 /**
  * 图片存储目标解析。
@@ -18,8 +18,8 @@ import { 去扩展名, 是绝对路径, normalizePath, 拼接 } from '@shared/im
  */
 
 // 路径工具从 shared 转出，方便调用方只 import 一处。
-export { 是绝对路径, normalizePath, 拼接, 去扩展名 } from '@shared/image-path'
-export { takeFileName, 取目录, 唯一文件名, 时间戳图片名 } from '@shared/image-path'
+export { isAbsolute, normalizePath, concat, stripExt } from '@shared/image-path'
+export { takeFileName, 取目录, uniqueFileName, 时间戳图片名 } from '@shared/image-path'
 
 // ---------------------------------------------------------------------------
 // 解析
@@ -37,9 +37,9 @@ export interface 目标解析输入 {
   /** 全局的图片存储策略。 */
   globalPolicy: ImageStoragePolicy
   /** `custom` 策略下使用的目录模板。 */
-  自定义目录: string
+  customDir: string
   /** 是否允许依据文档级设置自动上传。 */
-  允许自动上传: boolean
+  autoUploadAllowed: boolean
   /** 用户显式要求上传（例如点了"上传图片"），可越过 `允许自动上传`。 */
   强制上传?: boolean
 }
@@ -60,7 +60,7 @@ function 是上传标记(value: string): boolean {
 
 /** 把 `${filename}` 换成不含扩展名的文档名。 */
 function 替换文件名占位符(template: string, docName: string | null): string {
-  const 基名 = docName ? 去扩展名(docName) : ''
+  const 基名 = docName ? stripExt(docName) : ''
   return template.replace(/\$\{filename\}/g, 基名)
 }
 
@@ -72,23 +72,23 @@ function 替换文件名占位符(template: string, docName: string | null): str
  *   2. 文档级设置（YAML 前置元数据）
  *   3. 全局策略
  */
-export function 解析目标目录(input: 目标解析输入): 目标结果 {
+export function resolveTargetDir(input: 目标解析输入): 目标结果 {
   // --- 1. 文本包：图片是包的内部资源，用户没有选择余地 -------------------
   if (input.是文本包) {
     if (!input.docDir) return { kind: '需要保存' }
-    return { kind: '目录', filePath: 拼接(input.docDir, 'assets'), origin: '文本包' }
+    return { kind: '目录', filePath: concat(input.docDir, 'assets'), origin: '文本包' }
   }
 
   // --- 2. 文档级设置优先于全局 ------------------------------------------
   const 文档级 = input.docSettings?.trim()
   if (文档级 && 文档级.length > 0) {
-    if ((input.允许自动上传 || input.强制上传) && 是上传标记(文档级)) {
+    if ((input.autoUploadAllowed || input.强制上传) && 是上传标记(文档级)) {
       return { kind: '上传', origin: '文档级设置' }
     }
     const expand = 替换文件名占位符(文档级, input.docName)
-    if (是绝对路径(expand)) return { kind: '目录', filePath: normalizePath(expand), origin: '文档级设置' }
+    if (isAbsolute(expand)) return { kind: '目录', filePath: normalizePath(expand), origin: '文档级设置' }
     if (!input.docDir) return { kind: '需要保存' }
-    return { kind: '目录', filePath: 拼接(input.docDir, expand), origin: '文档级设置' }
+    return { kind: '目录', filePath: concat(input.docDir, expand), origin: '文档级设置' }
   }
 
   // --- 3. 全局策略 -------------------------------------------------------
@@ -105,25 +105,25 @@ export function 解析目标目录(input: 目标解析输入): 目标结果 {
 
     case 'assets':
       if (!input.docDir) return { kind: '需要保存' }
-      return { kind: '目录', filePath: 拼接(input.docDir, 'assets'), origin: '全局设置' }
+      return { kind: '目录', filePath: concat(input.docDir, 'assets'), origin: '全局设置' }
 
     case 'per-file-assets': {
       if (!input.docDir || !input.docName) return { kind: '需要保存' }
       return {
         kind: '目录',
-        filePath: 拼接(input.docDir, `${去扩展名(input.docName)}.assets`),
+        filePath: concat(input.docDir, `${stripExt(input.docName)}.assets`),
         origin: '全局设置'
       }
     }
 
     case 'custom': {
-      const template = input.自定义目录?.trim()
+      const template = input.customDir?.trim()
       // 自定义目录没填时退回"不动"，而不是悄悄把图片丢到某个默认位置。
       if (!template) return { kind: '不动' }
       const expand = 替换文件名占位符(template, input.docName)
-      if (是绝对路径(expand)) return { kind: '目录', filePath: normalizePath(expand), origin: '全局设置' }
+      if (isAbsolute(expand)) return { kind: '目录', filePath: normalizePath(expand), origin: '全局设置' }
       if (!input.docDir) return { kind: '需要保存' }
-      return { kind: '目录', filePath: 拼接(input.docDir, expand), origin: '全局设置' }
+      return { kind: '目录', filePath: concat(input.docDir, expand), origin: '全局设置' }
     }
 
     default:

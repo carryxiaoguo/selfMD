@@ -3,7 +3,7 @@ import { mkdirSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { pathToFileURL } from 'node:url'
-import { 构建导出HTML, type 导出选项 } from './index'
+import { buildExportHtml, type ExportOptions } from './index'
 
 /**
  * 把文档渲染成图片并放进剪贴板。
@@ -47,7 +47,7 @@ export interface 图片结果 {
 }
 
 export async function 复制为图片(
-  options: 导出选项,
+  options: ExportOptions,
   /** 目标宽度；省略时用默认值。 */
   width = 默认宽度
 ): Promise<图片结果> {
@@ -63,7 +63,7 @@ export async function 复制为图片(
   try {
     // 内嵌图片：截图是"拿走一份"，图片必须跟着走，
     // 否则粘到别处就是一堆破图。
-    html = await 构建导出HTML({
+    html = await buildExportHtml({
       ...options,
       format: 'html',
       withOutline: false,
@@ -73,10 +73,10 @@ export async function 复制为图片(
     return failure(`渲染失败：${error instanceof Error ? error.message : String(error)}`)
   }
 
-  const 临时文件 = join(tmpdir(), `selfmd-图片-${Date.now()}.html`)
+  const tempFile = join(tmpdir(), `selfmd-图片-${Date.now()}.html`)
   try {
-    mkdirSync(dirname(临时文件), { recursive: true })
-    writeFileSync(临时文件, html, 'utf8')
+    mkdirSync(dirname(tempFile), { recursive: true })
+    writeFileSync(tempFile, html, 'utf8')
   } catch (error) {
     return failure(`写入临时文件失败：${error instanceof Error ? error.message : String(error)}`)
   }
@@ -96,7 +96,7 @@ export async function 复制为图片(
   })
 
   try {
-    await win.loadURL(pathToFileURL(临时文件).toString())
+    await win.loadURL(pathToFileURL(tempFile).toString())
 
     // 等图片真正解码完。只等 load 事件不够——那时图片可能还没画上去。
     await win.webContents.executeJavaScript(`

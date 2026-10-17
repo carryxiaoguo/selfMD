@@ -10,7 +10,7 @@ import {
   replaceWith,
   渲染标点装饰
 } from './decorations'
-import type { 构建上下文, SyntaxNode } from './types'
+import type { BuildContext, SyntaxNode } from './types'
 import { addLineDeco, 行内公式已启用, 渲染标点已启用 } from './types'
 import {
   列表圆点,
@@ -125,25 +125,25 @@ function 落在手工块内(position: number, 手工块列表: manualBlock[]): b
 
 export interface 手工扫描结果 {
   frontMatter: manualBlock | null
-  数学块: manualBlock[]
+  mathBlock: manualBlock[]
   全部块: manualBlock[]
 }
 
 /** 第一遍：处理语法树里不存在的两类块，并把它们占用的行登记好。 */
-export function 扫描手工块(state: EditorState, context: 构建上下文): 手工扫描结果 {
+export function 扫描手工块(state: EditorState, context: BuildContext): 手工扫描结果 {
   const frontMatter = 检测前置元数据(state)
-  const 数学块 = 检测数学块(state)
+  const mathBlock = 检测数学块(state)
 
   const 全部块: manualBlock[] = []
   if (frontMatter) 全部块.push(frontMatter)
-  全部块.push(...数学块)
+  全部块.push(...mathBlock)
 
   for (const no of frontMatter?.lineNoSet ?? []) {
     addLineDeco(context, state.doc.line(no).from, blockLineStyles.frontMatter)
   }
-  for (const block of 数学块) {
+  for (const block of mathBlock) {
     for (const no of block.lineNoSet) {
-      addLineDeco(context, state.doc.line(no).from, blockLineStyles.数学块)
+      addLineDeco(context, state.doc.line(no).from, blockLineStyles.mathBlock)
     }
     // 块级公式的**替换**装饰不在这里加。
     //
@@ -155,14 +155,14 @@ export function 扫描手工块(state: EditorState, context: 构建上下文): �
     // 这里保留行装饰：它对插件是合法的，且与替换装饰互不冲突。
   }
 
-  return { frontMatter, 数学块, 全部块 }
+  return { frontMatter, mathBlock, 全部块 }
 }
 
 /** 第二遍：按语法树节点名分派块级装饰。返回是否已处理该节点。 */
 export function 处理块级(
   node: SyntaxNode,
   state: EditorState,
-  context: 构建上下文,
+  context: BuildContext,
   手工: 手工扫描结果
 ): boolean {
   // 落在手工块内部的节点交给手工扫描处理（主要是别把 `---` 画成水平线）。
@@ -221,21 +221,21 @@ export function 处理块级(
     case 'ATXHeading4':
     case 'ATXHeading5':
     case 'ATXHeading6': {
-      const 级 = Number(node.name.slice(-1))
-      addLineDeco(context, state.doc.lineAt(node.from).from, 标题行装饰(级))
+      const levelNo = Number(node.name.slice(-1))
+      addLineDeco(context, state.doc.lineAt(node.from).from, 标题行装饰(levelNo))
       return false // 继续下沉，让 HeaderMark 被行内逻辑折叠
     }
 
     case 'SetextHeading1':
     case 'SetextHeading2': {
-      const 级 = Number(node.name.slice(-1))
-      addLineDeco(context, state.doc.lineAt(node.from).from, 标题行装饰(级))
+      const levelNo = Number(node.name.slice(-1))
+      addLineDeco(context, state.doc.lineAt(node.from).from, 标题行装饰(levelNo))
       return false
     }
 
     case 'HeaderMark': {
-      const 父名 = node.parent?.name ?? ''
-      if (父名.startsWith('ATXHeading') || 父名.startsWith('SetextHeading')) {
+      const parentName = node.parent?.name ?? ''
+      if (parentName.startsWith('ATXHeading') || parentName.startsWith('SetextHeading')) {
         if (!onActiveLine) {
           context.entry.push({ from: node.from, to: node.to, deco: hidden, rank: 1 })
         }
@@ -470,8 +470,8 @@ export function 处理块级(
     }
 
     case 'TableDelimiter': {
-      const 父名 = node.parent?.name
-      if (父名 === 'Table') {
+      const parentName = node.parent?.name
+      if (parentName === 'Table') {
         // 对齐定义行（`| :--- | :--: |`）整行折叠，只留一条分隔视觉。
         addLineDeco(context, state.doc.lineAt(node.from).from, blockLineStyles.表格分隔行)
         if (!onActiveLine) {
@@ -498,12 +498,12 @@ export function 处理块级(
       // 挂上之后针对它写的规则（缩进、行高、完成态淡化）可直接生效。
       addLineDeco(context, state.doc.lineAt(node.from).from, blockLineStyles.任务项行)
       const originalText = state.sliceDoc(node.from, node.to)
-      const 已勾选 = /\[[xX]\]/.test(originalText)
+      const checkedFlag = /\[[xX]\]/.test(originalText)
       // 复选框始终替换，即使光标在本行——否则勾选后光标会把标记"撑开"。
       context.entry.push({
         from: node.from,
         to: node.to,
-        deco: replaceWith(new 任务框(已勾选, node.from)),
+        deco: replaceWith(new 任务框(checkedFlag, node.from)),
         rank: 1
       })
       return true

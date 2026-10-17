@@ -4,12 +4,12 @@ import { join } from 'node:path'
 import { CH, type ClipboardContent, type ImageDownloadResult } from '@shared/ipc'
 import { 上传图片, 上传器可用 } from '../services/uploader'
 import {
-  去扩展名,
+  stripExt,
   takeFileName,
-  唯一文件名,
+  uniqueFileName,
   扩展名由类型,
   normalizePath,
-  是图片文件,
+  isImageFile,
   类型由扩展名
 } from '@shared/image-path'
 /**
@@ -45,7 +45,7 @@ function 读剪贴板(): ClipboardContent {
         .toString('ucs2')
         .split('\0')
         .map((s) => s.trim())
-        .filter((s) => s.length > 0 && 是图片文件(s))
+        .filter((s) => s.length > 0 && isImageFile(s))
       if (paths.length > 0) return { kind: '文件', filePath: paths }
     }
 
@@ -72,7 +72,7 @@ function 读剪贴板(): ClipboardContent {
 /** 在目录内挑一个不冲突的名字。 */
 function 安排路径(dir: string, expectedName: string): string {
   mkdirSync(dir, { recursive: true })
-  const 最终名 = 唯一文件名(expectedName, (candidate) => existsSync(join(dir, candidate)))
+  const 最终名 = uniqueFileName(expectedName, (candidate) => existsSync(join(dir, candidate)))
   return join(dir, 最终名)
 }
 
@@ -87,7 +87,7 @@ function 校正扩展名(displayName: string, kind: string | null): string {
   if (!应由类型) return displayName
   const 现有 = 类型由扩展名(displayName)
   if (!现有) return displayName + 应由类型
-  return 现有 === 应由类型 ? displayName : 去扩展名(displayName) + 应由类型
+  return 现有 === 应由类型 ? displayName : stripExt(displayName) + 应由类型
 }
 
 export function registerImageIpc(): void {

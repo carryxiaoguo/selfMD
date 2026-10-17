@@ -1,6 +1,6 @@
 import { RangeSet, StateField, type EditorState } from '@codemirror/state'
 import { Decoration, EditorView, type DecorationSet } from '@codemirror/view'
-import { 识别块级公式 } from '@shared/数学'
+import { findBlockMath } from '@shared/数学'
 import { 检测数学块 } from './block'
 import { 数学公式 } from './widgets'
 
@@ -41,7 +41,7 @@ function 构建公式(state: EditorState): DecorationSet {
     // 整个公式就变回源码，编辑体验很割裂。
     if (cursor.from >= block.from && cursor.to <= block.to) continue
 
-    const formula = 识别块级公式(state.sliceDoc(block.from, block.to))
+    const formula = findBlockMath(state.sliceDoc(block.from, block.to))
     if (!formula) continue
 
     range.push(

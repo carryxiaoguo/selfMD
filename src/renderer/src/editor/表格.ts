@@ -65,8 +65,8 @@ export function cellRanges(lineText: string): cell[] {
 export function currentCellIndex(lineText: string, 行内偏移: number): number {
   const ranges = cellRanges(lineText)
   for (let i = 0; i < ranges.length; i++) {
-    const 格 = ranges[i]
-    if (行内偏移 >= 格.start && 行内偏移 <= 格.end) return i
+    const cellBox = ranges[i]
+    if (行内偏移 >= cellBox.start && 行内偏移 <= cellBox.end) return i
   }
   // 落在最后一个竖线之后（行尾没有闭合竖线的情况）
   return ranges.length > 0 ? ranges.length - 1 : -1
@@ -100,9 +100,9 @@ function makeEmptyRow(模板行文本: string): string {
 
   const 段们: string[] = []
   for (let i = 0; i < ranges.length; i++) {
-    const 格 = ranges[i]
+    const cellBox = ranges[i]
     // 保留每格原来多宽，只把内容换成空格
-    const width = Math.max(1, 格.end - 格.start)
+    const width = Math.max(1, cellBox.end - cellBox.start)
     段们.push(' '.repeat(width))
   }
   const 体 = 段们.join('|')
@@ -115,7 +115,7 @@ function makeEmptyRow(模板行文本: string): string {
  * 在**最后一个单元格**上继续往后跳时，自动补一行——这是表格编辑里
  * 最顺手的那个行为：一直按 Tab 就能一直往下写，不用先插行。
  */
-export function 跳到相邻单元格(view: EditorView, direction: 1 | -1): boolean {
+export function moveToAdjacentCell(view: EditorView, direction: 1 | -1): boolean {
   const state = view.state
   const selection = state.selection.main
   if (!selection.empty) return false
@@ -131,9 +131,9 @@ export function 跳到相邻单元格(view: EditorView, direction: 1 | -1): bool
 
   const target = current + direction
   if (target >= 0 && target < ranges.length) {
-    const 格 = ranges[target]
+    const cellBox = ranges[target]
     // 落在单元格内容区的起点：跳过 `| ` 之后的空白，光标贴在第一个字上
-    const 内容起 = line.from + 格.start + (/^\s*/.exec(line.text.slice(格.start))?.[0].length ?? 0)
+    const 内容起 = line.from + cellBox.start + (/^\s*/.exec(line.text.slice(cellBox.start))?.[0].length ?? 0)
     view.dispatch({ selection: { anchor: 内容起 }, scrollIntoView: true, userEvent: 'select' })
     return true
   }

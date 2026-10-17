@@ -1,12 +1,12 @@
 import { markdown } from '@codemirror/lang-markdown'
 import { EditorSelection, EditorState } from '@codemirror/state'
 import type { EditorView } from '@codemirror/view'
-import { 渲染Markdown为HTML } from '@shared/markdown-html'
-import { 偏好设置结构, 全部设置项, 校验设置表 } from '@shared/settings-schema'
-import { 识别块级公式, 扫描行内公式 } from '@shared/数学'
+import { renderMarkdownToHtml } from '@shared/markdown-html'
+import { PrefsSchema, 全部设置项, 校验设置表 } from '@shared/settings-schema'
+import { findBlockMath, 扫描行内公式 } from '@shared/数学'
 import { DEFAULT_SETTINGS, type uploaderType } from '@shared/types'
-import { 生成上传命令, 解析上传结果 } from '@shared/upload-parse'
-import { 提取标题, 定位当前标题 } from '../ui/outline'
+import { buildUploadCmd, parseUploadResult } from '@shared/upload-parse'
+import { 提取标题, locateHeading } from '../ui/outline'
 import {
   toggleList,
   切换引用,
@@ -15,21 +15,21 @@ import {
   插入链接,
   clearFormat,
   调整缩进,
-  设置标题级别
+  setHeadingLevel
 } from './commands'
 import { 换引号, 换破折号, 扫描渲染标点 } from './smart-punctuation'
-import { 模糊评分, 模糊筛选, pathTail } from '@shared/模糊匹配'
+import { fuzzyScore, 模糊筛选, pathTail } from '@shared/模糊匹配'
 import { 句子区间, 词区间 } from './selection'
-import { readFrontMatter, 写入属性, 移除属性 } from '@shared/front-matter'
+import { readFrontMatter, setAttr, 移除属性 } from '@shared/front-matter'
 import {
-  唯一文件名,
+  uniqueFileName,
   应当搬运,
-  解析目标目录,
+  resolveTargetDir,
   type 目标解析输入,
   type 目标结果,
   type 搬运判定输入
 } from '../image/resolve-target'
-import { 生成图片语法, 生成引用地址, type 引用选项 } from '../image/reference'
+import { buildImageSyntax, 生成引用地址, type 引用选项 } from '../image/reference'
 
 /**
  * 编辑命令自测。
@@ -54,17 +54,17 @@ const 用例表: 用例[] = [
   {
     name: '设为二级标题',
     input: '甲',
-    run: (v) => void 设置标题级别(v, 2)
+    run: (v) => void setHeadingLevel(v, 2)
   },
   {
     name: '同级别再执行一次=取消',
     input: '## 甲',
-    run: (v) => void 设置标题级别(v, 2)
+    run: (v) => void setHeadingLevel(v, 2)
   },
   {
     name: '一级升为二级（降级）',
     input: '# 甲',
-    run: (v) => void 设置标题级别(v, 2)
+    run: (v) => void setHeadingLevel(v, 2)
   },
   {
     name: '段落加粗',
@@ -268,8 +268,8 @@ export function 运行图片管线自测(): Record<string, string> {
     是文本包: false,
     docSettings: null,
     globalPolicy: '',
-    自定义目录: './${filename}',
-    允许自动上传: false
+    customDir: './${filename}',
+    autoUploadAllowed: false
   }
   const 目标用例: [string, Partial<目标解析输入>][] = [
     ['默认策略（不做特殊处理）', {}],
@@ -277,23 +277,23 @@ export function 运行图片管线自测(): Record<string, string> {
     ['assets 子目录', { globalPolicy: 'assets' }],
     ['每文件独立 assets', { globalPolicy: 'per-file-assets' }],
     ['自定义相对目录', { globalPolicy: 'custom' }],
-    ['自定义绝对目录', { globalPolicy: 'custom', 自定义目录: 'D:/图床' }],
-    ['自定义绝对目录带占位符', { globalPolicy: 'custom', 自定义目录: 'D:/图/${filename}' }],
-    ['自定义目录留空', { globalPolicy: 'custom', 自定义目录: '' }],
+    ['自定义绝对目录', { globalPolicy: 'custom', customDir: 'D:/图床' }],
+    ['自定义绝对目录带占位符', { globalPolicy: 'custom', customDir: 'D:/图/${filename}' }],
+    ['自定义目录留空', { globalPolicy: 'custom', customDir: '' }],
     ['全局上传', { globalPolicy: 'upload' }],
     ['文档级覆盖全局', { docSettings: 'imgs', globalPolicy: 'assets' }],
-    ['文档级要求上传且已允许', { docSettings: 'upload', 允许自动上传: true }],
-    ['文档级要求上传但未允许', { docSettings: 'upload', 允许自动上传: false }],
-    ['文档级用 ipic 标记', { docSettings: 'ipic', 允许自动上传: true }],
+    ['文档级要求上传且已允许', { docSettings: 'upload', autoUploadAllowed: true }],
+    ['文档级要求上传但未允许', { docSettings: 'upload', autoUploadAllowed: false }],
+    ['文档级用 ipic 标记', { docSettings: 'ipic', autoUploadAllowed: true }],
     ['文档级绝对路径', { docSettings: 'D:/图' }],
     ['文档级含文件名占位符', { docSettings: '${filename}.assets' }],
     ['文本包走包内 assets', { 是文本包: true, globalPolicy: 'assets' }],
     ['未保存文档 + 需要目录的策略', { docDir: null, docName: null, globalPolicy: 'folder' }],
     ['未保存文档 + 不动策略', { docDir: null, docName: null, globalPolicy: '' }],
-    ['未保存文档 + 绝对自定义目录', { docDir: null, docName: null, globalPolicy: 'custom', 自定义目录: 'D:/图' }]
+    ['未保存文档 + 绝对自定义目录', { docDir: null, docName: null, globalPolicy: 'custom', customDir: 'D:/图' }]
   ]
   for (const [name, 覆盖] of 目标用例) {
-    result[`目标·${name}`] = 显示目标(解析目标目录({ ...baseline, ...覆盖 }))
+    result[`目标·${name}`] = 显示目标(resolveTargetDir({ ...baseline, ...覆盖 }))
   }
 
   // --- 是否搬运 ---------------------------------------------------------
@@ -319,9 +319,9 @@ export function 运行图片管线自测(): Record<string, string> {
 
   // --- 唯一文件名 -------------------------------------------------------
   const 占用集合 = new Set(['甲.png', '甲-1.png'])
-  result['命名·不重名'] = 唯一文件名('乙.png', () => false)
-  result['命名·重名一次'] = 唯一文件名('甲.png', () => false)
-  result['命名·跳过已占用的连续编号'] = 唯一文件名('甲.png', (name) => 占用集合.has(name))
+  result['命名·不重名'] = uniqueFileName('乙.png', () => false)
+  result['命名·重名一次'] = uniqueFileName('甲.png', () => false)
+  result['命名·跳过已占用的连续编号'] = uniqueFileName('甲.png', (name) => 占用集合.has(name))
 
   // --- 前置元数据读写 ---------------------------------------------------
   const 无元数据 = '# 标题\n\n正文'
@@ -333,18 +333,18 @@ export function 运行图片管线自测(): Record<string, string> {
   result['元数据·读取图片目录'] = 读有.attr['image-folder'] ?? '(缺失)'
   result['元数据·读取标题'] = 读有.attr['title'] ?? '(缺失)'
 
-  result['元数据·写入到无元数据的文档'] = 写入属性(无元数据, 'image-folder', 'imgs')
+  result['元数据·写入到无元数据的文档'] = setAttr(无元数据, 'image-folder', 'imgs')
     .split('\n')
     .slice(0, 3)
     .join('⏎')
 
   result['元数据·更新已有键'] =
-    readFrontMatter(写入属性(有元数据, 'image-folder', '图')).attr[
+    readFrontMatter(setAttr(有元数据, 'image-folder', '图')).attr[
       'image-folder'
     ] ?? '(缺失)'
 
   result['元数据·新增键'] =
-    readFrontMatter(写入属性(有元数据, 'author', '我')).attr['author'] ?? '(缺失)'
+    readFrontMatter(setAttr(有元数据, 'author', '我')).attr['author'] ?? '(缺失)'
 
   result['元数据·移除一个键后块仍存在'] = readFrontMatter(
     移除属性(有元数据, 'image-folder')
@@ -373,9 +373,9 @@ export function 运行图片管线自测(): Record<string, string> {
     result[`引用·${name}`] = 生成引用地址(image, 文档目录值, options)
   }
 
-  result['语法·Markdown'] = 生成图片语法('图/甲.png', '甲')
-  result['语法·HTML'] = 生成图片语法('图/甲.png', '甲', 'html')
-  result['语法·alt 含方括号'] = 生成图片语法('图/甲.png', '甲]乙')
+  result['语法·Markdown'] = buildImageSyntax('图/甲.png', '甲')
+  result['语法·HTML'] = buildImageSyntax('图/甲.png', '甲', 'html')
+  result['语法·alt 含方括号'] = buildImageSyntax('图/甲.png', '甲]乙')
 
   return result
 }
@@ -417,7 +417,7 @@ export function 运行导出自测(): Record<string, string> {
     '段落里的 <标签> 与 & 符号必须转义。'
   ].join('\n')
 
-  const html = 渲染Markdown为HTML(docModel)
+  const html = renderMarkdownToHtml(docModel)
   const has = (parts: string): string => (html.includes(parts) ? '有' : '无')
 
   const result: Record<string, string> = {
@@ -473,7 +473,7 @@ export function 运行偏好设置自测(): Record<string, string> {
   const items = 全部设置项()
 
   result['偏好设置·项目数'] = String(items.length)
-  result['偏好设置·分区数'] = String(偏好设置结构.length)
+  result['偏好设置·分区数'] = String(PrefsSchema.length)
 
   const 坏键 = 校验设置表()
   result['偏好设置·键名全部有效'] = 坏键.length === 0 ? '有效' : `无效：${坏键.join('、')}`
@@ -532,7 +532,7 @@ export function 运行偏好设置自测(): Record<string, string> {
 export function 运行上传自测(): Record<string, string> {
   const result: Record<string, string> = {}
   const solved = (output: string, uploader: uploaderType = 'picgo-cli', 期望 = 1): string => {
-    const r = 解析上传结果(output, uploader, 期望)
+    const r = parseUploadResult(output, uploader, 期望)
     return r.error ? `错误(${r.url.length})` : r.url.join(',')
   }
 
@@ -584,21 +584,21 @@ export function 运行上传自测(): Record<string, string> {
     用户数据目录: 'C:/Users/甲/AppData/Roaming/selfmd',
     platform: 'win32' as const
   }
-  result['上传·自定义命令占位符'] = 生成上传命令(
+  result['上传·自定义命令占位符'] = buildUploadCmd(
     'custom',
     'C:\\笔记\\我的 图.png',
     config
   ) ?? '(空)'
-  result['上传·路径用正斜杠'] = 生成上传命令('custom', 'C:\\a\\b.png', config)?.includes('/')
+  result['上传·路径用正斜杠'] = buildUploadCmd('custom', 'C:\\a\\b.png', config)?.includes('/')
     ? '正斜杠'
     : '反斜杠'
-  result['上传·PicGo 命令行含 UTF-8 前缀'] = 生成上传命令('picgo-cli', 'C:/a.png', config)
+  result['上传·PicGo 命令行含 UTF-8 前缀'] = buildUploadCmd('picgo-cli', 'C:/a.png', config)
     ?.startsWith('chcp 65001')
     ? '有'
     : '无'
-  result['上传·app 模式不生成命令'] = 生成上传命令('picgo-app', 'C:/a.png', config) ?? '无命令'
+  result['上传·app 模式不生成命令'] = buildUploadCmd('picgo-app', 'C:/a.png', config) ?? '无命令'
   // 含空格的路径不加引号会被 shell 拆成两个参数
-  result['上传·含空格路径加引号'] = 生成上传命令('custom', 'C:\\我的 文档\\a.png', {
+  result['上传·含空格路径加引号'] = buildUploadCmd('custom', 'C:\\我的 文档\\a.png', {
     ...config,
     自定义命令: 'up ${filepath}'
   })?.includes('"C:/我的 文档/a.png"')
@@ -648,11 +648,11 @@ export function 运行数学自测(): Record<string, string> {
   result['数学·结尾前有空白不闭合'] = sweep('$a $') || '（无）'
 
   // --- 块级识别 -------------------------------------------------------
-  result['数学·块级单行'] = 识别块级公式('$$E = mc^2$$') ?? '（无）'
-  result['数学·块级跨行'] = 识别块级公式('$$\n\\int_0^1 x\\,dx\n$$') ?? '（无）'
-  result['数学·块级去首尾空白'] = 识别块级公式('$$  x  $$') ?? '（无）'
-  result['数学·非块级返回空'] = 识别块级公式('$x$') ?? '（无）'
-  result['数学·空块级返回空'] = 识别块级公式('$$$$') ?? '（无）'
+  result['数学·块级单行'] = findBlockMath('$$E = mc^2$$') ?? '（无）'
+  result['数学·块级跨行'] = findBlockMath('$$\n\\int_0^1 x\\,dx\n$$') ?? '（无）'
+  result['数学·块级去首尾空白'] = findBlockMath('$$  x  $$') ?? '（无）'
+  result['数学·非块级返回空'] = findBlockMath('$x$') ?? '（无）'
+  result['数学·空块级返回空'] = findBlockMath('$$$$') ?? '（无）'
 
   // --- 关闭开关 -------------------------------------------------------
   result['数学·关闭后不扫描'] = 扫描行内公式('$x$', 0, false).length === 0 ? '不扫描' : '仍扫描'
@@ -722,7 +722,7 @@ export function 运行模糊匹配自测(): Record<string, string> {
     'E:/项目/note.md',
     'E:/项目/a_b_c.md'
   ]
-  const 筛 = (query: string): string =>
+  const filterOut = (query: string): string =>
     模糊筛选(
       query,
       名单.map((p) => ({ entry: p, docText: p })),
@@ -732,28 +732,28 @@ export function 运行模糊匹配自测(): Record<string, string> {
       .join(' ')
 
   // --- 基本匹配 ---
-  result['匹配·空查询返回全部'] = pathTail(筛('').split(' ')[0] ?? '') || '（空）'
-  result['匹配·命中文件名'] = 筛('readme')
+  result['匹配·空查询返回全部'] = pathTail(filterOut('').split(' ')[0] ?? '') || '（空）'
+  result['匹配·命中文件名'] = filterOut('readme')
   // 子序列：`nbt` 命中"笔记"的拼音首字母不成立，改用英文字母的子序列
-  result['匹配·子序列命中'] = 筛('nmd')
+  result['匹配·子序列命中'] = filterOut('nmd')
 
   // --- 排序：词首/连续优先 ---
   // `err` 应当先命中 error.md，而不是把别的排前面
-  result['匹配·前缀优于词中'] = 筛('err').split(' ')[0]
+  result['匹配·前缀优于词中'] = filterOut('err').split(' ')[0]
 
   // --- 末段权重：同名情况下，文件名命中要压过目录名命中 ---
   // `note` 只在 note.md 的文件名里出现
-  result['匹配·末段命中排前'] = 筛('note').split(' ')[0]
+  result['匹配·末段命中排前'] = filterOut('note').split(' ')[0]
 
   // --- 不匹配的淘汰 ---
-  result['匹配·无命中返回空'] = 筛('zzzz') || '（空）'
+  result['匹配·无命中返回空'] = filterOut('zzzz') || '（空）'
 
   // --- 评分函数的边界 ---
-  result['评分·查询比文本长'] = 模糊评分('abcdef', 'abc') === null ? '不匹配' : '匹配'
-  result['评分·大小写不敏感'] = 模糊评分('ABC', 'abc') === null ? '不匹配' : '匹配'
+  result['评分·查询比文本长'] = fuzzyScore('abcdef', 'abc') === null ? '不匹配' : '匹配'
+  result['评分·大小写不敏感'] = fuzzyScore('ABC', 'abc') === null ? '不匹配' : '匹配'
   // 完全包含要拿到高分，且位置越靠前分越高
-  const 靠前 = 模糊评分('a', 'a___') ?? -1
-  const 靠后 = 模糊评分('a', '___a') ?? -1
+  const 靠前 = fuzzyScore('a', 'a___') ?? -1
+  const 靠后 = fuzzyScore('a', '___a') ?? -1
   result['评分·靠前分更高'] = 靠前 > 靠后 ? '是' : `否(${靠前} vs ${靠后})`
 
   // --- 路径末段 ---
@@ -812,13 +812,13 @@ export function 运行大纲自测(): Record<string, string> {
   result['大纲·行号'] = headings.map((t) => t.lineNo).join(',')
 
   // 光标在第一个标题之前 → -1，而不是错误地高亮第一个标题
-  result['定位·文首'] = String(定位当前标题(headings, 0))
+  result['定位·文首'] = String(locateHeading(headings, 0))
   // 光标正好落在某个标题的起始偏移上
-  result['定位·标题起始处'] = String(定位当前标题(headings, headings[2].position))
+  result['定位·标题起始处'] = String(locateHeading(headings, headings[2].position))
   // 光标在标题正文中间
-  result['定位·标题内部'] = String(定位当前标题(headings, headings[2].position + 3))
+  result['定位·标题内部'] = String(locateHeading(headings, headings[2].position + 3))
   // 光标在文末
-  result['定位·文末'] = String(定位当前标题(headings, state.doc.length))
+  result['定位·文末'] = String(locateHeading(headings, state.doc.length))
 
   return result
 }

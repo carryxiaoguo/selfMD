@@ -12,7 +12,7 @@ import { 扫描手工块, 处理块级 } from './block'
 import { 处理行内 } from './inline'
 import { 数学字段 } from './数学字段'
 import { 建立图表字段 } from './图表字段'
-import type { 构建上下文, 装饰条目, SyntaxNode } from './types'
+import type { BuildContext, 装饰条目, SyntaxNode } from './types'
 
 /**
  * 实时预览装饰层——对应渲染层里那套"brush / styler"。
@@ -55,7 +55,7 @@ function 计算活动行(state: EditorState): Set<number> {
 
 function 构建装饰(view: EditorView): DecorationSet {
   const state = view.state
-  const context: 构建上下文 = {
+  const context: BuildContext = {
     活动行: 计算活动行(state),
     行装饰已用: new Set<number>(),
     已换头部栏: new Set<number>(),
@@ -152,8 +152,8 @@ const 实时预览插件 = ViewPlugin.fromClass(实时预览, {
  *             ——即 "源码模式"。
  * @param 是暗色 当前配色是否为深色，供 Mermaid 选择主题。
  */
-export function livePreview(启用: boolean, 是暗色: () => boolean = () => false): Extension {
-  if (!启用) return []
+export function livePreview(enable: boolean, 是暗色: () => boolean = () => false): Extension {
+  if (!enable) return []
   // 块级替换（数学公式、Mermaid 图表）来自 StateField——插件不能提供块级装饰；
   // 其余装饰来自插件，因为那里能拿到 view.visibleRanges 做视口虚拟化。
   // 两类都通过 EditorView.decorations 汇入，CodeMirror 会把它们合并。

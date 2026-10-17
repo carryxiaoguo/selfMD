@@ -74,7 +74,7 @@ export function 渲染标点装饰(show: string): Decoration {
 // 行内
 // ---------------------------------------------------------------------------
 
-export const 行内样式 = {
+export const inlineStyles = {
   强调: Decoration.mark({ class: 'cm-md-emphasis' }),
   加粗: Decoration.mark({ class: 'cm-md-strong' }),
   删除线: Decoration.mark({ class: 'cm-md-strikethrough' }),
@@ -90,12 +90,12 @@ export const 行内样式 = {
 // 块级：行装饰
 // ---------------------------------------------------------------------------
 
-const 标题行 = [1, 2, 3, 4, 5, 6].map((级) =>
-  Decoration.line({ class: `cm-lp-heading cm-lp-h${级}` })
+const 标题行 = [1, 2, 3, 4, 5, 6].map((levelNo) =>
+  Decoration.line({ class: `cm-lp-heading cm-lp-h${levelNo}` })
 )
 
-export function 标题行装饰(级: number): Decoration {
-  return 标题行[Math.min(6, Math.max(1, 级)) - 1]
+export function 标题行装饰(levelNo: number): Decoration {
+  return 标题行[Math.min(6, Math.max(1, levelNo)) - 1]
 }
 
 export const blockLineStyles = {
@@ -120,7 +120,7 @@ export const blockLineStyles = {
   代码块末行: Decoration.line({ class: 'cm-lp-code cm-lp-code-last md-fences' }),
   任务项行: Decoration.line({ class: 'md-task-list-item' }),
   frontMatter: Decoration.line({ class: 'cm-lp-frontmatter' }),
-  数学块: Decoration.line({ class: 'cm-lp-math md-math-block' }),
+  mathBlock: Decoration.line({ class: 'cm-lp-math md-math-block' }),
   HTML块: Decoration.line({ class: 'cm-lp-html' }),
   table: Decoration.line({ class: 'cm-lp-table' }),
   表头行: Decoration.line({ class: 'cm-lp-table cm-lp-table-head' }),

@@ -14,7 +14,7 @@ import type { SyntaxNode } from '../editor/syntax-node'
  * 也不必担心文档改动后行号失效。
  */
 
-export interface 标题项 {
+export interface headingItem {
   /** 1–6。 */
   level: number
   /** 去掉 `#` 与收尾井号之后的正文。 */
@@ -34,8 +34,8 @@ const 标题节点 = /^(?:ATX|Setext)Heading(\d)$/
  * 大纲，重新解析在大文档上是明显的浪费。标题正文的清洗逻辑与导出侧共用
  * `清理标题文本`，避免两边对"收尾井号算不算正文"产生分歧。
  */
-export function 提取标题(state: EditorState): 标题项[] {
-  const result: 标题项[] = []
+export function 提取标题(state: EditorState): headingItem[] {
+  const result: headingItem[] = []
   const tree = syntaxTree(state)
 
   tree.iterate({
@@ -66,7 +66,7 @@ export function 提取标题(state: EditorState): 标题项[] {
  * 光标落在第一个标题之前时返回 -1——界面据此把"高亮"清空，
  * 而不是错误地高亮第一个标题。
  */
-export function 定位当前标题(headings: 标题项[], position: number): number {
+export function locateHeading(headings: headingItem[], position: number): number {
   let result = -1
   for (let i = 0; i < headings.length; i++) {
     if (headings[i].position <= position) result = i

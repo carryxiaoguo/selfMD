@@ -50,7 +50,7 @@ function 取URL区间(node: {
 /** 取 `![` 与 `]` 之间的替代文字（填空式：它在两个 LinkMark 的间隙里）。 */
 function 取替代(node: { from: number; to: number; firstChild: unknown }, state: EditorState): string {
   let docText = ''
-  let 收集 = false
+  let collect = false
   let cursor = node.from
   let child = node.firstChild as {
     name: string
@@ -60,16 +60,16 @@ function 取替代(node: { from: number; to: number; firstChild: unknown }, stat
   } | null
   while (child) {
     const 间隙 = state.sliceDoc(cursor, child.from)
-    if (收集 && 间隙) docText += 间隙
+    if (collect && 间隙) docText += 间隙
     const txt = state.sliceDoc(child.from, child.to)
     if (child.name === 'LinkMark') {
-      if (txt === '![') 收集 = true
-      else if (txt === ']') 收集 = false
+      if (txt === '![') collect = true
+      else if (txt === ']') collect = false
     } else if (child.name === 'URL') {
       // 地址不算替代文字
     } else if (child.name === 'LinkTitle') {
       // 标题也不算
-    } else if (收集) {
+    } else if (collect) {
       docText += txt
     }
     cursor = child.to

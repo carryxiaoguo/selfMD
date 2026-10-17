@@ -120,8 +120,8 @@ function 建立菜单(items: menuItem[], 是子菜单 = false): HTMLElement {
       // 离开时收起，但要把"指针正移向子菜单"的情况排除掉——
       // 否则指针一离开行、还没进子菜单，子菜单就没了，永远点不到。
       line.addEventListener('mouseleave', (event) => {
-        const 相关 = event.relatedTarget as Node | null
-        if (相关 && 当前子菜单?.contains(相关)) return
+        const related = event.relatedTarget as Node | null
+        if (related && 当前子菜单?.contains(related)) return
         收起子菜单()
       })
 
@@ -159,15 +159,15 @@ function 展开子菜单(宿主行: HTMLElement, items: menuItem[]): void {
   const width = child.offsetWidth
 
   // 优先右侧；右边塞不下就翻到左侧。窄窗口下这是唯一能看全的办法。
-  const 右 = 行框.right
-  const 左 = 右 + width > window.innerWidth - 6 ? 行框.left - width : 右
-  child.style.left = `${Math.max(6, 左)}px`
+  const rightward = 行框.right
+  const leftward = rightward + width > window.innerWidth - 6 ? 行框.left - width : rightward
+  child.style.left = `${Math.max(6, leftward)}px`
   child.style.top = `${Math.min(行框.top, window.innerHeight - child.offsetHeight - 6)}px`
 
   // 指针从宿主行移进子菜单的途中会经过这里，所以子菜单也要接管
   child.addEventListener('mouseleave', (event) => {
-    const 相关 = event.relatedTarget as Node | null
-    if (相关 && (child.contains(相关) || 宿主行.contains(相关))) return
+    const related = event.relatedTarget as Node | null
+    if (related && (child.contains(related) || 宿主行.contains(related))) return
     收起子菜单()
   })
 

@@ -80,9 +80,9 @@ function 解析JSON应答(docText: string): string[] | null {
   try {
     const data = JSON.parse(docText) as 上传应答
     if (data.success === false) return []
-    const 原 = data.result
-    if (Array.isArray(原)) return 原.filter((item) => typeof item === 'string')
-    if (typeof 原 === 'string' && 原.length > 0) return [原]
+    const original = data.result
+    if (Array.isArray(original)) return original.filter((item) => typeof item === 'string')
+    if (typeof original === 'string' && original.length > 0) return [original]
     return []
   } catch {
     // 不是 JSON —— 有些版本会打印日志再吐 JSON，交给命令行解析兜底
@@ -97,7 +97,7 @@ function 解析JSON应答(docText: string): string[] | null {
  * @param 上传器 用的哪种上传器（决定要不要先按 JSON 解）
  * @param 期望数量 本次上传了几张图；用于校验是否一一对应
  */
-export function 解析上传结果(
+export function parseUploadResult(
   output: string,
   uploader: uploaderType,
   期望数量: number
@@ -137,7 +137,7 @@ export function 解析上传结果(
  * 引用，而渲染层没有 `process`。改成参数还有个附带好处——可以在自测里
  * 断言三个平台的命令形态，不必真的换系统。
  */
-export function 生成上传命令(
+export function buildUploadCmd(
   uploader: uploaderType,
   文件路径: string,
   config: {
@@ -159,12 +159,12 @@ export function 生成上传命令(
       return `/Applications/Picsee.app/Contents/MacOS/Picsee -u ${quoteChar(filePath)}`
     case 'picgo-cli': {
       // Windows 下必须先切到 UTF-8 代码页，否则 PicGo 输出的中文路径会乱码
-      const 前缀 = config.platform === 'win32' ? 'chcp 65001>nul && ' : ''
+      const prefixText = config.platform === 'win32' ? 'chcp 65001>nul && ' : ''
       const 子目录 =
         config.platform === 'win32' ? 'win64' : config.platform === 'darwin' ? 'mac' : 'linux'
       const extension = config.platform === 'win32' ? '.exe' : ''
       const program = `${config.用户数据目录}/picgo/${子目录}/picgo${extension}`
-      return `${前缀}${quoteChar(program)} u ${quoteChar(filePath)}`
+      return `${prefixText}${quoteChar(program)} u ${quoteChar(filePath)}`
     }
     case 'custom': {
       const template = config.自定义命令.trim()

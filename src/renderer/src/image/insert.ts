@@ -3,9 +3,9 @@ import type { EditorView } from '@codemirror/view'
 import { isolateHistory } from '@codemirror/commands'
 import type { Settings } from '@shared/types'
 import { readFrontMatter } from '@shared/front-matter'
-import { takeFileName, 时间戳图片名, 是图片文件 } from '@shared/image-path'
-import { 解析目标目录 } from './resolve-target'
-import { 生成图片语法, 生成引用地址, 生成替代文本, type 图片语法 } from './reference'
+import { takeFileName, 时间戳图片名, isImageFile } from '@shared/image-path'
+import { resolveTargetDir } from './resolve-target'
+import { buildImageSyntax, 生成引用地址, 生成替代文本, type 图片语法 } from './reference'
 
 /**
  * 图片插入编排。
@@ -55,7 +55,7 @@ function docDir(docPath: string | null): string | null {
 }
 
 /** 由当前上下文构造解析输入。 */
-function 构造输入(request: InsertRequest): Parameters<typeof 解析目标目录>[0] {
+function 构造输入(request: InsertRequest): Parameters<typeof resolveTargetDir>[0] {
   const meta = readFrontMatter(request.文档文本)
   return {
     docDir: docDir(request.docPath),
@@ -63,8 +63,8 @@ function 构造输入(request: InsertRequest): Parameters<typeof 解析目标目
     是文本包: /\.(textbundle|textpack)$/i.test(request.docPath ?? ''),
     docSettings: meta.attr['image-folder'] ?? null,
     globalPolicy: request.settings.imageStoragePolicy,
-    自定义目录: request.settings.customImageSaveLocation,
-    允许自动上传: request.settings.allowImageUpload
+    customDir: request.settings.customImageSaveLocation,
+    autoUploadAllowed: request.settings.allowImageUpload
   }
 }
 
@@ -79,7 +79,7 @@ function 引用文本(图片路径: string, request: InsertRequest): string {
     addDotPrefix: request.settings.relativePathWithDot,
     escapeUrl: request.settings.autoEscapeImageURL
   })
-  return 生成图片语法(url, 生成替代文本(图片路径), 语法(request.settings))
+  return buildImageSyntax(url, 生成替代文本(图片路径), 语法(request.settings))
 }
 
 /**
@@ -170,29 +170,29 @@ export async function 从剪贴板插入(request: InsertRequest): Promise<插入
   const content = await window.selfmd.image.readClipboard()
 
   if (content.kind === '无') return { okCount: 0, error: '剪贴板里没有图片。' }
-  if (content.kind === '文件') return 从文件插入(request, content.filePath)
+  if (content.kind === '文件') return insertFromFile(request, content.filePath)
 
   // --- 位图 -------------------------------------------------------------
-  const target = 解析目标目录(构造输入(request))
+  const target = resolveTargetDir(构造输入(request))
   if (target.kind === '需要保存' || target.kind === '上传') {
     return { okCount: 0, error: 失败说明(target.kind) }
   }
 
   const dir = target.kind === '目录' ? target.filePath : await 取默认图片目录()
   const name = `${时间戳图片名(new Date())}.png`
-  const 写回 = await window.selfmd.image.saveBytes(dir, name, content.data)
-  if (!写回) return { okCount: 0, error: '写入图片失败。' }
+  const writeBack = await window.selfmd.image.saveBytes(dir, name, content.data)
+  if (!writeBack) return { okCount: 0, error: '写入图片失败。' }
 
-  写入引用(request.view, 引用文本(写回.filePath, request))
+  写入引用(request.view, 引用文本(writeBack.filePath, request))
   return { okCount: 1, error: null }
 }
 
 /** 从本地文件插入（对话框选图、拖放、从资源管理器复制）。 */
-export async function 从文件插入(request: InsertRequest, paths: string[]): Promise<插入结果> {
-  const 图片们 = paths.filter(是图片文件)
-  if (图片们.length === 0) return { okCount: 0, error: '没有可插入的图片文件。' }
+export async function insertFromFile(request: InsertRequest, paths: string[]): Promise<插入结果> {
+  const images = paths.filter(isImageFile)
+  if (images.length === 0) return { okCount: 0, error: '没有可插入的图片文件。' }
 
-  const target = 解析目标目录(构造输入(request))
+  const target = resolveTargetDir(构造输入(request))
   if (target.kind === '需要保存' || target.kind === '上传') {
     return { okCount: 0, error: 失败说明(target.kind) }
   }
@@ -200,14 +200,14 @@ export async function 从文件插入(request: InsertRequest, paths: string[]): 
   const 引用们: string[] = []
   let error: string | null = null
 
-  for (const origin of 图片们) {
+  for (const origin of images) {
     if (target.kind === '不动') {
       // 策略是"不做特殊处理"：图片留在原地，引用原路径。
       引用们.push(引用文本(origin, request))
       continue
     }
-    const 写回 = await window.selfmd.image.import(origin, target.filePath, takeFileName(origin))
-    if (写回) 引用们.push(引用文本(写回.filePath, request))
+    const writeBack = await window.selfmd.image.import(origin, target.filePath, takeFileName(origin))
+    if (writeBack) 引用们.push(引用文本(writeBack.filePath, request))
     else if (!error) error = `复制失败：${takeFileName(origin)}`
   }
 
@@ -225,7 +225,7 @@ export async function 从文件插入(request: InsertRequest, paths: string[]): 
  * 图片仓库——位图没有原路径可留，见 `取默认图片目录` 的说明。
  */
 export async function 本次目标目录(request: InsertRequest): Promise<string | null> {
-  const target = 解析目标目录(构造输入(request))
+  const target = resolveTargetDir(构造输入(request))
   if (target.kind === '目录') return target.filePath
   if (target.kind === '不动') return 取默认图片目录()
   return null
@@ -243,7 +243,7 @@ export async function 从地址插入(request: InsertRequest, url: string): Prom
     return { okCount: 0, error: '请输入以 http:// 或 https:// 开头的图片地址。' }
   }
 
-  const target = 解析目标目录(构造输入(request))
+  const target = resolveTargetDir(构造输入(request))
   if (target.kind === '不动') {
     写入引用(request.view, 引用文本(清理后, request))
     return { okCount: 1, error: null }

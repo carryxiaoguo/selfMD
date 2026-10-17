@@ -357,13 +357,13 @@ export interface DraftInfo {
   /** 原文档路径；未保存的文档为 null。 */
   rawPath: string | null
   /** 草稿写入时间（毫秒）。 */
-  保存时间: number
+  savedAt: number
   /** 原文件最后修改时间；文件不存在时为 null。 */
   原文件时间: number | null
   /** 原文件的字符数；读不到时为 null。 */
   原文件字符数: number | null
   /** 草稿内容的字符数。 */
-  草稿字符数: number
+  draftChars: number
 }
 
 // ---------------------------------------------------------------------------

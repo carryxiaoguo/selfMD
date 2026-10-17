@@ -63,13 +63,13 @@ export async function 打开快速打开面板(options: 快速打开选项): Pro
   }
 
   /** 把当前命中列表画出来。 */
-  const 重绘 = (): void => {
+  const repaint = (): void => {
     list.textContent = ''
     if (hit.length === 0) {
-      const 空 = document.createElement('div')
-      空.className = 'quick-open-empty'
-      空.textContent = all.length === 0 ? '这个目录下没有文件' : '没有匹配的文件'
-      list.append(空)
+      const emptyText = document.createElement('div')
+      emptyText.className = 'quick-open-empty'
+      emptyText.textContent = all.length === 0 ? '这个目录下没有文件' : '没有匹配的文件'
+      list.append(emptyText)
       return
     }
 
@@ -97,7 +97,7 @@ export async function 打开快速打开面板(options: 快速打开选项): Pro
       })
       line.addEventListener('mouseenter', () => {
         选中 = subscript
-        重绘()
+        repaint()
       })
       list.append(line)
     }
@@ -106,7 +106,7 @@ export async function 打开快速打开面板(options: 快速打开选项): Pro
     list.querySelector('.is-active')?.scrollIntoView({ block: 'nearest' })
   }
 
-  const 过滤 = (): void => {
+  const filterBy = (): void => {
     const query = input.value
     // 文件越小越新，越可能是用户想找的；把它作为同分时的第二排序键
     hit = 模糊筛选(
@@ -115,7 +115,7 @@ export async function 打开快速打开面板(options: 快速打开选项): Pro
       pathTail
     )
     选中 = 0
-    重绘()
+    repaint()
     页脚.textContent =
       `共 ${all.length} 个文件` +
       (query.trim() ? ` · 匹配 ${hit.length} 个` : '') +
@@ -135,7 +135,7 @@ export async function 打开快速打开面板(options: 快速打开选项): Pro
       event.stopPropagation()
       if (hit.length === 0) return
       选中 = (选中 + (event.key === 'ArrowDown' ? 1 : -1) + hit.length) % hit.length
-      重绘()
+      repaint()
       return
     }
     if (event.key === 'Enter') {
@@ -148,7 +148,7 @@ export async function 打开快速打开面板(options: 快速打开选项): Pro
     }
   }
 
-  input.addEventListener('input', 过滤)
+  input.addEventListener('input', filterBy)
   input.addEventListener('keydown', 全局键)
   // 点遮罩空白处关闭（点面板内部不关）
   overlay.addEventListener('mousedown', (event) => {
@@ -160,7 +160,7 @@ export async function 打开快速打开面板(options: 快速打开选项): Pro
     all = result.file
     // 索引是异步建的，期间用户可能已经打了不少字——这里必须按**当前**输入重算，
     // 而不是用建索引时捕获的旧值
-    过滤()
+    filterBy()
     if (result.truncated) 页脚.textContent += ' · 文件太多，只索引了一部分'
   } catch {
     页脚.textContent = '建立索引失败'

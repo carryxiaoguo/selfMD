@@ -1,9 +1,9 @@
 import type { EditorState } from '@codemirror/state'
-import { 取文档目录, 解析图片地址 } from '../../image/显示地址'
-import { blockLineStyles, hidden, 行内样式, replaceWith } from './decorations'
+import { takeDocDir, 解析图片地址 } from '../../image/显示地址'
+import { blockLineStyles, hidden, inlineStyles, replaceWith } from './decorations'
 import { addLineDeco } from './types'
 import { image } from './widgets'
-import type { 构建上下文, SyntaxNode } from './types'
+import type { BuildContext, SyntaxNode } from './types'
 
 /**
  * 行内装饰。
@@ -40,7 +40,7 @@ function 是否行内标记(node: SyntaxNode): boolean {
 export function 处理行内(
   node: SyntaxNode,
   state: EditorState,
-  context: 构建上下文
+  context: BuildContext
 ): boolean {
   const lineNo = state.doc.lineAt(node.from).number
   const onActiveLine = context.活动行.has(lineNo)
@@ -57,35 +57,35 @@ export function 处理行内(
       context.entry.push({
         from: node.from,
         to: node.to,
-        deco: 行内样式.强调,
+        deco: inlineStyles.强调,
         rank: 0
       })
       return true
 
     case 'StrongEmphasis':
-      context.entry.push({ from: node.from, to: node.to, deco: 行内样式.加粗, rank: 0 })
+      context.entry.push({ from: node.from, to: node.to, deco: inlineStyles.加粗, rank: 0 })
       return true
 
     case 'Strikethrough':
-      context.entry.push({ from: node.from, to: node.to, deco: 行内样式.删除线, rank: 0 })
+      context.entry.push({ from: node.from, to: node.to, deco: inlineStyles.删除线, rank: 0 })
       return true
 
     case 'InlineCode':
-      context.entry.push({ from: node.from, to: node.to, deco: 行内样式.行内代码, rank: 0 })
+      context.entry.push({ from: node.from, to: node.to, deco: inlineStyles.行内代码, rank: 0 })
       return true
 
     case 'Link':
-      context.entry.push({ from: node.from, to: node.to, deco: 行内样式.链接文字, rank: 0 })
+      context.entry.push({ from: node.from, to: node.to, deco: inlineStyles.链接文字, rank: 0 })
       return true
 
     case 'URL': {
       // 行内链接的目标地址：非活动行折叠，只留链接文字。
       // 但要避开引用定义的 URL——那里是内容本身，不能藏。
-      const 父名 = node.parent?.name
-      if (父名 === 'Link' && !onActiveLine) {
+      const parentName = node.parent?.name
+      if (parentName === 'Link' && !onActiveLine) {
         context.entry.push({ from: node.from, to: node.to, deco: hidden, rank: 1 })
-      } else if (父名 === 'LinkReference') {
-        context.entry.push({ from: node.from, to: node.to, deco: 行内样式.链接地址, rank: 0 })
+      } else if (parentName === 'LinkReference') {
+        context.entry.push({ from: node.from, to: node.to, deco: inlineStyles.链接地址, rank: 0 })
       }
       return true
     }
@@ -99,7 +99,7 @@ export function 处理行内(
 
     case 'LinkReference': {
       // 引用定义整行（`[名]: 地址 "标题"`）淡化，不隐藏：用户需要看见它。
-      context.entry.push({ from: node.from, to: node.to, deco: 行内样式.引用定义, rank: 0 })
+      context.entry.push({ from: node.from, to: node.to, deco: inlineStyles.引用定义, rank: 0 })
       return true
     }
 
@@ -181,7 +181,7 @@ function 取图片信息(node: SyntaxNode, state: EditorState): { url: string; s
 /** 本地图片在磁盘上的绝对路径；远程或无法解析时为 null。 */
 function 本地绝对路径(url: string): string | null {
   if (/^(https?:|data:|blob:)/i.test(url.trim())) return null
-  const dir = 取文档目录()
+  const dir = takeDocDir()
   let filePath = url.trim()
   try {
     filePath = decodeURI(filePath)

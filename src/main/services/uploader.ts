@@ -3,7 +3,7 @@ import { existsSync } from 'node:fs'
 import { net } from 'electron'
 import { promisify } from 'node:util'
 import { uploaderType } from '@shared/types'
-import { 生成上传命令, 解析上传结果 } from '@shared/upload-parse'
+import { buildUploadCmd, parseUploadResult } from '@shared/upload-parse'
 import { getAppPaths } from '../util/paths'
 import { getSettings } from './settings'
 
@@ -96,7 +96,7 @@ async function 应用模式上传(paths: string[]): Promise<{ url: string[]; err
 
   const 首次 = await 试HTTP上传(paths)
   if (首次 !== null) {
-    return 解析上传结果(首次, settings.imageUploader, paths.length)
+    return parseUploadResult(首次, settings.imageUploader, paths.length)
   }
 
   // 没连上：需要知道去哪儿找这个应用才能把它拉起来
@@ -119,14 +119,14 @@ async function 应用模式上传(paths: string[]): Promise<{ url: string[]; err
   await 启动应用(program)
   await new Promise((done) => setTimeout(done, 启动等待))
 
-  const 重试 = await 试HTTP上传(paths)
-  if (重试 === null) {
+  const retryCount = await 试HTTP上传(paths)
+  if (retryCount === null) {
     return {
       url: [],
       error: `已尝试启动 ${program}，但等待 ${启动等待 / 1000} 秒后仍未连上 ${本地端点}。`
     }
   }
-  return 解析上传结果(重试, settings.imageUploader, paths.length)
+  return parseUploadResult(retryCount, settings.imageUploader, paths.length)
 }
 
 /** 命令行模式的完整流程。 */
@@ -140,7 +140,7 @@ async function 命令行上传(
   // 命令行上传器一次只吃一个文件，所以逐个执行。
   // 这也让"部分失败"成为可能——某一张图挂了不该让整批都失败。
   for (const filePath of paths) {
-    const command = 生成上传命令(uploader, filePath, {
+    const command = buildUploadCmd(uploader, filePath, {
       自定义命令: settings.customImageUploader,
       用户数据目录: getAppPaths().userData.replace(/\\/g, '/'),
       platform: process.platform === 'win32' ? 'win32' : process.platform === 'darwin' ? 'darwin' : 'linux'
@@ -158,7 +158,7 @@ async function 命令行上传(
 
     try {
       const { stdout } = await run(command, { maxBuffer: 输出上限, windowsHide: true })
-      const 单个 = 解析上传结果(stdout, uploader, 1)
+      const 单个 = parseUploadResult(stdout, uploader, 1)
       if (单个.error) return { url: [], error: 单个.error }
       url.push(...单个.url)
     } catch (error) {
@@ -177,22 +177,22 @@ async function 命令行上传(
  */
 export async function 上传图片(文件路径们: string[]): Promise<上传结果> {
   const settings = getSettings()
-  const 待传 = 文件路径们.filter((filePath) => filePath.length > 0)
+  const pendingUpload = 文件路径们.filter((filePath) => filePath.length > 0)
 
-  if (待传.length === 0) return { success: [], failure: [] }
+  if (pendingUpload.length === 0) return { success: [], failure: [] }
 
   if (settings.imageUploader === 'none') {
     return {
       success: [],
-      failure: 待传.map((rawPath) => ({
+      failure: pendingUpload.map((rawPath) => ({
         rawPath,
         reason: '尚未选择图床上传器。请在「偏好设置 → 图片」里选择。'
       }))
     }
   }
 
-  const 缺失 = 待传.filter((filePath) => !existsSync(filePath))
-  const exists = 待传.filter((filePath) => existsSync(filePath))
+  const 缺失 = pendingUpload.filter((filePath) => !existsSync(filePath))
+  const exists = pendingUpload.filter((filePath) => existsSync(filePath))
   const failure: 上传失败项[] = 缺失.map((rawPath) => ({
     rawPath,
     reason: '文件不存在（可能已被移动或删除）'

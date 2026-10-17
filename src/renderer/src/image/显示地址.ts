@@ -18,15 +18,15 @@ import { localFileUrl } from '@shared/url'
  * 文档切换时由 `设置文档目录` 更新一次。
  */
 
-let 当前文档目录: string | null = null
+let currentDocDir: string | null = null
 
 /** 文档切换时调用。传 null 表示文档尚未保存。 */
 export function setDocDir(dir: string | null): void {
-  当前文档目录 = dir
+  currentDocDir = dir
 }
 
-export function 取文档目录(): string | null {
-  return 当前文档目录
+export function takeDocDir(): string | null {
+  return currentDocDir
 }
 
 /** 是否是无需解析的外部地址。 */
@@ -35,7 +35,7 @@ function 是外部地址(url: string): boolean {
 }
 
 /** 是否是绝对路径。Windows 盘符与 POSIX 根路径都算。 */
-function 是绝对路径(url: string): boolean {
+function isAbsolute(url: string): boolean {
   return /^[a-zA-Z]:[\\/]/.test(url) || url.startsWith('/') || url.startsWith('\\\\')
 }
 
@@ -45,10 +45,10 @@ function normalize(filePath: string): string {
 }
 
 /** 拼两段路径，处理中间的斜杠与 `./`。 */
-function 拼接(dir: string, relativePath: string): string {
-  const 左 = normalize(dir).replace(/\/+$/, '')
-  const 右 = normalize(relativePath).replace(/^\.\//, '')
-  return `${左}/${右}`
+function concat(dir: string, relativePath: string): string {
+  const leftward = normalize(dir).replace(/\/+$/, '')
+  const rightward = normalize(relativePath).replace(/^\.\//, '')
+  return `${leftward}/${rightward}`
 }
 
 /**
@@ -80,9 +80,9 @@ export function 解析图片地址(原始: string): string {
     // 编码损坏就按原样找，总比直接放弃好
   }
 
-  if (是绝对路径(filePath)) return localFileUrl(filePath)
-  if (!当前文档目录) return ''
-  return localFileUrl(拼接(当前文档目录, filePath))
+  if (isAbsolute(filePath)) return localFileUrl(filePath)
+  if (!currentDocDir) return ''
+  return localFileUrl(concat(currentDocDir, filePath))
 }
 
 /**

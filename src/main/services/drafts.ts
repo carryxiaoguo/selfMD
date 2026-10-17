@@ -39,14 +39,14 @@ function 元数据文件(key: string): string {
  * 刻意**不抛异常**：自动保存是后台行为，磁盘满或文件被占用时应当安静地跳过，
  * 而不是弹一个错误打断用户打字。失败就是这一次没存上，下一次改动还会再试。
  */
-export function 写草稿(rawPath: string | null, content: string): boolean {
+export function writeDraft(rawPath: string | null, content: string): boolean {
   const key = 计算键(rawPath)
   try {
     mkdirSync(getAppPaths().drafts, { recursive: true })
     writeFileSync(内容文件(key), content, 'utf8')
     writeFileSync(
       元数据文件(key),
-      JSON.stringify({ rawPath, 保存时间: Date.now() }, null, 2),
+      JSON.stringify({ rawPath, savedAt: Date.now() }, null, 2),
       'utf8'
     )
     return true
@@ -77,7 +77,7 @@ export function listDrafts(): DraftInfo[] {
     try {
       const meta = JSON.parse(readFileSync(join(dir, name), 'utf8')) as {
         rawPath?: string | null
-        保存时间?: number
+        savedAt?: number
       }
       const rawPath = meta.rawPath ?? null
       let 原文件时间: number | null = null
@@ -89,21 +89,21 @@ export function listDrafts(): DraftInfo[] {
         }
       }
       const content = 内容文件(key)
-      const 草稿字符数 = existsSync(content) ? readFileSync(content, 'utf8').length : 0
+      const draftChars = existsSync(content) ? readFileSync(content, 'utf8').length : 0
       result.push({
         key,
         rawPath,
-        保存时间: meta.保存时间 ?? 0,
+        savedAt: meta.savedAt ?? 0,
         原文件时间,
         原文件字符数: 取原文件字符数(rawPath),
-        草稿字符数
+        draftChars
       })
     } catch {
       // 元数据损坏：跳过这一条，不让一个坏文件挡住整份恢复列表
     }
   }
 
-  return result.sort((a, b) => b.保存时间 - a.保存时间)
+  return result.sort((a, b) => b.savedAt - a.savedAt)
 }
 
 export function 读草稿(key: string): string | null {
@@ -115,7 +115,7 @@ export function 读草稿(key: string): string | null {
   }
 }
 
-export function 删除草稿(key: string): void {
+export function deleteDraft(key: string): void {
   for (const filePath of [内容文件(key), 元数据文件(key)]) {
     try {
       rmSync(filePath, { force: true })
@@ -132,7 +132,7 @@ export function 清理该文档的草稿(rawPath: string | null, content: string
   // 保存是异步的，期间用户可能又敲了几个字，那部分还没落盘。
   const 现有 = 读草稿(key)
   if (现有 !== null && 现有 !== content) return
-  删除草稿(key)
+  deleteDraft(key)
 }
 
 /**
@@ -145,12 +145,12 @@ export function 清理该文档的草稿(rawPath: string | null, content: string
  *
  * 未命名文档（原路径为 null）一律提示：它没有落盘的地方，草稿是唯一的副本。
  */
-export function 需要恢复的草稿(): DraftInfo[] {
+export function recoverableDraft(): DraftInfo[] {
   return listDrafts().filter((draft) => {
-    if (!draft.rawPath) return draft.草稿字符数 > 0
-    if (!existsSync(draft.rawPath)) return draft.草稿字符数 > 0
+    if (!draft.rawPath) return draft.draftChars > 0
+    if (!existsSync(draft.rawPath)) return draft.draftChars > 0
     // 内容没变就不提示——纯粹是时间戳造成的差异不值得打扰用户
-    if (draft.原文件字符数 !== null && draft.原文件字符数 === draft.草稿字符数) return false
-    return draft.保存时间 > (draft.原文件时间 ?? 0)
+    if (draft.原文件字符数 !== null && draft.原文件字符数 === draft.draftChars) return false
+    return draft.savedAt > (draft.原文件时间 ?? 0)
   })
 }

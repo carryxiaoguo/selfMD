@@ -25,7 +25,7 @@ export interface 设置项 {
   options?: { value: string; text: string }[]
   minValue?: number
   maxValue?: number
-  步长?: number
+  stepSize?: number
   /** 数值与文本项的单位后缀。 */
   unit?: string
 }
@@ -43,7 +43,7 @@ export interface 设置分区 {
 }
 
 /** 各分区的中文标题。 */
-export const 偏好设置结构: 设置分区[] = [
+export const PrefsSchema: 设置分区[] = [
   {
     title: '通用',
     subsection: [
@@ -82,7 +82,7 @@ export const 偏好设置结构: 设置分区[] = [
             unit: 'px',
             minValue: 0,
             maxValue: 32,
-            步长: 1,
+            stepSize: 1,
             description: '填 0 表示跟随主题——主题会按自己的气质定正文字号。'
           },
           {
@@ -91,7 +91,7 @@ export const 偏好设置结构: 设置分区[] = [
             label: '行高',
             minValue: 0,
             maxValue: 3,
-            步长: 0.05,
+            stepSize: 0.05,
             description: '填 0 表示跟随主题。'
           },
           {
@@ -123,7 +123,7 @@ export const 偏好设置结构: 设置分区[] = [
             unit: '%',
             minValue: 50,
             maxValue: 300,
-            步长: 10
+            stepSize: 10
           }
         ]
       }
@@ -164,7 +164,7 @@ export const 偏好设置结构: 设置分区[] = [
             unit: '空格',
             minValue: 1,
             maxValue: 12,
-            步长: 1
+            stepSize: 1
           },
           {
             key: 'autoWrapLongLines',
@@ -480,7 +480,7 @@ export const 偏好设置结构: 设置分区[] = [
 
 /** 扁平化后的全部设置项，供校验与遍历使用。 */
 export function 全部设置项(): 设置项[] {
-  return 偏好设置结构.flatMap((section) => section.subsection.flatMap((subsection) => subsection.item))
+  return PrefsSchema.flatMap((section) => section.subsection.flatMap((subsection) => subsection.item))
 }
 
 /**

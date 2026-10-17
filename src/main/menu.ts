@@ -1,5 +1,5 @@
 import { app, BrowserWindow, Menu, dialog, type MenuItemConstructorOptions } from 'electron'
-import { COMMANDS, isImplemented, roadmap, 分类显示名, type CommandDef } from '@shared/commands'
+import { COMMANDS, isImplemented, roadmap, categoryLabel, type CommandDef } from '@shared/commands'
 import { EV } from '@shared/ipc'
 import { activeTheme } from '@shared/types'
 import { listRecent } from './services/recent'
@@ -175,7 +175,7 @@ function 导出子菜单(): MenuItemConstructorOptions[] {
 
 function fileMenu(): MenuItemConstructorOptions {
   return {
-    label: 分类显示名.File,
+    label: categoryLabel.File,
     submenu: [
       toItem(pick('File', 'file.new')),
       toItem(pick('File', 'file.newWindow')),
@@ -214,7 +214,7 @@ function editMenu(): MenuItemConstructorOptions {
   // role 直接作用于获得焦点的 webContents，从而保留原生剪贴板行为
   // （富文本粘贴、输入法、选区手势）。
   return {
-    label: 分类显示名.Edit,
+    label: categoryLabel.Edit,
     submenu: [
       toItem(pick('Edit', 'edit.undo')),
       toItem(pick('Edit', 'edit.redo')),
@@ -307,7 +307,7 @@ function smartPunctuationSubmenu(): MenuItemConstructorOptions[] {
 
 function paragraphMenu(): MenuItemConstructorOptions {
   return {
-    label: 分类显示名.Paragraph,
+    label: categoryLabel.Paragraph,
     submenu: [
       toItem(pick('Paragraph', 'para.h1')),
       toItem(pick('Paragraph', 'para.h2')),
@@ -341,7 +341,7 @@ function paragraphMenu(): MenuItemConstructorOptions {
 
 function formatMenu(): MenuItemConstructorOptions {
   return {
-    label: 分类显示名.Format,
+    label: categoryLabel.Format,
     submenu: [
       toItem(pick('Format', 'fmt.strong')),
       toItem(pick('Format', 'fmt.emphasis')),
@@ -437,7 +437,7 @@ function 图像工具子菜单(): MenuItemConstructorOptions[] {
 function viewMenu(): MenuItemConstructorOptions {
   const settings = getSettings()
   return {
-    label: 分类显示名.View,
+    label: categoryLabel.View,
     submenu: [
       {
         label: pick('View', 'view.sourceMode').label,
@@ -520,7 +520,7 @@ function viewMenu(): MenuItemConstructorOptions {
 function helpMenu(): MenuItemConstructorOptions {
   return {
     role: 'help',
-    label: 分类显示名.Help,
+    label: categoryLabel.Help,
     submenu: [
       toItem(pick('Help', 'help.defaultApp')),
       { type: 'separator' },

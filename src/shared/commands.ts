@@ -172,7 +172,7 @@ export const COMMANDS: CommandDef[] = [
 export const COMMAND_BY_ID = new Map(COMMANDS.map((c) => [c.id, c]))
 
 /** 顶级菜单的显示名，同样取自 zh-Hans 语言包。 */
-export const 分类显示名: Record<MenuCategory, string> = {
+export const categoryLabel: Record<MenuCategory, string> = {
   File: '文件',
   Edit: '编辑',
   Paragraph: '段落',

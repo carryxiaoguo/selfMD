@@ -11,12 +11,12 @@ import { rebuildMenu, 菜单摘要, 设置Pandoc可用 } from './menu'
 import { 检测Pandoc, 执行导出 } from './export'
 import { 取关联状态 } from './services/文件关联'
 import {
-  写草稿,
+  writeDraft,
   listDrafts,
-  删除草稿,
+  deleteDraft,
   清理该文档的草稿,
   读草稿,
-  需要恢复的草稿
+  recoverableDraft
 } from './services/drafts'
 import { ensureAppDirs, getAppPaths } from './util/paths'
 import { loadSettings, onSettingsChanged } from './services/settings'
@@ -239,7 +239,7 @@ async function 运行导出测试(): Promise<boolean> {
   }
 
   const content = readFileSync(target, 'utf8')
-  const 检查: [string, boolean][] = [
+  const check: [string, boolean][] = [
     ['文档类型声明', content.startsWith('<!doctype html>')],
     ['导出态类名', content.includes('class="selfmd-export selfmd-export-show-outline"')],
     ['内容容器', content.includes('<div id="write">')],
@@ -257,9 +257,9 @@ async function 运行导出测试(): Promise<boolean> {
     ['无残留专有指令', !content.includes('@include-when-export')]
   ]
 
-  const failure = 检查.filter(([, 好]) => !好)
+  const failure = check.filter(([, 好]) => !好)
   console.log(
-    `[selfMD] 导出端到端：${检查.length - failure.length}/${检查.length} 项通过` +
+    `[selfMD] 导出端到端：${check.length - failure.length}/${check.length} 项通过` +
       `  文件 ${content.length} 字符  路径=${target}`
   )
   if (failure.length > 0) {
@@ -282,9 +282,9 @@ async function 运行草稿测试(): Promise<boolean> {
   const docModel = join(dir, '草稿测试.md')
   writeFileSync(docModel, '磁盘上的旧内容\n', 'utf8')
 
-  const 检查: [string, boolean][] = []
+  const check: [string, boolean][] = []
   const record = (name: string, 好: boolean): void => {
-    检查.push([name, 好])
+    check.push([name, 好])
   }
 
   // 先把历史遗留的无名草稿清掉。
@@ -294,12 +294,12 @@ async function 运行草稿测试(): Promise<boolean> {
   // 不先打扫就会因为别人的残渣而失败——表现为单独跑能过、
   // 放进完整流水线就挂，这类顺序依赖最难排查。
   for (const 旧 of listDrafts()) {
-    if (旧.rawPath === null) 删除草稿(旧.key)
+    if (旧.rawPath === null) deleteDraft(旧.key)
   }
 
   // 1) 写一份比原文件新的草稿
   const 草稿内容 = '磁盘上的旧内容\n\n用户后来敲的新内容\n'
-  record('写入草稿', 写草稿(docModel, 草稿内容))
+  record('写入草稿', writeDraft(docModel, 草稿内容))
 
   // 2) 能列出来
   const 这条 = listDrafts().find((c) => c.rawPath === docModel)
@@ -311,7 +311,7 @@ async function 运行草稿测试(): Promise<boolean> {
   // 4) 需要恢复：草稿比原文件新，且内容长度不同
   record(
     '被判定为需要恢复',
-    需要恢复的草稿().some((c) => c.rawPath === docModel)
+    recoverableDraft().some((c) => c.rawPath === docModel)
   )
 
   // 5) 竞态守卫：内容不一致时**不能**清掉草稿
@@ -323,27 +323,27 @@ async function 运行草稿测试(): Promise<boolean> {
   record('内容一致时清除草稿', !listDrafts().some((c) => c.rawPath === docModel))
 
   // 7) 未命名文档（原路径为 null）也要能存与恢复
-  record('未命名文档可写草稿', 写草稿(null, '未命名的内容'))
+  record('未命名文档可写草稿', writeDraft(null, '未命名的内容'))
   const 未命名 = listDrafts().find((c) => c.rawPath === null)
   record(
     '未命名文档需要恢复',
-    未命名 !== undefined && 需要恢复的草稿().some((c) => c.key === 未命名.key)
+    未命名 !== undefined && recoverableDraft().some((c) => c.key === 未命名.key)
   )
-  if (未命名) 删除草稿(未命名.key)
+  if (未命名) deleteDraft(未命名.key)
   record('未命名草稿可删除', !listDrafts().some((c) => c.rawPath === null))
 
   // 8) 原文件已被删除时也要提示恢复——草稿是唯一副本
   const 幽灵 = join(dir, '已经不存在了.md')
-  写草稿(幽灵, '文件被删了但草稿还在')
+  writeDraft(幽灵, '文件被删了但草稿还在')
   record(
     '原文件缺失时提示恢复',
-    需要恢复的草稿().some((c) => c.rawPath === 幽灵)
+    recoverableDraft().some((c) => c.rawPath === 幽灵)
   )
   const 幽灵条目 = listDrafts().find((c) => c.rawPath === 幽灵)
-  if (幽灵条目) 删除草稿(幽灵条目.key)
+  if (幽灵条目) deleteDraft(幽灵条目.key)
 
-  const failure = 检查.filter(([, 好]) => !好)
-  console.log(`[selfMD] 草稿与恢复：${检查.length - failure.length}/${检查.length} 项通过`)
+  const failure = check.filter(([, 好]) => !好)
+  console.log(`[selfMD] 草稿与恢复：${check.length - failure.length}/${check.length} 项通过`)
   if (failure.length > 0) {
     console.error(`[selfMD] 草稿与恢复：未通过 — ${failure.map(([name]) => name).join('、')}`)
     return false
@@ -509,7 +509,7 @@ async function runSmokeTest(): Promise<void> {  const target = smokeOpenPath()
     const association = 取关联状态()
     console.log(
       `[selfMD] 文件关联：当前=${association.current || '（未设置）'} ` +
-        `是默认=${association.是默认} 有新建菜单=${association.有新建菜单}`
+        `是默认=${association.isDefaultFlag} 有新建菜单=${association.有新建菜单}`
     )
   }
 

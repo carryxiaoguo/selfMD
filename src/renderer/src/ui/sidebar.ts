@@ -1,5 +1,5 @@
 import type { DirEntry } from '@shared/types'
-import type { 标题项 } from './outline'
+import type { headingItem } from './outline'
 
 /**
  * 侧边栏。
@@ -35,7 +35,7 @@ export interface 侧边栏依赖 {
   /** 点击文档列表项的关闭按钮。 */
   关闭文档: (id: number) => void
   /** 折叠 / 展开大纲某一段（当前不做折叠，保留接口）。 */
-  保存状态: (state: { 可见: boolean; label: 侧边栏标签; widthPx: number }) => void
+  保存状态: (state: { visibleNow: boolean; label: 侧边栏标签; widthPx: number }) => void
 }
 
 const 最小宽度 = 160
@@ -46,10 +46,10 @@ export class sidebar {
   private deps: 侧边栏依赖
   private label: 侧边栏标签 = 'outline'
   private widthPx = 260
-  private 可见 = false
-  private 大纲面板!: HTMLElement
-  private 文件面板!: HTMLElement
-  private 文档面板!: HTMLElement
+  private visibleNow = false
+  private outlinePanel!: HTMLElement
+  private filesPanel!: HTMLElement
+  private docsPanel!: HTMLElement
   /** 已打开的文档列表。由外层在多文档变化时推送。 */
   private 文档列表: 文档列表项[] = []
   private 标签按钮 = new Map<侧边栏标签, HTMLButtonElement>()
@@ -90,19 +90,19 @@ export class sidebar {
     const 主体 = document.createElement('div')
     主体.className = 'sidebar-body'
 
-    this.大纲面板 = document.createElement('div')
-    this.大纲面板.className = 'outline-content'
-    this.大纲面板.dataset.panel = 'outline'
+    this.outlinePanel = document.createElement('div')
+    this.outlinePanel.className = 'outline-content'
+    this.outlinePanel.dataset.panel = 'outline'
 
-    this.文件面板 = document.createElement('div')
-    this.文件面板.className = 'file-list'
-    this.文件面板.dataset.panel = 'files'
+    this.filesPanel = document.createElement('div')
+    this.filesPanel.className = 'file-list'
+    this.filesPanel.dataset.panel = 'files'
 
-    this.文档面板 = document.createElement('div')
-    this.文档面板.className = 'article-list'
-    this.文档面板.dataset.panel = 'articles'
+    this.docsPanel = document.createElement('div')
+    this.docsPanel.className = 'article-list'
+    this.docsPanel.dataset.panel = 'articles'
 
-    主体.append(this.大纲面板, this.文件面板, this.文档面板)
+    主体.append(this.outlinePanel, this.filesPanel, this.docsPanel)
 
     const 拖柄 = document.createElement('div')
     拖柄.className = 'sidebar-resizer'
@@ -114,9 +114,9 @@ export class sidebar {
 
   private 应用标签(): void {
     for (const [value, button] of this.标签按钮) button.classList.toggle('active', value === this.label)
-    this.大纲面板.hidden = this.label !== 'outline'
-    this.文件面板.hidden = this.label !== 'files'
-    this.文档面板.hidden = this.label !== 'articles'
+    this.outlinePanel.hidden = this.label !== 'outline'
+    this.filesPanel.hidden = this.label !== 'files'
+    this.docsPanel.hidden = this.label !== 'articles'
     if (this.label === 'files') void this.refreshFileTree()
     if (this.label === 'articles') this.重绘文档列表()
   }
@@ -138,7 +138,7 @@ export class sidebar {
       document.removeEventListener('mouseup', 松开)
       // 拖拽期间给 body 加类，避免选中文本、并把光标保持为左右拉伸
       document.body.classList.remove('resizing-sidebar')
-      this.deps.保存状态({ 可见: this.可见, label: this.label, widthPx: this.widthPx })
+      this.deps.保存状态({ visibleNow: this.visibleNow, label: this.label, widthPx: this.widthPx })
     }
 
     document.body.classList.add('resizing-sidebar')
@@ -149,21 +149,21 @@ export class sidebar {
   // ------------------------------------------------------------- 对外 ----
 
   get visible(): boolean {
-    return this.可见
+    return this.visibleNow
   }
 
-  setVisible(可见: boolean): void {
-    this.可见 = 可见
-    this.host.hidden = !可见
-    if (可见 && this.label === 'files') void this.refreshFileTree()
-    this.deps.保存状态({ 可见, label: this.label, widthPx: this.widthPx })
+  setVisible(visibleNow: boolean): void {
+    this.visibleNow = visibleNow
+    this.host.hidden = !visibleNow
+    if (visibleNow && this.label === 'files') void this.refreshFileTree()
+    this.deps.保存状态({ visibleNow, label: this.label, widthPx: this.widthPx })
   }
 
   /** 在显示 / 隐藏之间切换，返回切换后的可见状态。 */
   toggle(label?: 侧边栏标签): boolean {
     // 已经显示且点的是同一个标签 → 收起；否则切到该标签并显示。
     // 这是通行行为：再点一次「大纲」是收起侧边栏。
-    if (this.可见 && (!label || label === this.label)) {
+    if (this.visibleNow && (!label || label === this.label)) {
       this.setVisible(false)
       return false
     }
@@ -176,7 +176,7 @@ export class sidebar {
   setTab(label: 侧边栏标签): void {
     this.label = label
     this.应用标签()
-    this.deps.保存状态({ 可见: this.可见, label, widthPx: this.widthPx })
+    this.deps.保存状态({ visibleNow: this.visibleNow, label, widthPx: this.widthPx })
   }
 
   setWidth(width: number): void {
@@ -194,7 +194,7 @@ export class sidebar {
    */
   private 上次大纲签名 = ''
 
-  setOutline(headings: 标题项[], currentIndex: number): void {
+  setOutline(headings: headingItem[], currentIndex: number): void {
     const 签名 = headings.map((t) => `${t.level}:${t.position}:${t.docText}`).join('|')
     if (签名 !== this.上次大纲签名) {
       this.上次大纲签名 = 签名
@@ -203,12 +203,12 @@ export class sidebar {
     this.高亮大纲(currentIndex)
   }
 
-  private 重绘大纲(headings: 标题项[]): void {
-    this.大纲面板.textContent = ''
+  private 重绘大纲(headings: headingItem[]): void {
+    this.outlinePanel.textContent = ''
     this.当前高亮下标 = -1
 
     if (headings.length === 0) {
-      this.大纲面板.append(this.建提示('本文档没有标题'))
+      this.outlinePanel.append(this.建提示('本文档没有标题'))
       return
     }
 
@@ -232,14 +232,14 @@ export class sidebar {
 
       item.append(fold, label)
       item.addEventListener('click', () => this.deps.跳转到(title.position))
-      this.大纲面板.append(item)
+      this.outlinePanel.append(item)
     })
   }
 
   private 高亮大纲(subscript: number): void {
     if (subscript === this.当前高亮下标) return
     this.当前高亮下标 = subscript
-    for (const item of Array.from(this.大纲面板.querySelectorAll('.outline-item'))) {
+    for (const item of Array.from(this.outlinePanel.querySelectorAll('.outline-item'))) {
       const 是当前 = Number((item as HTMLElement).dataset.subscript) === subscript
       item.classList.toggle('active', 是当前)
       // 滚动到可见：文档很长时当前标题可能在视野外
@@ -303,8 +303,8 @@ export class sidebar {
 
   private 提交文件树(parts: DocumentFragment, index: number): void {
     if (index !== this.刷新序号) return
-    this.文件面板.textContent = ''
-    this.文件面板.append(parts)
+    this.filesPanel.textContent = ''
+    this.filesPanel.append(parts)
   }
 
   /**
@@ -322,10 +322,10 @@ export class sidebar {
   }
 
   private 重绘文档列表(): void {
-    this.文档面板.textContent = ''
+    this.docsPanel.textContent = ''
 
     if (this.文档列表.length === 0) {
-      this.文档面板.append(this.建提示('没有打开的文档'))
+      this.docsPanel.append(this.建提示('没有打开的文档'))
       return
     }
 
@@ -346,29 +346,29 @@ export class sidebar {
       // 未保存的标记。只是一个点，但它是"这个文档还有改动没落盘"的唯一提示，
       // 而文档列表恰恰是多文档下最容易忘记存盘的地方。
       if (item.脏) {
-        const 点 = document.createElement('span')
-        点.className = 'article-dirty'
-        点.textContent = '•'
-        点.title = '有未保存的改动'
-        line.append(点)
+        const dot = document.createElement('span')
+        dot.className = 'article-dirty'
+        dot.textContent = '•'
+        dot.title = '有未保存的改动'
+        line.append(dot)
       }
 
       // 只有一个文档时不给关闭按钮：关掉就没有编辑器了
       if (this.文档列表.length > 1) {
-        const 关 = document.createElement('button')
-        关.className = 'article-close'
-        关.type = 'button'
-        关.textContent = '×'
-        关.title = '关闭'
-        关.addEventListener('click', (event) => {
+        const off = document.createElement('button')
+        off.className = 'article-close'
+        off.type = 'button'
+        off.textContent = '×'
+        off.title = '关闭'
+        off.addEventListener('click', (event) => {
           event.stopPropagation()
           this.deps.关闭文档(item.id)
         })
-        line.append(关)
+        line.append(off)
       }
 
       line.addEventListener('click', () => this.deps.点击文档(item.id))
-      this.文档面板.append(line)
+      this.docsPanel.append(line)
     }
   }
 
@@ -445,24 +445,24 @@ export class sidebar {
       container.append(line)
 
       if (item.isDirectory) {
-        const 子容器 = document.createElement('div')
-        子容器.className = 'file-tree-children'
-        container.append(子容器)
+        const subContainer = document.createElement('div')
+        subContainer.className = 'file-tree-children'
+        container.append(subContainer)
 
         if (this.已展开.has(item.path)) {
-          await this.展开目录(item.path, 子容器, depth + 1)
+          await this.展开目录(item.path, subContainer, depth + 1)
         }
 
         line.addEventListener('click', async () => {
           if (this.已展开.has(item.path)) {
             this.已展开.delete(item.path)
-            子容器.textContent = ''
+            subContainer.textContent = ''
             展开箭头.textContent = '▸'
           } else {
             this.已展开.add(item.path)
             展开箭头.textContent = '▾'
-            子容器.textContent = ''
-            await this.展开目录(item.path, 子容器, depth + 1)
+            subContainer.textContent = ''
+            await this.展开目录(item.path, subContainer, depth + 1)
           }
         })
       } else {
@@ -475,7 +475,7 @@ export class sidebar {
 
   /** 高亮文件树里对应当前文档的那一项。 */
   高亮当前文件(filePath: string | null): void {
-    for (const line of Array.from(this.文件面板.querySelectorAll('.file-list-item'))) {
+    for (const line of Array.from(this.filesPanel.querySelectorAll('.file-list-item'))) {
       const 是当前 = filePath !== null && (line as HTMLElement).dataset.path === filePath
       line.classList.toggle('active', 是当前)
     }

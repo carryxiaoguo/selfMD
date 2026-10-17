@@ -157,7 +157,7 @@ export class DocumentService {
    * 供标签管理器在切换文档时把"这一份"存回标签里。
    * 返回副本而不是引用：调用方拿到之后不该有能力改到内部状态。
    */
-  导出状态(): DocState {
+  exportStatus(): DocState {
     return { ...this.state }
   }
 

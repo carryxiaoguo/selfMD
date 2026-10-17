@@ -11,7 +11,7 @@
  */
 
 /** 是否为绝对路径：Windows 盘符、UNC、或 POSIX 前导斜杠。 */
-export function 是绝对路径(filePath: string): boolean {
+export function isAbsolute(filePath: string): boolean {
   return /^[a-zA-Z]:[\\/]/.test(filePath) || /^[\\/]/.test(filePath)
 }
 
@@ -33,7 +33,7 @@ export function normalizePath(filePath: string): string {
 }
 
 /** 用正斜杠拼接路径段，折叠重复分隔符。空段被忽略。 */
-export function 拼接(...segment: (string | null | undefined)[]): string {
+export function concat(...segment: (string | null | undefined)[]): string {
   const valid = segment.filter((s): s is string => typeof s === 'string' && s.length > 0)
   if (valid.length === 0) return ''
   let result = valid[0].replace(/[\\/]+$/, '')
@@ -52,7 +52,7 @@ export function takeFileName(filePath: string): string {
 }
 
 /** 去掉最后一层扩展名。 */
-export function 去扩展名(name: string): string {
+export function stripExt(name: string): string {
   return name.replace(/\.[^./\\]+$/, '')
 }
 
@@ -68,7 +68,7 @@ export function 取目录(filePath: string): string {
  * 重名时追加 `-1`、`-2`……而不是覆盖。图片被静默覆盖是不可接受的：
  * 用户往往在几周后才发现某张图变成了另一张。
  */
-export function 唯一文件名(
+export function uniqueFileName(
   expectedName: string,
   /** 询问"该名字是否已被占用"。由调用方注入，便于测试与异步实现。 */
   已存在: (候选名: string) => boolean
@@ -139,6 +139,6 @@ export function 类型由扩展名(fileName: string): string | null {
 }
 
 /** 判断一个扩展名是否属于受支持的图片类型。 */
-export function 是图片文件(filePath: string): boolean {
+export function isImageFile(filePath: string): boolean {
   return 类型由扩展名(filePath) !== null
 }

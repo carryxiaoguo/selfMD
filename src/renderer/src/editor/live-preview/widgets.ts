@@ -9,7 +9,7 @@ import {
   样式显示名,
   样式顺序,
   解析围栏首行,
-  type 围栏信息
+  type FenceInfo
 } from '@shared/代码块信息'
 
 /**
@@ -94,7 +94,7 @@ export interface 代码块位置 {
  */
 export class 代码块头部 extends WidgetType {
   constructor(
-    readonly info: 围栏信息,
+    readonly info: FenceInfo,
     readonly position: 代码块位置
   ) {
     super()
@@ -179,7 +179,7 @@ export class 代码块头部 extends WidgetType {
     for (const name of 样式顺序) style.append(new Option(样式显示名[name], name))
     style.value = this.info.style
     style.addEventListener('change', () => {
-      this.改信息(view, { style: style.value as 围栏信息['style'] })
+      this.改信息(view, { style: style.value as FenceInfo['style'] })
     })
 
     // --- 复制 -----------------------------------------------------------
@@ -226,7 +226,7 @@ export class 代码块头部 extends WidgetType {
   }
 
   /** 把改动写回围栏首行的信息串。 */
-  private 改信息(view: EditorView, 部分: Partial<围栏信息>): void {
+  private 改信息(view: EditorView, 部分: Partial<FenceInfo>): void {
     const state = view.state
     const line = state.doc.lineAt(Math.min(this.position.firstLineStart, state.doc.length))
     const lineText = state.sliceDoc(line.from, line.to)
@@ -331,8 +331,8 @@ export class 列表圆点 extends WidgetType {
 export type 图片右键处理器 = (
   event: MouseEvent,
   /** 文档里写的原始地址（相对路径形态，未解析）。 */
-  原地址: string,
-  替代文字: string,
+  originalUrl: string,
+  altText: string,
   /** widget 的根元素；上层用它反查文档位置。 */
   el: HTMLElement
 ) => void
@@ -359,8 +359,8 @@ export class image extends WidgetType {
     /** 解析后的可加载 URL；空串表示解析失败。 */
     readonly url: string,
     /** 文档里写的原始地址，右键菜单与上传回填要用。 */
-    readonly 原地址: string,
-    readonly 替代文字: string,
+    readonly originalUrl: string,
+    readonly altText: string,
     /** 本地文件在磁盘上的绝对路径；远程图片为 null。 */
     readonly localPath: string | null
   ) {
@@ -370,8 +370,8 @@ export class image extends WidgetType {
   override eq(other: image): boolean {
     return (
       other.url === this.url &&
-      other.原地址 === this.原地址 &&
-      other.替代文字 === this.替代文字
+      other.originalUrl === this.originalUrl &&
+      other.altText === this.altText
     )
   }
 
@@ -379,11 +379,11 @@ export class image extends WidgetType {
     const box = document.createElement('span')
     // `md-image` 是通用的类名，挂上它主题规则才有机会生效
     box.className = 'cm-w-image md-image'
-    box.setAttribute('data-src', this.原地址)
+    box.setAttribute('data-src', this.originalUrl)
 
     if (!this.url) {
       box.classList.add('md-img-error')
-      box.textContent = `⚠ 无法显示图片${this.替代文字 ? `：${this.替代文字}` : `：${this.原地址}`}`
+      box.textContent = `⚠ 无法显示图片${this.altText ? `：${this.altText}` : `：${this.originalUrl}`}`
       box.title =
         '无法解析图片地址。若用的是相对路径，请先保存文档——' +
         '相对路径需要一个基准目录。'
@@ -393,7 +393,7 @@ export class image extends WidgetType {
 
     const img = document.createElement('img')
     img.src = this.url
-    img.alt = this.替代文字
+    img.alt = this.altText
     img.draggable = false
     // 延迟加载：长文档里几十张图同时解码会让滚动卡顿
     img.loading = 'lazy'
@@ -402,8 +402,8 @@ export class image extends WidgetType {
     // 并保留原地址供排查——只留一个破图图标等于什么都没说。
     img.addEventListener('error', () => {
       box.classList.add('md-img-error')
-      box.textContent = `⚠ 图片加载失败：${this.替代文字 || this.原地址}`
-      box.title = `找不到文件：${this.localPath ?? this.原地址}`
+      box.textContent = `⚠ 图片加载失败：${this.altText || this.originalUrl}`
+      box.title = `找不到文件：${this.localPath ?? this.originalUrl}`
     })
 
     box.append(img)
@@ -415,7 +415,7 @@ export class image extends WidgetType {
     box.addEventListener('contextmenu', (event) => {
       event.preventDefault()
       event.stopPropagation()
-      图片右键?.(event, this.原地址, this.替代文字, box)
+      图片右键?.(event, this.originalUrl, this.altText, box)
     })
   }
 
@@ -428,7 +428,7 @@ export class image extends WidgetType {
 
 export class 任务框 extends WidgetType {
   constructor(
-    readonly 已勾选: boolean,
+    readonly checkedFlag: boolean,
     /** 标记 `[ ]` 在文档中的起始位置，用于回写。 */
     readonly position: number
   ) {
@@ -436,15 +436,15 @@ export class 任务框 extends WidgetType {
   }
 
   override eq(other: 任务框): boolean {
-    return other.已勾选 === this.已勾选 && other.position === this.position
+    return other.checkedFlag === this.checkedFlag && other.position === this.position
   }
 
   override toDOM(view: EditorView): HTMLElement {
     const el = document.createElement('input')
     el.type = 'checkbox'
     el.className = 'cm-w-task'
-    el.checked = this.已勾选
-    el.setAttribute('aria-label', this.已勾选 ? '标记为未完成' : '标记为已完成')
+    el.checked = this.checkedFlag
+    el.setAttribute('aria-label', this.checkedFlag ? '标记为未完成' : '标记为已完成')
 
     el.addEventListener('mousedown', (event) => {
       // 阻止默认行为，否则点击会把光标移进被替换的标记区间。
@@ -471,7 +471,7 @@ export class 任务框 extends WidgetType {
     const originalText = state.sliceDoc(start, end)
     if (!/^\[[ xX]\]$/.test(originalText)) return
 
-    const nextText = this.已勾选 ? '[ ]' : '[x]'
+    const nextText = this.checkedFlag ? '[ ]' : '[x]'
     view.dispatch({
       changes: { from: start, to: end, insert: nextText },
       // 保持光标不动：勾选复选框不应该抢走输入焦点。

@@ -25,7 +25,7 @@ export interface 装饰条目 {
   rank: number
 }
 
-export interface 构建上下文 {
+export interface BuildContext {
   /** 光标所在行（1 基）。这些行上的语法标记保持可见。 */
   活动行: Set<number>
   /** 已经加过行装饰的位置，避免同一行被重复加类。 */
@@ -44,7 +44,7 @@ export interface 构建上下文 {
 
 /** 把一条行装饰加入收集器；同一位置只保留第一条。 */
 export function addLineDeco(
-  context: 构建上下文,
+  context: BuildContext,
   lineStart: number,
   deco: Decoration
 ): void {
@@ -69,8 +69,8 @@ export function addLineDeco(
  */
 let 行内公式启用 = true
 
-export function setInlineMathEnabled(启用: boolean): void {
-  行内公式启用 = 启用
+export function setInlineMathEnabled(enable: boolean): void {
+  行内公式启用 = enable
 }
 
 export function 行内公式已启用(): boolean {
@@ -85,8 +85,8 @@ export function 行内公式已启用(): boolean {
  */
 let 渲染标点启用 = false
 
-export function setPunctuationRenderingEnabled(启用: boolean): void {
-  渲染标点启用 = 启用
+export function setPunctuationRenderingEnabled(enable: boolean): void {
+  渲染标点启用 = enable
 }
 
 export function 渲染标点已启用(): boolean {

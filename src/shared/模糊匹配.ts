@@ -19,7 +19,7 @@
  */
 
 /** 匹配上时返回分数（越大越好），匹配不上返回 null。 */
-export function 模糊评分(query: string, docText: string): number | null {
+export function fuzzyScore(query: string, docText: string): number | null {
   if (query.length === 0) return 0
   if (query.length > docText.length) return null
 
@@ -96,8 +96,8 @@ export function 模糊筛选<T>(
   const hit: { entry: T; score: number }[] = []
 
   for (const candidate of 候选们) {
-    const 整体分 = 模糊评分(查询段, candidate.docText)
-    const 段分 = 模糊评分(查询段, 取末段(candidate.docText))
+    const 整体分 = fuzzyScore(查询段, candidate.docText)
+    const 段分 = fuzzyScore(查询段, 取末段(candidate.docText))
 
     // 两处都不匹配就淘汰
     if (整体分 === null && 段分 === null) continue

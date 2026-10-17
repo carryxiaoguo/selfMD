@@ -1,4 +1,4 @@
-import { 偏好设置结构, 校验设置表, type 设置项 } from '@shared/settings-schema'
+import { PrefsSchema, 校验设置表, type 设置项 } from '@shared/settings-schema'
 import type { Settings } from '@shared/types'
 
 /**
@@ -23,7 +23,7 @@ export class 偏好设置面板 {
   private deps: 偏好设置依赖
   private overlay: HTMLElement | null = null
   private 当前分区 = 0
-  private 搜索词 = ''
+  private searchTerm = ''
 
   constructor(deps: 偏好设置依赖) {
     this.deps = deps
@@ -49,12 +49,12 @@ export class 偏好设置面板 {
     }
 
     if (this.overlay) this.close()
-    this.搜索词 = ''
+    this.searchTerm = ''
 
     // 定位分区：找不到就保持当前分区（不清零），
     // 免得名字写错时直接把用户丢回第一页却毫无提示。
     if (定位分区) {
-      const subscript = 偏好设置结构.findIndex((score) => score.title === 定位分区)
+      const subscript = PrefsSchema.findIndex((score) => score.title === 定位分区)
       if (subscript >= 0) this.当前分区 = subscript
       else console.warn(`[偏好设置] 没有名为「${定位分区}」的分区`)
     }
@@ -72,7 +72,7 @@ export class 偏好设置面板 {
     title.textContent = '偏好设置'
     左栏.append(title)
 
-    偏好设置结构.forEach((section, subscript) => {
+    PrefsSchema.forEach((section, subscript) => {
       const label = document.createElement('button')
       label.className = 'prefs-tab'
       label.type = 'button'
@@ -80,10 +80,10 @@ export class 偏好设置面板 {
       label.textContent = section.title
       label.addEventListener('click', () => {
         this.当前分区 = subscript
-        this.搜索词 = ''
+        this.searchTerm = ''
         const input = panel.querySelector('.prefs-search') as HTMLInputElement | null
         if (input) input.value = ''
-        this.重绘()
+        this.repaint()
       })
       左栏.append(label)
     })
@@ -98,8 +98,8 @@ export class 偏好设置面板 {
     search.type = 'search'
     search.placeholder = '搜索设置项…'
     search.addEventListener('input', () => {
-      this.搜索词 = search.value.trim()
-      this.重绘()
+      this.searchTerm = search.value.trim()
+      this.repaint()
     })
     const 关闭钮 = document.createElement('button')
     关闭钮.className = 'selfmd-btn'
@@ -117,7 +117,7 @@ export class 偏好设置面板 {
     document.body.append(overlay)
 
     this.overlay = overlay
-    this.内容区 = content
+    this.contentArea = content
     this.左栏区 = 左栏
 
     // Esc 关闭；捕获阶段监听，避免编辑器抢先处理
@@ -126,11 +126,11 @@ export class 偏好设置面板 {
       if (event.target === overlay) this.close()
     })
 
-    this.重绘()
+    this.repaint()
     search.focus()
   }
 
-  private 内容区: HTMLElement | null = null
+  private contentArea: HTMLElement | null = null
   private 左栏区: HTMLElement | null = null
 
   private keyboard = (event: KeyboardEvent): void => {
@@ -146,35 +146,35 @@ export class 偏好设置面板 {
     document.removeEventListener('keydown', this.keyboard, true)
     this.overlay.remove()
     this.overlay = null
-    this.内容区 = null
+    this.contentArea = null
     this.左栏区 = null
   }
 
   /** 面板开着时设置被外部改动，需要重绘以反映新值。 */
   refresh(): void {
-    if (this.overlay) this.重绘()
+    if (this.overlay) this.repaint()
   }
 
   // ------------------------------------------------------------- 渲染 ----
 
-  private 重绘(): void {
-    const content = this.内容区
+  private repaint(): void {
+    const content = this.contentArea
     if (!content) return
 
     // 左栏高亮：搜索时所有分区都不选中——结果已经跨分区平铺了
     for (const button of Array.from(this.左栏区?.querySelectorAll('.prefs-tab') ?? [])) {
       const subscript = Number((button as HTMLElement).dataset.section)
-      button.classList.toggle('active', this.搜索词 === '' && subscript === this.当前分区)
+      button.classList.toggle('active', this.searchTerm === '' && subscript === this.当前分区)
     }
 
     content.textContent = ''
 
-    if (this.搜索词 !== '') {
+    if (this.searchTerm !== '') {
       this.渲染搜索结果(content)
       return
     }
 
-    const section = 偏好设置结构[this.当前分区]
+    const section = PrefsSchema[this.当前分区]
     if (!section) return
 
     for (const subsection of section.subsection) {
@@ -197,12 +197,12 @@ export class 偏好设置面板 {
   }
 
   private 渲染搜索结果(content: HTMLElement): void {
-    const 词 = this.搜索词.toLowerCase()
+    const 词 = this.searchTerm.toLowerCase()
     const block = document.createElement('div')
     block.className = 'prefs-section'
 
     let hit = 0
-    for (const section of 偏好设置结构) {
+    for (const section of PrefsSchema) {
       for (const subsection of section.subsection) {
         for (const item of subsection.item) {
           const whole = `${item.label} ${item.description ?? ''} ${String(item.key)}`.toLowerCase()
@@ -216,10 +216,10 @@ export class 偏好设置面板 {
     }
 
     if (hit === 0) {
-      const 空 = document.createElement('div')
-      空.className = 'prefs-empty'
-      空.textContent = `没有匹配「${this.搜索词}」的设置项`
-      block.append(空)
+      const emptyText = document.createElement('div')
+      emptyText.className = 'prefs-empty'
+      emptyText.textContent = `没有匹配「${this.searchTerm}」的设置项`
+      block.append(emptyText)
     } else {
       const 计数 = document.createElement('p')
       计数.className = 'prefs-note'
@@ -275,16 +275,16 @@ export class 偏好设置面板 {
     }
 
     if (item.kind === '下拉') {
-      const 选 = document.createElement('select')
+      const pick = document.createElement('select')
       for (const options of item.options ?? []) {
         const 条 = document.createElement('option')
         条.value = options.value
         条.textContent = options.text
-        选.append(条)
+        pick.append(条)
       }
-      选.value = String(currentValue ?? '')
-      选.addEventListener('change', () => void this.提交(item.key, 选.value))
-      return 选
+      pick.value = String(currentValue ?? '')
+      pick.addEventListener('change', () => void this.提交(item.key, pick.value))
+      return pick
     }
 
     if (item.kind === '数字') {
@@ -295,7 +295,7 @@ export class 偏好设置面板 {
       numItems.value = String(currentValue ?? 0)
       if (item.minValue !== undefined) numItems.min = String(item.minValue)
       if (item.maxValue !== undefined) numItems.max = String(item.maxValue)
-      if (item.步长 !== undefined) numItems.step = String(item.步长)
+      if (item.stepSize !== undefined) numItems.step = String(item.stepSize)
       // 用 change 而不是 input：拖数字框的箭头或长按删除键时，
       // input 会在每一个中间值上触发一次写盘，产生一串无意义的历史。
       numItems.addEventListener('change', () => {

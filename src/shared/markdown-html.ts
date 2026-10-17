@@ -23,7 +23,7 @@ export interface 渲染选项 {
 }
 
 /** HTML 文本转义。`&` 必须最先替换，否则会把后面生成的实体再转一次。 */
-export function 转义HTML(docText: string): string {
+export function escapeHtml(docText: string): string {
   return docText
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -31,8 +31,8 @@ export function 转义HTML(docText: string): string {
 }
 
 /** 属性值转义：除文本转义外还要处理引号。 */
-function 转义属性(docText: string): string {
-  return 转义HTML(docText).replace(/"/g, '&quot;')
+function escapeAttr(docText: string): string {
+  return escapeHtml(docText).replace(/"/g, '&quot;')
 }
 
 /** 这些节点只是 Markdown 的语法标记，输出时整段跳过。 */
@@ -103,17 +103,17 @@ interface context {
  * 这个"填空"写法是遍历 Lezer 树的关键——树是扁平的区间列表，
  * 不属于任何子节点的部分才是正文，漏掉就会丢字。
  */
-function 递归(node: any, context: context): void {
+function recursive(node: any, context: context): void {
   let cursor = node.from
   for (let child = node.firstChild; child; child = child.nextSibling) {
     if (child.from > cursor) {
-      context.output.push(转义HTML(context.source.slice(cursor, child.from)))
+      context.output.push(escapeHtml(context.source.slice(cursor, child.from)))
     }
     处理(child, context)
     cursor = child.to
   }
   if (cursor < node.to) {
-    context.output.push(转义HTML(context.source.slice(cursor, node.to)))
+    context.output.push(escapeHtml(context.source.slice(cursor, node.to)))
   }
 }
 
@@ -143,7 +143,7 @@ function 处理(node: any, context: context): void {
     case 'FencedCode':
     case 'IndentedCode': {
       const language = name === 'FencedCode' ? 取语言(node, context) : ''
-      const 类 = language ? ` class="${转义属性((options.语言类前缀 ?? 'language-') + language)}"` : ''
+      const 类 = language ? ` class="${escapeAttr((options.语言类前缀 ?? 'language-') + language)}"` : ''
       // CodeText 是正文，逐段取；围栏符号本身是 CodeMark，已被跳过
       output.push(`<pre><code${类}>`)
       收集代码文本(node, context)
@@ -161,7 +161,7 @@ function 处理(node: any, context: context): void {
       let tail = node.lastChild
       if (tail && tail.name === 'CodeMark' && tail !== head) 止 = tail.from
       const content = source.slice(start, 止).trim()
-      output.push(`<code>${转义HTML(content)}</code>`)
+      output.push(`<code>${escapeHtml(content)}</code>`)
       return
     }
 
@@ -169,9 +169,9 @@ function 处理(node: any, context: context): void {
     case 'Image': {
       const url = 取链接地址(node, context)
       const substitute = 取图片替代文本(node, context)
-      output.push(`<img src="${转义属性(url)}" alt="${转义属性(substitute)}"`)
+      output.push(`<img src="${escapeAttr(url)}" alt="${escapeAttr(substitute)}"`)
       const title = 取链接标题(node, context)
-      if (title) output.push(` title="${转义属性(title)}"`)
+      if (title) output.push(` title="${escapeAttr(title)}"`)
       output.push('>')
       return
     }
@@ -179,9 +179,9 @@ function 处理(node: any, context: context): void {
     // ------------------------------------------------------------ 链接 --
     case 'Link': {
       const url = 取链接地址(node, context)
-      output.push(`<a href="${转义属性(url)}"`)
+      output.push(`<a href="${escapeAttr(url)}"`)
       const title = 取链接标题(node, context)
-      if (title) output.push(` title="${转义属性(title)}"`)
+      if (title) output.push(` title="${escapeAttr(title)}"`)
       output.push('>')
       // 只渲染 `[` 与 `]` 之间的部分。
       //
@@ -197,7 +197,7 @@ function 处理(node: any, context: context): void {
     case 'Autolink': {
       const docText = source.slice(node.from, node.to)
       const url = docText.replace(/^</, '').replace(/>$/, '')
-      output.push(`<a href="${转义属性(url)}">${转义HTML(url)}</a>`)
+      output.push(`<a href="${escapeAttr(url)}">${escapeHtml(url)}</a>`)
       return
     }
 
@@ -209,7 +209,7 @@ function 处理(node: any, context: context): void {
       const 起始 = /^\s*(\d+)[.)]/.exec(originalText)
       const 起始值 = 起始 ? Number(起始[1]) : 1
       output.push(起始值 === 1 ? '<ol>\n' : `<ol start="${起始值}">\n`)
-      递归(node, context)
+      recursive(node, context)
       output.push('</ol>\n')
       return
     }
@@ -219,7 +219,7 @@ function 处理(node: any, context: context): void {
       const mark = 找任务标记(node, context)
       const 勾选 = /\[[xX]\]/.test(mark)
       output.push(`<input type="checkbox" disabled${勾选 ? ' checked' : ''}> `)
-      递归(node, context)
+      recursive(node, context)
       return
     }
 
@@ -256,7 +256,7 @@ function 处理(node: any, context: context): void {
     case 'TableCell': {
       // 单独的单元格只在异常输入下出现，兜底当 td 处理
       output.push('<td>')
-      递归(node, context)
+      recursive(node, context)
       output.push('</td>')
       return
     }
@@ -280,7 +280,7 @@ function 处理(node: any, context: context): void {
   const 标题匹配 = 标题模式.exec(name)
   if (标题匹配) {
     const 子缓冲: string[] = []
-    递归(node, { ...context, output: 子缓冲 })
+    recursive(node, { ...context, output: 子缓冲 })
     output.push(`<h${标题匹配[1]}>${子缓冲.join('').trim()}</h${标题匹配[1]}>\n`)
     return
   }
@@ -289,14 +289,14 @@ function 处理(node: any, context: context): void {
   if (label) {
     const blockLevel = ['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote', 'ul', 'li'].includes(label)
     output.push(`<${label}>`)
-    递归(node, context)
+    recursive(node, context)
     output.push(`</${label}>${blockLevel ? '\n' : ''}`)
     return
   }
 
   // 未特别处理的节点：递归进去，让子节点各自渲染。
   // 这样新增语法（比如脚注）至少不会整段丢失，只是少了外层标签。
-  递归(node, context)
+  recursive(node, context)
 }
 
 /** 代码块内容：只取 CodeText 子节点，避免把围栏符号也当内容。 */
@@ -304,7 +304,7 @@ function 收集代码文本(node: any, context: context): void {
   let 有内容 = false
   for (let child = node.firstChild; child; child = child.nextSibling) {
     if (child.name === 'CodeText') {
-      context.output.push(转义HTML(context.source.slice(child.from, child.to)))
+      context.output.push(escapeHtml(context.source.slice(child.from, child.to)))
       有内容 = true
     }
   }
@@ -314,7 +314,7 @@ function 收集代码文本(node: any, context: context): void {
     const docText = context.source.slice(node.from, node.to)
     const lines = docText.split('\n')
     if (lines.length > 2) {
-      context.output.push(转义HTML(lines.slice(1, -1).join('\n')))
+      context.output.push(escapeHtml(lines.slice(1, -1).join('\n')))
     }
   }
 }
@@ -337,7 +337,7 @@ function 渲染链接文字(node: any, context: context): void {
   for (let child = node.firstChild; child; child = child.nextSibling) {
     if (child.name === 'URL' || child.name === 'LinkTitle') break
     if (child.from > cursor) {
-      context.output.push(转义HTML(context.source.slice(cursor, child.from)))
+      context.output.push(escapeHtml(context.source.slice(cursor, child.from)))
     }
     if (!标记节点.has(child.name)) 处理(child, context)
     cursor = child.to
@@ -368,12 +368,12 @@ function 取图片替代文本(node: any, context: context): string {
   const 第一个标记 = node.firstChild
   if (!第一个标记) return ''
   // 结构是 LinkMark(`![`) → 文本 → LinkMark(`]`) → LinkMark(`(`) → URL → LinkMark(`)`)
-  const 收集: string[] = []
+  const collect: string[] = []
   for (let child = 第一个标记.nextSibling; child; child = child.nextSibling) {
     if (child.name === 'LinkMark') break
-    收集.push(context.source.slice(child.from, child.to))
+    collect.push(context.source.slice(child.from, child.to))
   }
-  return 收集.join('')
+  return collect.join('')
 }
 
 function 渲染表格行(行节点: any, context: context, 单元格标签: string): void {
@@ -384,7 +384,7 @@ function 渲染表格行(行节点: any, context: context, 单元格标签: stri
     if (child.name !== 'TableCell') continue
     const 对齐 = 对齐们[index]
     context.output.push(`<${单元格标签}${对齐 ? ` style="text-align:${对齐}"` : ''}>`)
-    递归(child, context)
+    recursive(child, context)
     context.output.push(`</${单元格标签}>\n`)
     index++
   }
@@ -415,11 +415,11 @@ function 取对齐(行节点: any, context: context): (string | null)[] {
       const docText = segment.trim()
       // 跳过首尾空段（`|a|b|` 按 `|` 切会切出空串）与非分隔段
       if (docText.length === 0 || !/^:?-+:?$/.test(docText)) continue
-      const 左 = docText.startsWith(':')
-      const 右 = docText.endsWith(':')
-      if (左 && 右) result.push('center')
-      else if (右) result.push('right')
-      else if (左) result.push('left')
+      const leftward = docText.startsWith(':')
+      const rightward = docText.endsWith(':')
+      if (leftward && rightward) result.push('center')
+      else if (rightward) result.push('right')
+      else if (leftward) result.push('left')
       else result.push(null)
     }
   }
@@ -433,10 +433,10 @@ function 取对齐(行节点: any, context: context): (string | null)[] {
  * 返回的是**正文片段**（一组块级元素），不含 `<html>` / `<body>` 外壳——
  * 外壳由导出模板负责，因为"网页"与"内嵌预览"需要不同的外壳。
  */
-export function 渲染Markdown为HTML(source: string, options: 渲染选项 = {}): string {
+export function renderMarkdownToHtml(source: string, options: 渲染选项 = {}): string {
   const tree = 解析器.parse(source)
   const context: context = { source, output: [], options }
-  递归(tree.topNode, context)
+  recursive(tree.topNode, context)
   return context.output.join('')
 }
 

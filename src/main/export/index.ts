@@ -3,7 +3,7 @@ import { spawn } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { basename, dirname, extname, isAbsolute, join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { 提取大纲, 渲染Markdown为HTML } from '@shared/markdown-html'
+import { 提取大纲, renderMarkdownToHtml } from '@shared/markdown-html'
 import { activeTheme } from '@shared/types'
 import { getAppPaths } from '../util/paths'
 import { getSettings } from '../services/settings'
@@ -24,7 +24,7 @@ import { 处理样式表 } from './css'
 
 export type 导出格式 = 'html' | 'html-plain' | 'pdf' | 'docx' | 'latex' | 'epub' | 'rtf' | 'odt'
 
-export interface 导出选项 {
+export interface ExportOptions {
   /** 导出后的目标文件路径。 */
   target: string
   /** 源 Markdown 文本。 */
@@ -39,7 +39,7 @@ export interface 导出选项 {
   format: 导出格式
 }
 
-export interface 导出结果 {
+export interface exportResult {
   success: boolean
   filePath: string | null
   error: string | null
@@ -184,8 +184,8 @@ const 图片MIME: Record<string, string> = {
  * 文档里，本来就不指望它离线可见。
  */
 function 内嵌本地图片(html: string, docPath: string | null): string {
-  return html.replace(/(<img[^>]+src=")([^"]+)(")/gi, (整体, before: string, url: string, after: string) => {
-    if (/^(https?:|data:)/i.test(url)) return 整体
+  return html.replace(/(<img[^>]+src=")([^"]+)(")/gi, (wholeText, before: string, url: string, after: string) => {
+    if (/^(https?:|data:)/i.test(url)) return wholeText
     // 还原百分号编码，中文路径才找得到文件
     let filePath = url
     try {
@@ -195,14 +195,14 @@ function 内嵌本地图片(html: string, docPath: string | null): string {
     }
     const baseline = docPath ? dirname(docPath) : getAppPaths().userImages
     const whole = isAbsolute(filePath) ? filePath : resolve(baseline, filePath)
-    if (!existsSync(whole)) return 整体
+    if (!existsSync(whole)) return wholeText
     const kind = 图片MIME[extname(whole).toLowerCase()]
-    if (!kind) return 整体
+    if (!kind) return wholeText
     try {
       const data = readFileSync(whole).toString('base64')
       return `${before}data:${kind};base64,${data}${after}`
     } catch {
-      return 整体
+      return wholeText
     }
   })
 }
@@ -277,11 +277,11 @@ function 读基础样式(): string | null {
   return null
 }
 
-export async function 构建导出HTML(options: 导出选项): Promise<string> {
+export async function buildExportHtml(options: ExportOptions): Promise<string> {
   const withOutline = options.withOutline ?? true
   const 内嵌 = options.embeddedImage ?? true
 
-  let body = 渲染Markdown为HTML(options.source)
+  let body = renderMarkdownToHtml(options.source)
   if (内嵌) body = 内嵌本地图片(body, options.docPath)
 
   // 无样式模式：只出结构，不带任何 CSS
@@ -341,13 +341,13 @@ function 转义标题(docPath: string | null): string {
  * 用一个**隐藏窗口**加载生成好的 HTML，再调 `printToPDF`。
  * 这是 Electron 白拿的能力——不需要装任何外部程序。
  */
-async function 导出PDF(options: 导出选项): Promise<导出结果> {
-  const html = await 构建导出HTML({ ...options, format: 'html' })
+async function 导出PDF(options: ExportOptions): Promise<exportResult> {
+  const html = await buildExportHtml({ ...options, format: 'html' })
 
   // 落一个临时 HTML：data: URL 在超长文档时会超出长度限制，
   // 而且相对图片地址需要真实的文件基准。
-  const 临时文件 = join(tempDir(), `导出-${Date.now()}.html`)
-  writeFileSync(临时文件, html, 'utf8')
+  const tempFile = join(tempDir(), `导出-${Date.now()}.html`)
+  writeFileSync(tempFile, html, 'utf8')
 
   const win = new BrowserWindow({
     show: false,
@@ -357,7 +357,7 @@ async function 导出PDF(options: 导出选项): Promise<导出结果> {
   })
 
   try {
-    await win.loadURL(pathToFileURL(临时文件).toString())
+    await win.loadURL(pathToFileURL(tempFile).toString())
     // 等一帧，让字体与布局稳定下来；否则首行有时会挤出页面。
     await new Promise((done) => setTimeout(done, 120))
 
@@ -445,7 +445,7 @@ const PANDOC格式: Record<string, string> = {
   odt: 'odt'
 }
 
-async function 导出经Pandoc(options: 导出选项): Promise<导出结果> {
+async function 导出经Pandoc(options: ExportOptions): Promise<exportResult> {
   const program = await 检测Pandoc()
   if (!program) {
     return {
@@ -469,13 +469,13 @@ async function 导出经Pandoc(options: 导出选项): Promise<导出结果> {
   const 中间文件 = join(中间目录, `导出-${Date.now()}.html`)
   writeFileSync(
     中间文件,
-    await 构建导出HTML({ ...options, format: 'html', withOutline: false, embeddedImage: true }),
+    await buildExportHtml({ ...options, format: 'html', withOutline: false, embeddedImage: true }),
     'utf8'
   )
 
   mkdirSync(dirname(options.target), { recursive: true })
 
-  return new Promise<导出结果>((done) => {
+  return new Promise<exportResult>((done) => {
     const params = [中间文件, '-f', 'html', '-t', 目标格式, '-o', options.target, '--standalone']
     let 错误输出 = ''
     let childProc: ReturnType<typeof spawn>
@@ -532,12 +532,12 @@ export async function 可用格式(): Promise<Record<导出格式, boolean>> {
   }
 }
 
-export async function 执行导出(options: 导出选项): Promise<导出结果> {
+export async function 执行导出(options: ExportOptions): Promise<exportResult> {
   try {
     if (options.format === 'pdf') return await 导出PDF(options)
 
     if (options.format === 'html' || options.format === 'html-plain') {
-      const html = await 构建导出HTML(options)
+      const html = await buildExportHtml(options)
       mkdirSync(dirname(options.target), { recursive: true })
       writeFileSync(options.target, html, 'utf8')
       return { success: true, filePath: options.target, error: null }
@@ -555,7 +555,7 @@ export async function 执行导出(options: 导出选项): Promise<导出结果>
 
 /** 供自测使用：直接拿一段 Markdown 生成 HTML，不落盘。 */
 export async function 试渲染(source: string, format: 导出格式 = 'html'): Promise<string> {
-  return 构建导出HTML({
+  return buildExportHtml({
     source,
     target: '',
     docPath: null,

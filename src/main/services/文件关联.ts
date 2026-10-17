@@ -23,7 +23,7 @@ export interface 关联状态 {
   /** 系统里 `.md` 当前生效的打开方式（ProgID 或可执行文件名）。 */
   current: string
   /** 是否就是本程序。 */
-  是默认: boolean
+  isDefaultFlag: boolean
   /** 是否已注册「新建」菜单项。 */
   有新建菜单: boolean
 }
@@ -82,7 +82,7 @@ export function 取关联状态(): 关联状态 {
 
   return {
     current,
-    是默认: current === 本程序ProgId,
+    isDefaultFlag: current === 本程序ProgId,
     有新建菜单: 键存在(`HKCU\\Software\\Classes\\${extension}\\ShellNew`)
   }
 }

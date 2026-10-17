@@ -37,7 +37,7 @@ import type { Settings } from '@shared/types'
 import { livePreview } from './live-preview'
 import { 按设置构建智能标点 } from './smart-punctuation'
 import { 继续代码围栏, 继续引用块, 跳出代码块 } from './commands'
-import { 跳到相邻单元格 } from './表格'
+import { moveToAdjacentCell } from './表格'
 
 /**
  * CodeMirror 6 装配。
@@ -225,8 +225,8 @@ export function baseExtensions(options: EditorOptions): Extension[] {
       // 表格内 Tab / Shift+Tab 走单元格，不走缩进。
       // **必须排在 `indentWithTab` 之前**——后者会把 Tab 吃掉当缩进。
       // 光标不在表格里时这两条返回 false，Tab 照旧缩进。
-      { key: 'Tab', run: (view) => 跳到相邻单元格(view, 1) },
-      { key: 'Shift-Tab', run: (view) => 跳到相邻单元格(view, -1) },
+      { key: 'Tab', run: (view) => moveToAdjacentCell(view, 1) },
+      { key: 'Shift-Tab', run: (view) => moveToAdjacentCell(view, -1) },
       ...closeBracketsKeymap,
       ...defaultKeymap,
       ...searchKeymap,

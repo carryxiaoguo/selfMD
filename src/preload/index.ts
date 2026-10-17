@@ -103,7 +103,7 @@ const api: SelfMdApi = {
   },
   print: () => invoke<{ success: boolean; error: string | null }>(CH.appPrint),
   fileAssoc: () =>
-    invoke<{ current: string; 是默认: boolean; 有新建菜单: boolean; 程序路径: string }>(
+    invoke<{ current: string; isDefaultFlag: boolean; 有新建菜单: boolean; 程序路径: string }>(
       CH.appFileAssoc
     ),
   openDefaultApps: () => invoke<void>(CH.appOpenDefaultApps),

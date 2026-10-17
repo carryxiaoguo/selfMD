@@ -127,8 +127,8 @@ export async function 处理样式表(
  * 在本机可用。若开启了图片内嵌，则由另一处把图片换成 data:。
  */
 export function 绝对化本地地址(docText: string, baseDir: string): string {
-  return docText.replace(/url\(\s*(['"]?)([^'")]+)\1\s*\)/gi, (整体, _引号, url: string) => {
-    if (/^(https?:|data:|file:|#)/i.test(url)) return 整体
+  return docText.replace(/url\(\s*(['"]?)([^'")]+)\1\s*\)/gi, (wholeText, _引号, url: string) => {
+    if (/^(https?:|data:|file:|#)/i.test(url)) return wholeText
     const whole = isAbsolute(url) ? url : join(baseDir, url)
     return `url("${pathToFileURL(whole).toString()}")`
   })

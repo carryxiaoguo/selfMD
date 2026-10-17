@@ -293,6 +293,21 @@ export function 处理块级(
       //     光标在行首按退格会整行去掉 `>`；文档里的字符一直都在，
       //     装饰只是不画出来，所以这个命令照常有效。
       上下文.条目.push({ from: 节点.from, to: 节点.to, deco: 隐藏, rank: 1 })
+      // **标记后面的空格也一起吃掉。**
+      // 只藏 `>` 的话，行首会剩下一个空格，整段文字比正文缩进一格——
+      // 肉眼看上去仍然"像还留着标记"。要干净就干净到底。
+      {
+        const 行 = 状态.doc.lineAt(节点.from)
+        const 空白 = /^[ \t]*/.exec(状态.sliceDoc(节点.to, 行.to))?.[0] ?? ''
+        if (空白.length > 0) {
+          上下文.条目.push({
+            from: 节点.to,
+            to: 节点.to + 空白.length,
+            deco: 隐藏,
+            rank: 1
+          })
+        }
+      }
       return true
     }
 

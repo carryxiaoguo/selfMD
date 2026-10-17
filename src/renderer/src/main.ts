@@ -28,7 +28,7 @@ import {
   设置标题级别
 } from './editor/commands'
 import { baseExtensions, modeExtensions } from './editor/setup'
-import { 继续代码围栏 } from './editor/commands'
+import { 继续代码围栏, 继续引用块 } from './editor/commands'
 import {
   在表格里,
   跳到相邻单元格,
@@ -3231,6 +3231,31 @@ async function openPath(path: string): Promise<void> {
           console.log(
             `[selfMD] 引用行文本：行数=${引用.length} 带引用符=${带符} ` +
               `全部=${JSON.stringify(引用.map((el) => (el.textContent ?? '').slice(0, 16)))}`
+          )
+        }
+      }
+
+      // 引用块里按回车：**框必须留着**。
+      //
+      // 标准 Markdown 会在空引用行上回车时撤掉 `>` 退出引用，但引用符现在
+      // 不显示了——"退出引用"在屏幕上就是"整个框凭空消失"。
+      // 这里真的按一次回车，看新行还在不在引用里。
+      {
+        const 引用 = Array.from(document.querySelectorAll('.cm-lp-quote'))
+        if (引用.length > 0) {
+          const 原文档 = view.state.doc.toString()
+          const 末 = view.state.doc.line(view.state.doc.lines)
+          view.dispatch({ selection: { anchor: 末.to } })
+          const 成功 = 继续引用块(view)
+          const 新末行 = view.state.doc.line(view.state.doc.lines).text
+          // 复原，别把后面的用例带偏
+          view.dispatch({
+            changes: { from: 0, to: view.state.doc.length, insert: 原文档 },
+            selection: { anchor: 0 }
+          })
+          console.log(
+            `[selfMD] 回车续引用：触发=${成功 ? '是' : '否'} ` +
+              `新行仍是引用=${/^\s*>/.test(新末行) ? '是' : `否(${JSON.stringify(新末行)})`}`
           )
         }
       }

@@ -409,6 +409,46 @@ export function 清除格式(view: EditorView): boolean {
 }
 
 /**
+ * 引用块里的回车：只加空行，**不撤掉 `>`**。
+ *
+ * ## 为什么要覆盖 CodeMirror 默认行为
+ *
+ * CM6 的 `insertNewlineContinueMarkup` 在空的引用行上按回车会**撤掉 `>`**
+ * 退出引用——那是标准 Markdown 做法。但引用符现在**不显示了**，
+ * 于是"退出引用"在屏幕上表现为**整个框凭空消失**：写着写着框没了，
+ * 用户完全不知道发生了什么。
+ *
+ * 参考的行为是：回车就把你带到下一行、仍然在引用里，框一直在。
+ * 想真的退出引用，在行首按退格（`deleteMarkupBackward` 认得引用上下文）。
+ *
+ * @returns 不在引用行上时返回 false，回车照常交给别的处理器
+ */
+export function 继续引用块(view: EditorView): boolean {
+  const 状态 = view.state
+  const 选区 = 状态.selection.main
+  if (!选区.empty) return false
+
+  const 行 = 状态.doc.lineAt(选区.head)
+  // 光标不在行尾：是在改这一行的内容，不是要开新行
+  if (选区.head !== 行.to) return false
+  // 光标之前的部分得**以引用前缀开头**：缩进 + 一层或多层 `>`。
+  // 注意这里**不能**用 `$` 锚定行尾——正文行是 `> 有字的一行`，
+  // 只匹配前缀即可，锚了 `$` 就永远匹配不上，命令等于没用。
+  const 匹配 = /^([ \t]*)((?:>[ \t]?)+)/.exec(状态.sliceDoc(行.from, 选区.head))
+  if (!匹配) return false
+
+  // 新行的前缀沿用原行：缩进 + 同样层数的 `>`，嵌套引用不会被压平
+  const 前缀 = 匹配[1] + 匹配[2]
+  view.dispatch({
+    changes: { from: 选区.head, insert: `\n${前缀}` },
+    selection: { anchor: 选区.head + 1 + 前缀.length },
+    scrollIntoView: true,
+    userEvent: 'input'
+  })
+  return true
+}
+
+/**
  * 在围栏首行按回车：补出闭合围栏，光标落进正文。
  *
  * ## 为什么要自己写

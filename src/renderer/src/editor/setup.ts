@@ -36,7 +36,7 @@ import { tags as t } from '@lezer/highlight'
 import type { Settings } from '@shared/types'
 import { livePreview } from './live-preview'
 import { 按设置构建智能标点 } from './smart-punctuation'
-import { 继续代码围栏, 跳出代码块 } from './commands'
+import { 继续代码围栏, 继续引用块, 跳出代码块 } from './commands'
 import { 跳到相邻单元格 } from './表格'
 
 /**
@@ -220,6 +220,7 @@ export function baseExtensions(options: EditorOptions): Extension[] {
       { key: 'Escape', run: 跳出代码块 },
       // 围栏首行按回车补出闭合围栏。**同样必须排在 markdown 的键位表之前**：
       // 它那边的 Enter 在围栏内虽然什么也不做，但仍然会先被调用、先返回。
+      { key: 'Enter', run: 继续引用块 },
       { key: 'Enter', run: 继续代码围栏 },
       // 表格内 Tab / Shift+Tab 走单元格，不走缩进。
       // **必须排在 `indentWithTab` 之前**——后者会把 Tab 吃掉当缩进。

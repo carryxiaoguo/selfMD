@@ -390,8 +390,11 @@ body.live-preview .cm-md-marker-hidden {
   font-family: var(--code-font, var(--font-mono));
   font-size: 0.92em;
   color: var(--code-text);
-  /* 左侧色带：比四周描边轻，但足以把代码块从正文里"切"出来 */
-  border-left: 3px solid var(--code-edge, var(--border));
+  /* 左侧色带用 **inset 阴影**画，不用 border-left。
+     border 会把内容盒往里推 3px，而头部栏所在的那一行没有 border，
+     两者就错开了——实测 头=193 码=190，肉眼能看出"头是头、身是身"。
+     inset 阴影不占盒尺寸，两行的内容盒一样宽，天然对齐。 */
+  box-shadow: inset 3px 0 0 var(--code-edge, var(--border));
   /* 行号与代码之间留出左内边距，数字才有地方站 */
   padding-left: 0.55em !important;
 }
@@ -548,8 +551,12 @@ body.live-preview .cm-md-marker-hidden {
   background: transparent;
   padding-top: 0 !important;
   padding-bottom: 0 !important;
+  /* 头部栏自带左右内边距，行这一层不能再加，否则又错开一截 */
+  padding-left: 0 !important;
   line-height: 0;
   font-size: 0;
+  /* 头部栏自己画色带，行这一层不画，免得边上出现两条竖线 */
+  box-shadow: none;
   /* 头部栏自带下边框，行本身不要再画一条，否则叠成双线 */
   border-bottom: none;
 }

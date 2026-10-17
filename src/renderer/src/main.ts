@@ -969,6 +969,9 @@ function 构建编辑器右键菜单(): 菜单项[] {
       子项: [
         转('image.insertLocal', '插入本地图片'),
         转('image.insertFromUrl', '插入网络图片'),
+        // 插入表格放在这里，**不挂在"光标已在表格内"的子菜单里**。
+        // 那个子菜单是给增删行列用的，插入表格恰恰是"当前不在表格里"时才需要。
+        转('para.table', '插入表格', 'Ctrl+Shift+T'),
         { 分隔: true },
         转('edit.copyAsMarkdown', '复制为 Markdown'),
         转('edit.copyAsHtmlCode', '复制为 HTML 代码'),
@@ -1289,6 +1292,23 @@ async function 运行代码块头部自测(): Promise<string> {
       )
     } else {
       结果.push('左留白=元素缺失')
+    }
+  }
+
+  // 头部栏必须与下面的代码块**左右对齐**：它俩是同一个卡片的两部分，
+  // 差几个像素就会看出"头是头、身是身"。分别量左右沿，才知道该收还是该扩。
+  {
+    const 头 = document.querySelector('.cm-w-codehead') as HTMLElement | null
+    const 代码行 = document.querySelector('.cm-lp-code[data-行号]') as HTMLElement | null
+    if (头 && 代码行) {
+      const 头框 = 头.getBoundingClientRect()
+      const 码框 = 代码行.getBoundingClientRect()
+      结果.push(
+        `对齐 头=${Math.round(头框.left)}~${Math.round(头框.right)} ` +
+          `码=${Math.round(码框.left)}~${Math.round(码框.right)}`
+      )
+    } else {
+      结果.push('对齐=元素缺失')
     }
   }
 

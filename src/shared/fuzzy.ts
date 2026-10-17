@@ -29,7 +29,7 @@ export function fuzzyScore(query: string, docText: string): number | null {
   // 完全包含时给一个很高的底分：这是最强的信号，不该被字符级评分超过
   const directPos = lowText.indexOf(lowQuery)
   if (directPos >= 0) {
-    return 1000 + 连续奖励(docText, directPos, query.length) - directPos
+    return 1000 + consecutiveBonus(docText, directPos, query.length) - directPos
   }
 
   // 退化到子序列匹配
@@ -64,7 +64,7 @@ function isWordStart(docText: string, position: number): boolean {
 }
 
 /** 连续匹配的奖励：连着命中越多，加分越高。 */
-function 连续奖励(docText: string, position: number, length: number): number {
+function consecutiveBonus(docText: string, position: number, length: number): number {
   let score = length * 2
   if (isWordStart(docText, position)) score += 10
   return score
@@ -85,7 +85,7 @@ export interface candidate<T> {
 export function fuzzyFilter<T>(
   query: string,
   candidates: candidate<T>[],
-  取末段: (docText: string) => string,
+  takeLastSegment: (docText: string) => string,
   limit = 50
 ): T[] {
   if (query.trim().length === 0) {
@@ -97,7 +97,7 @@ export function fuzzyFilter<T>(
 
   for (const candidate of candidates) {
     const totalScoreValue = fuzzyScore(querySegment, candidate.docText)
-    const segmentScore = fuzzyScore(querySegment, 取末段(candidate.docText))
+    const segmentScore = fuzzyScore(querySegment, takeLastSegment(candidate.docText))
 
     // 两处都不匹配就淘汰
     if (totalScoreValue === null && segmentScore === null) continue

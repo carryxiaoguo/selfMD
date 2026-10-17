@@ -66,7 +66,7 @@ export function readFrontMatter(docText: string): frontMatter {
 }
 
 /** 把值序列化成可以安全放进 YAML 的形态。 */
-function 序列化值(value: string): string {
+function serializedValue(value: string): string {
   // 含特殊字符时加双引号，避免被解析成列表或注释。
   if (value === '' || /[:#\-[\]{}&*!|>'"%@`]/.test(value) || /^\s|\s$/.test(value)) {
     return JSON.stringify(value)
@@ -82,7 +82,7 @@ function 序列化值(value: string): string {
  */
 export function setAttr(docText: string, key: string, value: string): string {
   const meta = readFrontMatter(docText)
-  const newLine = `${key}: ${序列化值(value)}`
+  const newLine = `${key}: ${serializedValue(value)}`
 
   if (!meta.exists) {
     return `---\n${newLine}\n---\n\n${docText}`

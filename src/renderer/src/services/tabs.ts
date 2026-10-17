@@ -32,7 +32,7 @@ export interface label {
 export class tabManager {
   private tabs: label[] = []
   private currentIndex = -1
-  private 下一个标识 = 1
+  private nextId = 1
   /** 最近关闭的标签，用于"重新打开关闭的文件"。后进先出。 */
   private closed: { state: DocState; content: string }[] = []
 
@@ -53,7 +53,7 @@ export class tabManager {
     return this.tabs.length > 1
   }
 
-  get 可以重开(): boolean {
+  get canReopen(): boolean {
     return this.closed.length > 0
   }
 
@@ -82,7 +82,7 @@ export class tabManager {
    * @param 编辑器状态 该文档的编辑器状态（含历史）
    */
   addTo(state: DocState, editorState: EditorState): label {
-    const label: label = { id: this.下一个标识++, state, editorState }
+    const label: label = { id: this.nextId++, state, editorState }
     // 插在当前标签之后，而不是追加到末尾——这样"新建"出来的标签
     // 就在手边，符合浏览器的行为习惯。
     this.tabs.splice(this.currentIndex + 1, 0, label)
@@ -156,12 +156,12 @@ export class tabManager {
   }
 
   /** 取回最近关闭的一个（后进先出）。 */
-  取出已关闭(): { state: DocState; content: string } | null {
+  takeClosed(): { state: DocState; content: string } | null {
     return this.closed.pop() ?? null
   }
 
   /** 按路径找已经打开的标签；用于"同一个文件不要开两遍"。 */
-  按路径找(filePath: string): label | null {
+  findByPath(filePath: string): label | null {
     return this.tabs.find((t) => t.state.path === filePath) ?? null
   }
 }

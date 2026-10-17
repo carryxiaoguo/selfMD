@@ -554,7 +554,7 @@ export async function runExport(options: ExportOptions): Promise<exportResult> {
 }
 
 /** 供自测使用：直接拿一段 Markdown 生成 HTML，不落盘。 */
-export async function 试渲染(source: string, format: exportFormat = 'html'): Promise<string> {
+export async function tryRender(source: string, format: exportFormat = 'html'): Promise<string> {
   return buildExportHtml({
     source,
     target: '',

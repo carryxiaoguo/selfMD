@@ -97,7 +97,7 @@ export async function openDefaultAppsSetting(): Promise<void> {
 }
 
 /** 让资源管理器重新读一遍关联（改完注册表后不刷新会看不到变化）。 */
-export function 通知外壳刷新(): void {
+export function notifyShell(): void {
   if (process.platform !== 'win32') return
   try {
     // SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, 0, 0)

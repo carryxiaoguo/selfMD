@@ -25,12 +25,12 @@ import {
 // 代码围栏的语言标签
 // ---------------------------------------------------------------------------
 
-export class 语言标签 extends WidgetType {
+export class langLabel extends WidgetType {
   constructor(readonly language: string) {
     super()
   }
 
-  override eq(other: 语言标签): boolean {
+  override eq(other: langLabel): boolean {
     return other.language === this.language
   }
 
@@ -92,7 +92,7 @@ export interface CodeBlockPos {
  *
  * （与它相反的是任务复选框——那边返回 `false`，靠 `preventDefault` 自行处理。）
  */
-export class 代码块头部 extends WidgetType {
+export class codeHeader extends WidgetType {
   constructor(
     readonly info: FenceInfo,
     readonly position: CodeBlockPos
@@ -100,7 +100,7 @@ export class 代码块头部 extends WidgetType {
     super()
   }
 
-  override eq(other: 代码块头部): boolean {
+  override eq(other: codeHeader): boolean {
     return (
       other.info.language === this.info.language &&
       other.info.displayName === this.info.displayName &&
@@ -296,12 +296,12 @@ export class calloutHint extends WidgetType {
 /** 按嵌套层级给出的项目符号，与常见 Markdown 渲染器的约定一致。 */
 const bulletGlyph = ['•', '◦', '▪']
 
-export class 列表圆点 extends WidgetType {
+export class bulletDot extends WidgetType {
   constructor(readonly layer: number) {
     super()
   }
 
-  override eq(other: 列表圆点): boolean {
+  override eq(other: bulletDot): boolean {
     return other.layer === this.layer
   }
 
@@ -489,9 +489,9 @@ export class taskBox extends WidgetType {
 // 水平线
 // ---------------------------------------------------------------------------
 
-export class 水平线 extends WidgetType {
-  override eq(other: 水平线): boolean {
-    return other instanceof 水平线
+export class horizontalRuleEl extends WidgetType {
+  override eq(other: horizontalRuleEl): boolean {
+    return other instanceof horizontalRuleEl
   }
 
   override toDOM(): HTMLElement {
@@ -584,7 +584,7 @@ async function ensureInit(theme: 'default' | 'dark'): Promise<typeof import('mer
  * （"Parse error on line 3"），用户需要对照源码才能找出问题；
  * 只显示一句错误提示等于让人去猜。
  */
-export class 图表 extends WidgetType {
+export class diagramWidget extends WidgetType {
   constructor(
     readonly sourceCode: string,
     readonly darkMode: boolean,
@@ -594,7 +594,7 @@ export class 图表 extends WidgetType {
     super()
   }
 
-  override eq(other: 图表): boolean {
+  override eq(other: diagramWidget): boolean {
     return other.sourceCode === this.sourceCode && other.darkMode === this.darkMode
   }
 
@@ -694,7 +694,7 @@ async function loadKatex(): Promise<{ render: typeof import('katex').default.ren
  * 原样显示，用户立刻看得到错在哪。抛异常的话整个 widget 构建失败，
  * 屏幕上什么都不剩——正在编辑的公式突然消失，比显示一段红字糟得多。
  */
-export class 数学公式 extends WidgetType {
+export class mathWidget extends WidgetType {
   constructor(
     readonly formula: string,
     readonly blockLevel: boolean
@@ -702,7 +702,7 @@ export class 数学公式 extends WidgetType {
     super()
   }
 
-  override eq(other: 数学公式): boolean {
+  override eq(other: mathWidget): boolean {
     return other.formula === this.formula && other.blockLevel === this.blockLevel
   }
 

@@ -45,7 +45,7 @@ export function applySpellDict(settings: Settings): void {
 }
 
 /** 当前系统上可用的词典语言，供设置面板展示。 */
-export function 可用词典(): string[] {
+export function availableDicts(): string[] {
   try {
     return session.defaultSession.availableSpellCheckerLanguages
   } catch {

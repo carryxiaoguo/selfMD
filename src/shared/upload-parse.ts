@@ -22,7 +22,7 @@ import type { uploaderType } from './types'
  */
 
 /** 带协议的地址。 */
-const 带协议 = /^(?:https?|ftp|file):\/\//i
+const hasProtocol = /^(?:https?|ftp|file):\/\//i
 
 /**
  * 裸域名 + 路径，例如 `img.example.com/2024/a.png`。
@@ -30,14 +30,14 @@ const 带协议 = /^(?:https?|ftp|file):\/\//i
  * 要求至少有一个点分段，且**必须带路径斜杠**——不带斜杠的裸域名太容易与
  * 普通名词混淆（`readme.md` 就会被误判成域名），会引入误报。
  */
-const 裸域名 = /^[a-z0-9]+(?:[-.][a-z0-9]+)*\.[a-z]{2,5}\/.+$/i
+const bareDomain = /^[a-z0-9]+(?:[-.][a-z0-9]+)*\.[a-z]{2,5}\/.+$/i
 
 /** 判断一行是不是图片地址；是则返回规范化后的地址。 */
-export function 识别地址行(line: string): string | null {
+export function detectUrlLine(line: string): string | null {
   const docText = line.trim()
   if (docText.length === 0) return null
-  if (带协议.test(docText)) return docText
-  if (裸域名.test(docText)) return `http://${docText}`
+  if (hasProtocol.test(docText)) return docText
+  if (bareDomain.test(docText)) return `http://${docText}`
   return null
 }
 
@@ -52,7 +52,7 @@ export function parseCliOutput(output: string): string[] {
   const result: string[] = []
 
   for (let i = lines.length - 1; i >= 0; i--) {
-    const url = 识别地址行(lines[i] ?? '')
+    const url = detectUrlLine(lines[i] ?? '')
     if (url) {
       result.unshift(url) // 从后往前扫，所以往前插，最终保持原有顺序
       continue
@@ -68,7 +68,7 @@ export function parseCliOutput(output: string): string[] {
   return result
 }
 
-export interface 上传应答 {
+export interface uploadResponse {
   success?: boolean
   result?: string[] | string
   msg?: string
@@ -76,9 +76,9 @@ export interface 上传应答 {
 }
 
 /** 把 PicGo 的 JSON 应答转成地址数组。 */
-function 解析JSON应答(docText: string): string[] | null {
+function parseJsonResponse(docText: string): string[] | null {
   try {
-    const data = JSON.parse(docText) as 上传应答
+    const data = JSON.parse(docText) as uploadResponse
     if (data.success === false) return []
     const original = data.result
     if (Array.isArray(original)) return original.filter((item) => typeof item === 'string')
@@ -102,11 +102,11 @@ export function parseUploadResult(
   uploader: uploaderType,
   expectedCount: number
 ): { url: string[]; error: string | null } {
-  const 用JSON = uploader === 'picgo-app' || uploader === 'piclist-app'
+  const useJson = uploader === 'picgo-app' || uploader === 'piclist-app'
 
   let url: string[] = []
-  if (用JSON) {
-    const jsonResult = 解析JSON应答(output)
+  if (useJson) {
+    const jsonResult = parseJsonResponse(output)
     if (jsonResult !== null) url = jsonResult
     else url = parseCliOutput(output)
   } else {

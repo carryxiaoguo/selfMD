@@ -63,15 +63,15 @@ export function handleInline(
       return true
 
     case 'StrongEmphasis':
-      context.entry.push({ from: node.from, to: node.to, deco: inlineStyles.加粗, rank: 0 })
+      context.entry.push({ from: node.from, to: node.to, deco: inlineStyles.strongMark, rank: 0 })
       return true
 
     case 'Strikethrough':
-      context.entry.push({ from: node.from, to: node.to, deco: inlineStyles.删除线, rank: 0 })
+      context.entry.push({ from: node.from, to: node.to, deco: inlineStyles.strikeMark, rank: 0 })
       return true
 
     case 'InlineCode':
-      context.entry.push({ from: node.from, to: node.to, deco: inlineStyles.行内代码, rank: 0 })
+      context.entry.push({ from: node.from, to: node.to, deco: inlineStyles.inlineCodeMark, rank: 0 })
       return true
 
     case 'Link':

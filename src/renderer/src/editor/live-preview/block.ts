@@ -13,13 +13,13 @@ import {
 import type { BuildContext, SyntaxNode } from './types'
 import { addLineDeco, inlineMathEnabled, typographyEnabled } from './types'
 import {
-  列表圆点,
-  水平线,
-  数学公式,
+  bulletDot,
+  horizontalRuleEl,
+  mathWidget,
   tableSeparatorDeco,
   taskBox,
-  语言标签,
-  代码块头部,
+  langLabel,
+  codeHeader,
   calloutHint,
   computeLevel
 } from './widgets'
@@ -187,7 +187,7 @@ export function handleBlock(
           context.entry.push({
             from: range.from,
             to: range.to + 1, // 含结尾的 `$`
-            deco: replaceWith(new 数学公式(range.formula, false)),
+            deco: replaceWith(new mathWidget(range.formula, false)),
             rank: 2
           })
         }
@@ -320,7 +320,7 @@ export function handleBlock(
           context.entry.push({
             from: node.from,
             to: node.to,
-            deco: replaceWith(new 列表圆点(computeLevel(state, node.from))),
+            deco: replaceWith(new bulletDot(computeLevel(state, node.from))),
             rank: 1
           })
         }
@@ -371,7 +371,7 @@ export function handleBlock(
           from: firstLine.from,
           to: firstLine.to,
           deco: replaceWith(
-            new 代码块头部(info, {
+            new codeHeader(info, {
               fenceStart: node.from,
               fenceEnd: node.to,
               firstLineStart: firstLine.from
@@ -437,7 +437,7 @@ export function handleBlock(
       context.entry.push({
         from: lineEnd,
         to: lineEnd,
-        deco: insert(new 语言标签(language || '文本'), 1),
+        deco: insert(new langLabel(language || '文本'), 1),
         rank: 2
       })
       return true
@@ -451,7 +451,7 @@ export function handleBlock(
         context.entry.push({
           from: node.from,
           to: node.to,
-          deco: replaceWith(new 水平线()),
+          deco: replaceWith(new horizontalRuleEl()),
           rank: 1
         })
       }

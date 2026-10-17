@@ -12,12 +12,12 @@ import { DEFAULT_SETTINGS, type Settings } from './types'
  * 通用 / 编辑器 / 图片 / 保存与恢复 / 导出。
  */
 
-export type 设置项类型 = '开关' | '下拉' | '数字' | '文本' | '列表'
+export type SettingKind = '开关' | '下拉' | '数字' | '文本' | '列表'
 
 export interface SettingItem {
   /** 必须是 Settings 的键。 */
   key: keyof Settings
-  kind: 设置项类型
+  kind: SettingKind
   label: string
   /** 灰色小字说明。 */
   description?: string
@@ -30,20 +30,20 @@ export interface SettingItem {
   unit?: string
 }
 
-export interface 设置小节 {
+export interface SettingSection {
   /** 小节标题；同一分区里连续的小节可以省略标题，靠视觉间距分组。 */
   title?: string
   description?: string
   item: SettingItem[]
 }
 
-export interface 设置分区 {
+export interface SettingGroup {
   title: string
-  subsection: 设置小节[]
+  subsection: SettingSection[]
 }
 
 /** 各分区的中文标题。 */
-export const PrefsSchema: 设置分区[] = [
+export const PrefsSchema: SettingGroup[] = [
   {
     title: '通用',
     subsection: [
@@ -490,8 +490,8 @@ export function allSettingItems(): SettingItem[] {
  * 而不是让用户点一个永远没反应的开关。
  */
 export function validateSchema(): string[] {
-  const 已知 = new Set(Object.keys(DEFAULT_SETTINGS))
+  const knownFlag = new Set(Object.keys(DEFAULT_SETTINGS))
   return allSettingItems()
     .map((item) => item.key as string)
-    .filter((key) => !已知.has(key))
+    .filter((key) => !knownFlag.has(key))
 }

@@ -36,7 +36,7 @@ export function replaceWith(widget: WidgetType): Decoration {
  *
  * 另外，块级替换的区间**必须落在行边界上**，否则同样会被拒绝。
  */
-export function 块级替换为(widget: WidgetType): Decoration {
+export function replaceBlockWith(widget: WidgetType): Decoration {
   return Decoration.replace({ widget, block: true })
 }
 
@@ -76,12 +76,12 @@ export function typographyDeco(show: string): Decoration {
 
 export const inlineStyles = {
   emphasisMark: Decoration.mark({ class: 'cm-md-emphasis' }),
-  加粗: Decoration.mark({ class: 'cm-md-strong' }),
-  删除线: Decoration.mark({ class: 'cm-md-strikethrough' }),
-  行内代码: Decoration.mark({ class: 'cm-md-code' }),
+  strongMark: Decoration.mark({ class: 'cm-md-strong' }),
+  strikeMark: Decoration.mark({ class: 'cm-md-strikethrough' }),
+  inlineCodeMark: Decoration.mark({ class: 'cm-md-code' }),
   linkTextMark: Decoration.mark({ class: 'cm-md-link' }),
   linkUrlMark: Decoration.mark({ class: 'cm-md-url' }),
-  引用文字: Decoration.mark({ class: 'cm-md-quote' }),
+  quoteTextDeco: Decoration.mark({ class: 'cm-md-quote' }),
   refDefinition: Decoration.mark({ class: 'cm-md-refdef' }),
   HTML: Decoration.mark({ class: 'cm-md-html' })
 } as const
@@ -90,12 +90,12 @@ export const inlineStyles = {
 // 块级：行装饰
 // ---------------------------------------------------------------------------
 
-const 标题行 = [1, 2, 3, 4, 5, 6].map((levelNo) =>
+const headingLineRow = [1, 2, 3, 4, 5, 6].map((levelNo) =>
   Decoration.line({ class: `cm-lp-heading cm-lp-h${levelNo}` })
 )
 
 export function headingLineDeco(levelNo: number): Decoration {
-  return 标题行[Math.min(6, Math.max(1, levelNo)) - 1]
+  return headingLineRow[Math.min(6, Math.max(1, levelNo)) - 1]
 }
 
 export const blockLineStyles = {
@@ -115,9 +115,9 @@ export const blockLineStyles = {
   // 注意：这只能兼容**基于类名**的规则。针对真实标签写的
   // `#write h1 { … }` 在本项目里永远不会命中——CodeMirror 的内容是一堆
   // div，没有 h1 元素。这一点在 报告里写明了，不能假装全兼容。
-  代码块首行: Decoration.line({ class: 'cm-lp-code cm-lp-code-first md-fences' }),
-  代码块中间行: Decoration.line({ class: 'cm-lp-code md-fences' }),
-  代码块末行: Decoration.line({ class: 'cm-lp-code cm-lp-code-last md-fences' }),
+  codeFirstLine: Decoration.line({ class: 'cm-lp-code cm-lp-code-first md-fences' }),
+  codeMiddleLine: Decoration.line({ class: 'cm-lp-code md-fences' }),
+  codeLastLine: Decoration.line({ class: 'cm-lp-code cm-lp-code-last md-fences' }),
   taskItemLine: Decoration.line({ class: 'md-task-list-item' }),
   frontMatter: Decoration.line({ class: 'cm-lp-frontmatter' }),
   mathBlock: Decoration.line({ class: 'cm-lp-math md-math-block' }),

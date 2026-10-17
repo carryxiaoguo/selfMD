@@ -61,12 +61,12 @@ export function decodeLocalToken(token: string): string | null {
  * 这个函数用于需要绝对地址的场合。
  */
 export function themeFileUrl(relativeTo: string): string {
-  const 安全 = relativeTo
+  const safeFlag = relativeTo
     .split('/')
     .filter((segment) => segment.length > 0 && segment !== '.' && segment !== '..')
     .map((segment) => encodeURIComponent(segment))
     .join('/')
-  return `${PROTOCOL_SCHEME}://theme/${安全}`
+  return `${PROTOCOL_SCHEME}://theme/${safeFlag}`
 }
 
 /** 全局自定义 CSS（对所有主题生效）。 */

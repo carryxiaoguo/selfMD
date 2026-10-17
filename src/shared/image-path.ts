@@ -22,13 +22,13 @@ export function isAbsolute(filePath: string): boolean {
  * 在 Windows 上直接变成另一个位置。
  */
 export function normalizePath(filePath: string): string {
-  const 有UNC前缀 = /^[\\/]{2}[^\\/]/.test(filePath)
+  const hasUncPrefix = /^[\\/]{2}[^\\/]/.test(filePath)
   let result = filePath
     .replace(/\\/g, '/')
     .replace(/\/\.\//g, '/')
     .replace(/^\.\//, '')
     .replace(/\/{2,}/g, '/')
-  if (有UNC前缀 && !result.startsWith('//')) result = `/${result}`
+  if (hasUncPrefix && !result.startsWith('//')) result = `/${result}`
   return result
 }
 
@@ -71,7 +71,7 @@ export function takeDir(filePath: string): string {
 export function uniqueFileName(
   expectedName: string,
   /** 询问"该名字是否已被占用"。由调用方注入，便于测试与异步实现。 */
-  alreadyExists: (候选名: string) => boolean
+  alreadyExists: (candidateName: string) => boolean
 ): string {
   if (!alreadyExists(expectedName)) return expectedName
 
@@ -115,8 +115,8 @@ export function extByKind(kind: string | null | undefined): string | null {
     'image/tiff': '.tiff',
     'image/avif': '.avif'
   }
-  const 主类型 = kind.split(';')[0].trim().toLowerCase()
-  return tbl[主类型] ?? null
+  const mainKind = kind.split(';')[0].trim().toLowerCase()
+  return tbl[mainKind] ?? null
 }
 
 /** 由文件名推断 MIME 类型；无法识别时返回 null。 */

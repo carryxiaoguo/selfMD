@@ -170,7 +170,7 @@ export class prefsPanelEl {
     content.textContent = ''
 
     if (this.searchTerm !== '') {
-      this.渲染搜索结果(content)
+      this.renderSearchResults(content)
       return
     }
 
@@ -196,8 +196,8 @@ export class prefsPanelEl {
     }
   }
 
-  private 渲染搜索结果(content: HTMLElement): void {
-    const 词 = this.searchTerm.toLowerCase()
+  private renderSearchResults(content: HTMLElement): void {
+    const wordText = this.searchTerm.toLowerCase()
     const block = document.createElement('div')
     block.className = 'prefs-section'
 
@@ -206,7 +206,7 @@ export class prefsPanelEl {
       for (const subsection of section.subsection) {
         for (const item of subsection.item) {
           const whole = `${item.label} ${item.description ?? ''} ${String(item.key)}`.toLowerCase()
-          if (!whole.includes(词)) continue
+          if (!whole.includes(wordText)) continue
           hit++
           // 搜索时带上分区名，否则用户不知道这一项属于哪里
           const line = this.renderOneLine(item, section.title)
@@ -256,13 +256,13 @@ export class prefsPanelEl {
 
     const controlArea = document.createElement('div')
     controlArea.className = 'prefs-control'
-    controlArea.append(this.渲染控件(item))
+    controlArea.append(this.renderControl(item))
 
     line.append(tabArea, controlArea)
     return line
   }
 
-  private 渲染控件(item: SettingItem): HTMLElement {
+  private renderControl(item: SettingItem): HTMLElement {
     const settings = this.deps.takeSettings()
     const currentValue = settings[item.key]
 

@@ -8,7 +8,7 @@
  * 刻意不引入 UI 框架：整个输入框只有几十行 DOM 操作，用框架反而要牵进构建配置。
  */
 
-export interface 询问选项 {
+export interface promptOptions {
   title: string
   /** 初始值。 */
   initialValue?: string
@@ -21,7 +21,7 @@ export interface 询问选项 {
 }
 
 /** 打开一个输入框；用户取消时返回 null。 */
-export function promptText(options: 询问选项): Promise<string | null> {
+export function promptText(options: promptOptions): Promise<string | null> {
   return new Promise((done) => {
     const overlay = document.createElement('div')
     overlay.className = 'selfmd-modal-mask'

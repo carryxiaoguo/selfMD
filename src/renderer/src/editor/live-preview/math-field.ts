@@ -2,7 +2,7 @@ import { RangeSet, StateField, type EditorState } from '@codemirror/state'
 import { Decoration, EditorView, type DecorationSet } from '@codemirror/view'
 import { findBlockMath } from '@shared/math'
 import { detectMathBlock } from './block'
-import { 数学公式 } from './widgets'
+import { mathWidget } from './widgets'
 
 /**
  * 块级数学公式的替换装饰。
@@ -46,7 +46,7 @@ function buildFormula(state: EditorState): DecorationSet {
 
     range.push(
       Decoration.replace({
-        widget: new 数学公式(formula, true),
+        widget: new mathWidget(formula, true),
         block: true,
         // 块级替换**必须落在行边界上**，否则 CodeMirror 会拒绝。
         // 检测数学块返回的 from/to 正是行首与行尾，这里天然满足。

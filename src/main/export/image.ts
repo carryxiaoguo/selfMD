@@ -142,7 +142,7 @@ export async function copyAsImage(
 }
 
 /** 供自测使用：把图片存到磁盘，避免测试污染用户剪贴板。 */
-export function 存图片到(filePath: string): boolean {
+export function saveImageTo(filePath: string): boolean {
   const img = clipboard.readImage()
   if (img.isEmpty()) return false
   try {

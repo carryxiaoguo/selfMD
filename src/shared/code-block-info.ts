@@ -52,13 +52,13 @@ export const styleOrder: codeBlockStyleName[] = ['follow', 'light', 'dark']
  * 最后一位统一是 `monospace`，保证再差也有等宽兜底——代码用比例字体排版
  * 会让缩进完全失去意义。
  */
-export interface 字体项 {
+export interface fontEntry {
   value: string
   name: string
   family: string
 }
 
-export const BUILTIN_FONTS: 字体项[] = [
+export const BUILTIN_FONTS: fontEntry[] = [
   { value: 'follow', name: '跟随主题', family: '' },
   { value: 'consolas', name: 'Consolas', family: 'Consolas, "Courier New", monospace' },
   {
@@ -91,7 +91,7 @@ export const BUILTIN_FONTS: 字体项[] = [
   { value: 'courier', name: 'Courier New', family: '"Courier New", monospace' }
 ]
 
-const 字体值表 = new Set(BUILTIN_FONTS.map((item) => item.value))
+const FONT_VALUE_SET = new Set(BUILTIN_FONTS.map((item) => item.value))
 
 export interface FenceInfo {
   language: string
@@ -106,7 +106,7 @@ function tidy(docText: string): string {
   return docText.trim().replace(/\s+/g, ' ')
 }
 
-function 是样式名(value: string): value is codeBlockStyleName {
+function isStyleName(value: string): value is codeBlockStyleName {
   return value === 'follow' || value === 'light' || value === 'dark'
 }
 
@@ -131,13 +131,13 @@ export function parseFenceInfo(rawValue: string): FenceInfo {
       const key = piece.slice(0, eqSign).toLowerCase()
       const value = piece.slice(eqSign + 1)
       if (key === 'style') {
-        if (是样式名(value)) style = value
+        if (isStyleName(value)) style = value
         // 认不出的样式值直接忽略，而不是把它当成名称的一部分——
         // 否则名称里会莫名其妙多出一截 `style=xxx`
         continue
       }
       if (key === 'font') {
-        if (字体值表.has(value)) font = value
+        if (FONT_VALUE_SET.has(value)) font = value
         // 同上：认不出的字体标识不该混进名称里
         continue
       }

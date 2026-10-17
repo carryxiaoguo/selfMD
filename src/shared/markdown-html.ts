@@ -19,7 +19,7 @@ const parserRef = parser.configure([Table, TaskList, Strikethrough, Autolink])
 
 export interface renderOptions {
   /** 代码块的语言类名前缀，默认 `language-`。 */
-  语言类前缀?: string
+  langClassPrefix?: string
 }
 
 /** HTML 文本转义。`&` 必须最先替换，否则会把后面生成的实体再转一次。 */
@@ -51,11 +51,11 @@ const markNode = new Set([
 ])
 
 /** 标题节点：内容需要去掉首尾空白。 */
-const 标题模式 = /^(?:ATX|Setext)Heading(\d)$/
+const headingPattern = /^(?:ATX|Setext)Heading(\d)$/
 
 /** 取节点对应的 HTML 标签；返回 null 表示"只递归子节点，不包标签"。 */
-function 标签名(节点名: string): string | null {
-  switch (节点名) {
+function tagNameText(nodeNameText: string): string | null {
+  switch (nodeNameText) {
     case 'Paragraph':
       return 'p'
     case 'ATXHeading1':
@@ -117,7 +117,7 @@ function recursive(node: any, context: context): void {
   }
 }
 
-function 取语言(node: any, context: context): string {
+function takeLanguage(node: any, context: context): string {
   // CodeInfo 是围栏后面那串语言标识，取它并去掉首尾空白
   for (let child = node.firstChild; child; child = child.nextSibling) {
     if (child.name === 'CodeInfo') {
@@ -142,11 +142,11 @@ function handle(node: any, context: context): void {
     // ---------------------------------------------------------- 代码块 --
     case 'FencedCode':
     case 'IndentedCode': {
-      const language = name === 'FencedCode' ? 取语言(node, context) : ''
-      const cls = language ? ` class="${escapeAttr((options.语言类前缀 ?? 'language-') + language)}"` : ''
+      const language = name === 'FencedCode' ? takeLanguage(node, context) : ''
+      const cls = language ? ` class="${escapeAttr((options.langClassPrefix ?? 'language-') + language)}"` : ''
       // CodeText 是正文，逐段取；围栏符号本身是 CodeMark，已被跳过
       output.push(`<pre><code${cls}>`)
-      收集代码文本(node, context)
+      collectCodeText(node, context)
       output.push('</code></pre>\n')
       return
     }
@@ -168,7 +168,7 @@ function handle(node: any, context: context): void {
     // ------------------------------------------------------------ 图片 --
     case 'Image': {
       const url = takeLinkUrl(node, context)
-      const substitute = 取图片替代文本(node, context)
+      const substitute = takeImageAltText(node, context)
       output.push(`<img src="${escapeAttr(url)}" alt="${escapeAttr(substitute)}"`)
       const title = takeLinkTitle(node, context)
       if (title) output.push(` title="${escapeAttr(title)}"`)
@@ -188,7 +188,7 @@ function handle(node: any, context: context): void {
       // `URL` 与 `LinkTitle` 也是 Link 的子节点，无差别递归会把它们当正文
       // 再输出一遍，得到 `<a href="…">链接https://…"标题"</a>`——
       // 靠肉眼看导出的 HTML 很难第一时间发现。
-      渲染链接文字(node, context)
+      renderLinkText(node, context)
       output.push('</a>')
       return
     }
@@ -216,7 +216,7 @@ function handle(node: any, context: context): void {
 
     case 'Task': {
       // 任务项：`- [x] 内容`。复选框是禁用状态，导出后不可交互。
-      const mark = 找任务标记(node, context)
+      const mark = findTaskMark(node, context)
       const checked = /\[[xX]\]/.test(mark)
       output.push(`<input type="checkbox" disabled${checked ? ' checked' : ''}> `)
       recursive(node, context)
@@ -277,7 +277,7 @@ function handle(node: any, context: context): void {
   // "子节点之间的空隙"里，直接输出会得到 `<h1> 标题一</h1>`。
   // Setext 标题更麻烦——它的下划线是末尾的 HeaderMark，正文前后还各有一个换行。
   // 所以先把内容渲染到临时缓冲，再整体去掉首尾空白。
-  const headingMatch = 标题模式.exec(name)
+  const headingMatch = headingPattern.exec(name)
   if (headingMatch) {
     const childBuffer: string[] = []
     recursive(node, { ...context, output: childBuffer })
@@ -285,7 +285,7 @@ function handle(node: any, context: context): void {
     return
   }
 
-  const label = 标签名(name)
+  const label = tagNameText(name)
   if (label) {
     const blockLevel = ['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote', 'ul', 'li'].includes(label)
     output.push(`<${label}>`)
@@ -300,7 +300,7 @@ function handle(node: any, context: context): void {
 }
 
 /** 代码块内容：只取 CodeText 子节点，避免把围栏符号也当内容。 */
-function 收集代码文本(node: any, context: context): void {
+function collectCodeText(node: any, context: context): void {
   let hasContent = false
   for (let child = node.firstChild; child; child = child.nextSibling) {
     if (child.name === 'CodeText') {
@@ -319,7 +319,7 @@ function 收集代码文本(node: any, context: context): void {
   }
 }
 
-function 找任务标记(node: any, context: context): string {
+function findTaskMark(node: any, context: context): string {
   for (let child = node.firstChild; child; child = child.nextSibling) {
     if (child.name === 'TaskMarker') return context.source.slice(child.from, child.to)
   }
@@ -332,7 +332,7 @@ function 找任务标记(node: any, context: context): string {
  * 遇到 `URL` 或 `LinkTitle` 就停——它们属于目标而不是文字。
  * 图片的 alt 用的是另一段逻辑（结构略有不同）。
  */
-function 渲染链接文字(node: any, context: context): void {
+function renderLinkText(node: any, context: context): void {
   let cursor = node.from
   for (let child = node.firstChild; child; child = child.nextSibling) {
     if (child.name === 'URL' || child.name === 'LinkTitle') break
@@ -364,7 +364,7 @@ function takeLinkTitle(node: any, context: context): string {
 }
 
 /** 图片的 alt 取自 `![...]` 里的内容。 */
-function 取图片替代文本(node: any, context: context): string {
+function takeImageAltText(node: any, context: context): string {
   const firstMark = node.firstChild
   if (!firstMark) return ''
   // 结构是 LinkMark(`![`) → 文本 → LinkMark(`]`) → LinkMark(`(`) → URL → LinkMark(`)`)
@@ -377,12 +377,12 @@ function 取图片替代文本(node: any, context: context): string {
 }
 
 function renderTableRow(lineNode: any, context: context, cellLabel: string): void {
-  const 对齐们 = 取对齐(lineNode, context)
+  const aligns = takeAlign(lineNode, context)
   context.output.push('<tr>\n')
   let index = 0
   for (let child = lineNode.firstChild; child; child = child.nextSibling) {
     if (child.name !== 'TableCell') continue
-    const alignKind = 对齐们[index]
+    const alignKind = aligns[index]
     context.output.push(`<${cellLabel}${alignKind ? ` style="text-align:${alignKind}"` : ''}>`)
     recursive(child, context)
     context.output.push(`</${cellLabel}>\n`)
@@ -401,7 +401,7 @@ const alignCache = new WeakMap<object, (string | null)[]>()
  * （打印解析树才发现：`TableDelimiter 68..85 = |:---|:---:|---:|`）。
  * 所以只能拿它的原始文本自己按 `|` 切。
  */
-function 取对齐(lineNode: any, context: context): (string | null)[] {
+function takeAlign(lineNode: any, context: context): (string | null)[] {
   const tbl = lineNode.parent
   if (!tbl) return []
   const alreadyHas = alignCache.get(tbl)
@@ -453,7 +453,7 @@ export interface outlineEntry {
   position: number
 }
 
-const 大纲标题模式 = /^(?:ATX|Setext)Heading(\d)$/
+const outlineHeadingPattern = /^(?:ATX|Setext)Heading(\d)$/
 
 /**
  * 去掉 Markdown 标记，得到标题正文。
@@ -461,9 +461,9 @@ const 大纲标题模式 = /^(?:ATX|Setext)Heading(\d)$/
  * 导出侧与编辑器侧共用这一份：两处各写一遍，迟早会在
  * "收尾井号算不算正文"这类细节上分叉，而症状是导出的大纲与侧边栏不一致。
  */
-export function cleanHeadingText(originalText: string, 是ATX: boolean): string {
+export function cleanHeadingText(originalText: string, isAtx: boolean): string {
   let docText = originalText
-  if (是ATX) {
+  if (isAtx) {
     // `## 标题` → `标题`
     docText = docText.replace(/^#{1,6}[ \t]+/, '')
     // `## 标题 ##` → `标题`
@@ -482,7 +482,7 @@ export function extractOutline(source: string): outlineEntry[] {
 
   tree.iterate({
     enter: (node) => {
-      const match = 大纲标题模式.exec(node.name)
+      const match = outlineHeadingPattern.exec(node.name)
       if (!match) return true
       result.push({
         level: Number(match[1]),

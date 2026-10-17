@@ -106,7 +106,7 @@ export class sidebar {
 
     const dragHandle = document.createElement('div')
     dragHandle.className = 'sidebar-resizer'
-    dragHandle.addEventListener('mousedown', (event) => this.开始拖拽(event))
+    dragHandle.addEventListener('mousedown', (event) => this.startDrag(event))
 
     this.host.append(tabBar, mainBody, dragHandle)
     this.applyTab()
@@ -123,13 +123,13 @@ export class sidebar {
 
   // ------------------------------------------------------------- 交互 ----
 
-  private 开始拖拽(pressed: MouseEvent): void {
+  private startDrag(pressed: MouseEvent): void {
     pressed.preventDefault()
     const fromPos = pressed.clientX
-    const 起始宽 = this.widthPx
+    const startWidth = this.widthPx
 
     const move = (event: MouseEvent): void => {
-      const width = Math.min(maxWidth, Math.max(minWidth, 起始宽 + (event.clientX - fromPos)))
+      const width = Math.min(maxWidth, Math.max(minWidth, startWidth + (event.clientX - fromPos)))
       this.widthPx = width
       this.host.style.width = `${width}px`
     }
@@ -198,12 +198,12 @@ export class sidebar {
     const signature = headings.map((t) => `${t.level}:${t.position}:${t.docText}`).join('|')
     if (signature !== this.lastOutlineSig) {
       this.lastOutlineSig = signature
-      this.重绘大纲(headings)
+      this.repaintOutline(headings)
     }
-    this.高亮大纲(currentIndex)
+    this.highlightOutline(currentIndex)
   }
 
-  private 重绘大纲(headings: headingItem[]): void {
+  private repaintOutline(headings: headingItem[]): void {
     this.outlinePanel.textContent = ''
     this.highlightIndex = -1
 
@@ -236,7 +236,7 @@ export class sidebar {
     })
   }
 
-  private 高亮大纲(subscript: number): void {
+  private highlightOutline(subscript: number): void {
     if (subscript === this.highlightIndex) return
     this.highlightIndex = subscript
     for (const item of Array.from(this.outlinePanel.querySelectorAll('.outline-item'))) {
@@ -378,12 +378,12 @@ export class sidebar {
    * 设过之后文件树不再跟随当前文档——这正是"打开文件夹"该有的语义：
    * 用户要的是浏览那个文件夹，切文档不该把树根也带走。
    */
-  设根目录(filePath: string): void {
+  setRootDir(filePath: string): void {
     this.manualRoot = filePath
   }
 
   /** 清除显式根，回到跟随当前文档的模式。 */
-  清除根目录(): void {
+  clearRootDir(): void {
     this.manualRoot = null
   }
 

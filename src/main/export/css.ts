@@ -126,7 +126,7 @@ export async function processStyleSheet(
  * 导出的 HTML 可能被放到别处打开，相对路径就失效了；转成绝对地址至少
  * 在本机可用。若开启了图片内嵌，则由另一处把图片换成 data:。
  */
-export function 绝对化本地地址(docText: string, baseDir: string): string {
+export function absolutizeLocalUrl(docText: string, baseDir: string): string {
   return docText.replace(/url\(\s*(['"]?)([^'")]+)\1\s*\)/gi, (wholeText, _引号, url: string) => {
     if (/^(https?:|data:|file:|#)/i.test(url)) return wholeText
     const whole = isAbsolute(url) ? url : join(baseDir, url)
@@ -135,13 +135,13 @@ export function 绝对化本地地址(docText: string, baseDir: string): string 
 }
 
 /** 样式表在其内部用 @import 引用别的文件时，基准目录要跟着变。 */
-export function 子样式基准(currentBaseline: string, url: string): string {
+export function subStyleBaseline(currentBaseline: string, url: string): string {
   if (/^https?:\/\//i.test(url)) return currentBaseline
   return dirname(isAbsolute(url) ? url : resolve(currentBaseline, url))
 }
 
 /** 判断一段样式里是否还有导出时才需要处理的指令。 */
-export function 含导出指令(docText: string): boolean {
+export function hasExportDirective(docText: string): boolean {
   exportIncludeRegex.lastIndex = 0
   return exportIncludeRegex.test(docText)
 }

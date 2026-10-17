@@ -57,22 +57,22 @@ const 样本断言 = [
       HTMLBlock: 1
     },
     渲染: {
-      标题行: 1,
-      代码块行: 3,
-      引用行: 1,
-      前置元数据行: 3,
+      headingLineRow: 1,
+      codeLineRow: 3,
+      quoteLineRow: 1,
+      frontMatterRow: 3,
       // 数学块不再有"行"了：它整块被替换成一个公式 widget，
       // 源码行从 DOM 里消失（光标移进去才会露出来）。
       // 所以这里断言的是渲染出的公式数，而不是行装饰数。
-      数学公式: 1,
-      表格行: 2,
-      表格分隔线: 1,
-      HTML块行: 1,
-      代码块头部: 1,
-      列表圆点: 3,
-      任务复选框: 2,
-      水平线: 1,
-      表格竖线: 6
+      mathWidget: 1,
+      tableRowCount: 2,
+      tableSeparatorRow: 1,
+      htmlBlockRow: 1,
+      codeHeader: 1,
+      bulletDot: 3,
+      taskCheckboxEl: 2,
+      horizontalRuleEl: 1,
+      tablePipeEl: 6
     }
   },
   {
@@ -88,27 +88,27 @@ const 样本断言 = [
       ATXHeading6: 1
     },
     渲染: {
-      标题行: 6,
-      加粗: 3,
-      斜体: 2, // 若嵌套强调被误跳过，这里会变成 1
-      删除线: 1,
-      行内代码: 2,
-      行内链接: 1,
-      代码块行: 6,
-      引用行: 2,
-      列表圆点: 3,
-      表格行: 2,
-      表格分隔线: 1,
-      表格竖线: 6,
-      代码块头部: 1,
-      水平线: 1
+      headingLineRow: 6,
+      strongMark: 3,
+      italicMark: 2, // 若嵌套强调被误跳过，这里会变成 1
+      strikeMark: 1,
+      inlineCodeMark: 2,
+      inlineLinkMark: 1,
+      codeLineRow: 6,
+      quoteLineRow: 2,
+      bulletDot: 3,
+      tableRowCount: 2,
+      tableSeparatorRow: 1,
+      tablePipeEl: 6,
+      codeHeader: 1,
+      horizontalRuleEl: 1
     }
   },
   {
     文件: 'fixtures/headings.md',
     说明: '六级标题全覆盖',
     解析树: { ATXHeading1: 1, ATXHeading6: 1 },
-    渲染: { 标题行: 6 }
+    渲染: { headingLineRow: 6 }
   },
   {
     文件: 'fixtures/提示框.md',
@@ -117,7 +117,7 @@ const 样本断言 = [
     // 提示框三行（标记行 + 两行正文），标签一个；
     // 普通引用**不该**被算进来——两者共用 cm-lp-quote，
     // 数错就说明判定条件写宽了
-    渲染: { 提示框行: 3, 提示框标签: 1 }
+    渲染: { calloutRow: 3, calloutLabelEl: 1 }
   }
 ]
 
@@ -816,12 +816,12 @@ async function 主流程() {
 
     if (计数行) {
       const 取数 = (名) => {
-        const 匹配 = new RegExp(`${名}=(\\d+)`).exec(计数行[1])
+        const 匹配 = new RegExp(`(?:^|\\s)${名}=(\\d+)`).exec(计数行[1])
         return 匹配 ? Number(匹配[1]) : -1
       }
-      const 图片 = 取数('图片')
-      const 失败 = 取数('图片失败')
-      const 独占行 = 取数('独占行图片')
+      const 图片 = 取数('image')
+      const 失败 = 取数('imageFailedEl')
+      const 独占行 = 取数('blockImageRow')
       const 解析数 = Number(/Image=(\d+)/.exec(图输出)?.[1] ?? 0)
 
       断言(解析数 === 4, `图片素材应有 4 个 Image 节点，实际 ${解析数}`)
@@ -848,7 +848,7 @@ async function 主流程() {
     断言(计数行 !== null, '应输出数学公式测试的 DOM 计数')
 
     if (计数行) {
-      const 公式数 = Number(/数学公式=(\d+)/.exec(计数行[1])?.[1] ?? 0)
+      const 公式数 = Number(/mathWidget=(\d+)/.exec(计数行[1])?.[1] ?? 0)
       // 素材里有 2 个行内公式 + 2 个块级公式
       断言(公式数 === 4, `应渲染出 4 个公式，实际 ${公式数}`)
 
@@ -874,13 +874,13 @@ async function 主流程() {
 
     if (计数行) {
       const 取数 = (名) => {
-        const 匹配 = new RegExp(`${名}=(\\d+)`).exec(计数行[1])
+        const 匹配 = new RegExp(`(?:^|\\s)${名}=(\\d+)`).exec(计数行[1])
         return 匹配 ? Number(匹配[1]) : 0
       }
-      const 图表 = 取数('图表')
-      const 出图 = 取数('图表已出图')
-      const 失败 = 取数('图表失败')
-      const 未完成 = 取数('图表未完成')
+      const 图表 = 取数('diagramWidget')
+      const 出图 = 取数('diagramDone')
+      const 失败 = 取数('diagramFailed')
+      const 未完成 = 取数('diagramPending')
 
       // 素材里三个 mermaid 围栏：流程图、时序图、一个语法错误的
       断言(图表 === 3, `三个 mermaid 围栏都应变成图表组件，实际 ${图表}`)
@@ -890,7 +890,7 @@ async function 主流程() {
       // 不能有图表卡在渲染中——那说明等待逻辑或渲染流程断了
       断言(未完成 === 0, `不应有图表卡在渲染中，实际 ${未完成}`)
       // 普通代码块不受影响
-      断言(取数('代码块行') === 3, '普通 js 代码块不应被当成图表')
+      断言(取数('codeLineRow') === 3, '普通 js 代码块不应被当成图表')
 
       断言(!/renderer:error/.test(图表输出), '图表渲染不应产生渲染层错误')
 
@@ -1092,7 +1092,7 @@ async function 主流程() {
     }
 
     console.log(
-      `  ${'引用块'.padEnd(30)} 引用行=${行?.[1] ?? '?'} 带引用符=${行?.[2] ?? '?'} ` +
+      `  ${'引用块'.padEnd(30)} quoteLineRow=${行?.[1] ?? '?'} 带引用符=${行?.[2] ?? '?'} ` +
         `行首空格=${空白?.[1] === '' ? '无' : '有'} ` +
         `回车续引用=${回?.[1] ?? '?'} 新行仍是引用=${回?.[2] ?? '?'}`
     )
@@ -1194,22 +1194,22 @@ async function 主流程() {
       // 三种语言各一段：JavaScript / Python / Rust
       // 光标在文档开头，三段围栏的首行一律换成头部栏。
       // 原来这里数的是行尾的 `cm-w-lang` 小标签，现在改由头部栏承担。
-      断言(取数('代码块头部') === 3, `三段围栏都应有头部栏，实际 ${取数('代码块头部')}`)
-      断言(取数('代码关键字') >= 5, `关键字应着色，实际 ${取数('代码关键字')}`)
-      断言(取数('代码字符串') >= 3, `字符串字面量应着色，实际 ${取数('代码字符串')}`)
-      断言(取数('代码注释') >= 3, `注释应着色，实际 ${取数('代码注释')}`)
-      断言(取数('代码函数') >= 2, `函数名应着色，实际 ${取数('代码函数')}`)
-      断言(取数('代码数字') >= 2, `数字字面量应着色，实际 ${取数('代码数字')}`)
+      断言(取数('codeHeader') === 3, `三段围栏都应有头部栏，实际 ${取数('codeHeader')}`)
+      断言(取数('codeKeyword') >= 5, `关键字应着色，实际 ${取数('codeKeyword')}`)
+      断言(取数('codeString') >= 3, `字符串字面量应着色，实际 ${取数('codeString')}`)
+      断言(取数('codeComment') >= 3, `注释应着色，实际 ${取数('codeComment')}`)
+      断言(取数('codeFunction') >= 2, `函数名应着色，实际 ${取数('codeFunction')}`)
+      断言(取数('codeNumber') >= 2, `数字字面量应着色，实际 ${取数('codeNumber')}`)
       // 总数兜底：任何一类掉到 0 都会被上面几条之一抓住，
       // 这条用来防"整体没跑"——例如解析器根本没接上
-      断言(取数('代码着色总数') >= 30, `代码着色总数应可观，实际 ${取数('代码着色总数')}`)
+      断言(取数('codeTokenTotal') >= 30, `代码着色总数应可观，实际 ${取数('codeTokenTotal')}`)
 
       断言(!/renderer:error/.test(代码输出), '代码着色不应产生渲染层错误')
 
       console.log(
         `  ${'代码语言着色'.padEnd(28)} ` +
-          `头部栏 ${取数('代码块头部')} · 着色 ${取数('代码着色总数')} ` +
-          `（关键字 ${取数('代码关键字')} 字符串 ${取数('代码字符串')} 注释 ${取数('代码注释')} 函数 ${取数('代码函数')}）`
+          `头部栏 ${取数('codeHeader')} · 着色 ${取数('codeTokenTotal')} ` +
+          `（关键字 ${取数('codeKeyword')} 字符串 ${取数('codeString')} 注释 ${取数('codeComment')} 函数 ${取数('codeFunction')}）`
       )
     }
   }

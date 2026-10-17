@@ -64,9 +64,9 @@ function closeSubmenu(): void {
  *
  * @param 是子菜单 子菜单不注册全局收尾，它的生死由父菜单管
  */
-function makeMenu(items: menuItem[], 是子菜单 = false): HTMLElement {
+function makeMenu(items: menuItem[], isSubmenu = false): HTMLElement {
   const menu = document.createElement('div')
-  menu.className = 是子菜单 ? 'selfmd-menu selfmd-submenu' : 'selfmd-menu'
+  menu.className = isSubmenu ? 'selfmd-menu selfmd-submenu' : 'selfmd-menu'
   menu.setAttribute('role', 'menu')
 
   for (const item of items) {
@@ -116,7 +116,7 @@ function makeMenu(items: menuItem[], 是子菜单 = false): HTMLElement {
 
       // 用 hover 展开而不是 click：菜单的惯例是"指过去就开"，
       // 要多点一次会让人以为这一项是禁用的。
-      line.addEventListener('mouseenter', () => 展开子菜单(line, item.children ?? []))
+      line.addEventListener('mouseenter', () => expandSubmenu(line, item.children ?? []))
       // 离开时收起，但要把"指针正移向子菜单"的情况排除掉——
       // 否则指针一离开行、还没进子菜单，子菜单就没了，永远点不到。
       line.addEventListener('mouseleave', (event) => {
@@ -149,7 +149,7 @@ function makeMenu(items: menuItem[], 是子菜单 = false): HTMLElement {
 }
 
 /** 在某一行右侧展开子菜单；右边放不下就翻到左侧。 */
-function 展开子菜单(hostRow: HTMLElement, items: menuItem[]): void {
+function expandSubmenu(hostRow: HTMLElement, items: menuItem[]): void {
   closeSubmenu()
 
   const child = makeMenu(items, true)

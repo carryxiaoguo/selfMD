@@ -17,7 +17,7 @@ import { activeTheme, type Settings } from '@shared/types'
  * 与 `@import` 能相对于主题目录解析。通行做法用 `应用私有协议` 也是同一个理由。
  */
 
-let 已应用的链接: Record<string, string> = {}
+let appliedLinks: Record<string, string> = {}
 
 /**
  * 取（必要时创建）某一层的 `<link>`，并保证它排在 `<head>` 的最后。
@@ -55,7 +55,7 @@ function setLink(id: string, href: string): void {
   // 但"重新加载主题"命令需要绕过这一点，所以由调用方负责改 URL。
   if (el.getAttribute('href') === href) return
   el.setAttribute('href', href)
-  已应用的链接[id] = href
+  appliedLinks[id] = href
 }
 
 /** 给定设置下实际生效的主题 id。 */

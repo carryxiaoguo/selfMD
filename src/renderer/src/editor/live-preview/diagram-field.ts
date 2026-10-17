@@ -1,7 +1,7 @@
 import { syntaxTree } from '@codemirror/language'
 import { RangeSet, StateField, type EditorState, type Extension } from '@codemirror/state'
 import { Decoration, EditorView, type DecorationSet } from '@codemirror/view'
-import { 图表 } from './widgets'
+import { diagramWidget } from './widgets'
 
 /**
  * Mermaid 图表的块级替换装饰。
@@ -80,7 +80,7 @@ export function createDiagramField(options: DiagramFieldOptions): Extension {
 
       range.push(
         Decoration.replace({
-          widget: new 图表(sourceCode, darkMode),
+          widget: new diagramWidget(sourceCode, darkMode),
           block: true
         }).range(node.from, node.to)
       )

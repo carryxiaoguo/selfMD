@@ -20,7 +20,7 @@ export function iconPath(name = 'icon.png'): string | undefined {
 }
 
 /** 图标集目录，供"关于"面板或调试使用。 */
-export function 图标目录(): string | undefined {
+export function iconDir(): string | undefined {
   const file = iconPath()
   return file ? join(file, '..') : undefined
 }

@@ -25,7 +25,7 @@ export interface headingItem {
   lineNo: number
 }
 
-const 标题节点 = /^(?:ATX|Setext)Heading(\d)$/
+const headingNode = /^(?:ATX|Setext)Heading(\d)$/
 
 /**
  * 提取文档中的全部标题，按出现顺序。
@@ -41,7 +41,7 @@ export function extractHeadings(state: EditorState): headingItem[] {
   tree.iterate({
     enter: (quote) => {
       const node = quote.node as unknown as SyntaxNode
-      const match = 标题节点.exec(node.name)
+      const match = headingNode.exec(node.name)
       if (!match) return true
 
       // 空标题（只有 `#`）也收进来：大纲里留一行空项比整段消失更符合预期。

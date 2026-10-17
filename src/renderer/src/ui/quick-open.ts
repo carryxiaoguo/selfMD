@@ -18,7 +18,7 @@ interface fileRow {
   sizeBytes: number
 }
 
-export interface 快速打开选项 {
+export interface quickOpenOptions {
   /** 建立索引：返回候选文件。失败时返回空数组。 */
   takeFile: () => Promise<{ file: fileRow[]; truncated: boolean }>
   /** 用户选中某个文件。 */
@@ -26,7 +26,7 @@ export interface 快速打开选项 {
 }
 
 /** 打开快速打开面板。重复调用会先关掉已有面板。 */
-export async function openQuickOpen(options: 快速打开选项): Promise<void> {
+export async function openQuickOpen(options: quickOpenOptions): Promise<void> {
   document.querySelector('.quick-open-mask')?.remove()
 
   const overlay = document.createElement('div')

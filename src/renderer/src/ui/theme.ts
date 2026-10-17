@@ -37,7 +37,7 @@ let 已应用的链接: Record<string, string> = {}
  * 所以链接必须**追加到 head 末尾**，才能压过构建产物。
  * 三层的先后顺序也由追加顺序保证，那是层叠契约的一部分。
  */
-function 取链接(id: string): HTMLLinkElement {
+function takeLink(id: string): HTMLLinkElement {
   let el = document.getElementById(id) as HTMLLinkElement | null
   if (!el) {
     el = document.createElement('link')
@@ -50,7 +50,7 @@ function 取链接(id: string): HTMLLinkElement {
 }
 
 function setLink(id: string, href: string): void {
-  const el = 取链接(id)
+  const el = takeLink(id)
   // 同一个 URL 重复赋值不会触发重新加载；主题切换本来就会换 URL，
   // 但"重新加载主题"命令需要绕过这一点，所以由调用方负责改 URL。
   if (el.getAttribute('href') === href) return
@@ -64,7 +64,7 @@ export function activeThemeId(settings: Settings): string {
 }
 
 /** 强制重新拉取当前三层样式表（用户在外部编辑器里改了 CSS 之后用）。 */
-export function 重新加载主题(settings: Settings): void {
+export function reloadThemes(settings: Settings): void {
   const id = activeThemeId(settings)
   for (const [el, href] of [
     ['theme-css', themeCssUrl(id)],
@@ -72,7 +72,7 @@ export function 重新加载主题(settings: Settings): void {
     ['theme-user-css', themeUserCssUrl(id)]
   ] as const) {
     // 清空再设：同一个 URL 不会触发重新拉取，必须先断开
-    取链接(el).setAttribute('href', '')
+    takeLink(el).setAttribute('href', '')
     setLink(el, href)
   }
 }

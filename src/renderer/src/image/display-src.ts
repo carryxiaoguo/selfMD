@@ -30,7 +30,7 @@ export function takeDocDir(): string | null {
 }
 
 /** 是否是无需解析的外部地址。 */
-function 是外部地址(url: string): boolean {
+function isExternalUrl(url: string): boolean {
   return /^(https?:|data:|blob:|selfmd:)/i.test(url)
 }
 
@@ -61,7 +61,7 @@ export function parseImageUrl(rawValue: string): string {
   const url = rawValue.trim()
   if (url.length === 0) return ''
 
-  if (是外部地址(url)) return url
+  if (isExternalUrl(url)) return url
 
   // `file://` 直接转成本地协议，省掉一次解码
   if (/^file:\/\//i.test(url)) {
@@ -92,5 +92,5 @@ export function parseImageUrl(rawValue: string): string {
  * 不是解析后的 URL。
  */
 export function isLocalImageUrl(url: string): boolean {
-  return !是外部地址(url)
+  return !isExternalUrl(url)
 }

@@ -11,21 +11,21 @@ import type { Settings } from '@shared/types'
  * 把所有命中的项平铺出来——这是通行行为。
  */
 
-export interface 偏好设置依赖 {
-  取设置: () => Settings
+export interface prefsDeps {
+  takeSettings: () => Settings
   /** 改一项设置。返回更新后的完整设置。 */
-  应用设置: (patchResult: Partial<Settings>) => Promise<Settings>
+  applySettings: (patchResult: Partial<Settings>) => Promise<Settings>
   /** 只读项（例如当前主题）要显示的值。 */
-  取只读值?: (key: keyof Settings) => string | null
+  takeReadOnlyValue?: (key: keyof Settings) => string | null
 }
 
-export class 偏好设置面板 {
-  private deps: 偏好设置依赖
+export class prefsPanelEl {
+  private deps: prefsDeps
   private overlay: HTMLElement | null = null
   private currentSection = 0
   private searchTerm = ''
 
-  constructor(deps: 偏好设置依赖) {
+  constructor(deps: prefsDeps) {
     this.deps = deps
   }
 
@@ -41,11 +41,11 @@ export class 偏好设置面板 {
    *                 还得自己往下找，等于没定位。
    */
   open(locateSection?: string): void {
-    const 问题 = validateSchema()
-    if (问题.length > 0) {
+    const issue = validateSchema()
+    if (issue.length > 0) {
       // 表里写了不存在的键：这是开发期错误，必须响亮地报出来。
       // 静默渲染的后果是"这一项点了没反应"，极难排查。
-      console.error(`[偏好设置] 设置表引用了不存在的键：${问题.join('、')}`)
+      console.error(`[偏好设置] 设置表引用了不存在的键：${issue.join('、')}`)
     }
 
     if (this.overlay) this.close()
@@ -191,7 +191,7 @@ export class 偏好设置面板 {
         description.textContent = subsection.description
         block.append(description)
       }
-      for (const item of subsection.item) block.append(this.渲染一行(item))
+      for (const item of subsection.item) block.append(this.renderOneLine(item))
       content.append(block)
     }
   }
@@ -209,7 +209,7 @@ export class 偏好设置面板 {
           if (!whole.includes(词)) continue
           hit++
           // 搜索时带上分区名，否则用户不知道这一项属于哪里
-          const line = this.渲染一行(item, section.title)
+          const line = this.renderOneLine(item, section.title)
           block.append(line)
         }
       }
@@ -230,7 +230,7 @@ export class 偏好设置面板 {
     content.append(block)
   }
 
-  private 渲染一行(item: SettingItem, 来源分区?: string): HTMLElement {
+  private renderOneLine(item: SettingItem, originSection?: string): HTMLElement {
     const line = document.createElement('div')
     line.className = 'prefs-row'
     line.dataset.key = String(item.key)
@@ -241,10 +241,10 @@ export class 偏好设置面板 {
     name.className = 'prefs-name'
     name.textContent = item.label
     tabArea.append(name)
-    if (来源分区) {
+    if (originSection) {
       const origin = document.createElement('div')
       origin.className = 'prefs-source'
-      origin.textContent = 来源分区
+      origin.textContent = originSection
       tabArea.append(origin)
     }
     if (item.description) {
@@ -263,7 +263,7 @@ export class 偏好设置面板 {
   }
 
   private 渲染控件(item: SettingItem): HTMLElement {
-    const settings = this.deps.取设置()
+    const settings = this.deps.takeSettings()
     const currentValue = settings[item.key]
 
     if (item.kind === '开关') {
@@ -344,7 +344,7 @@ export class 偏好设置面板 {
     const inputText = document.createElement('input')
     inputText.type = 'text'
     inputText.value = String(currentValue ?? '')
-    const readOnlyValue = this.deps.取只读值?.(item.key)
+    const readOnlyValue = this.deps.takeReadOnlyValue?.(item.key)
     if (readOnlyValue !== null && readOnlyValue !== undefined) {
       inputText.value = readOnlyValue
       // 只读项（例如「当前主题」）在界面上不可编辑——它由别的入口决定
@@ -357,7 +357,7 @@ export class 偏好设置面板 {
 
   private async commitIt(key: keyof Settings, value: unknown): Promise<void> {
     try {
-      await this.deps.应用设置({ [key]: value } as Partial<Settings>)
+      await this.deps.applySettings({ [key]: value } as Partial<Settings>)
     } catch (error) {
       console.error('[偏好设置] 写入失败：', error)
     }

@@ -5,7 +5,7 @@ import type { Settings } from '@shared/types'
 import { readFrontMatter } from '@shared/front-matter'
 import { takeFileName, timestampImageName, isImageFile } from '@shared/image-path'
 import { resolveTargetDir } from './resolve-target'
-import { buildImageSyntax, buildRefUrl, 生成替代文本, type imageSyntax } from './reference'
+import { buildImageSyntax, buildRefUrl, buildAltText, type imageSyntax } from './reference'
 
 /**
  * 图片插入编排。
@@ -35,7 +35,7 @@ export interface InsertRequest {
   /** 当前文档的绝对路径；未保存为 null。 */
   docPath: string | null
   /** 当前文档全文，用于读取 YAML 前置元数据里的图片目录设置。 */
-  文档文本: string
+  docText: string
   settings: Settings
 }
 
@@ -56,7 +56,7 @@ function docDir(docPath: string | null): string | null {
 
 /** 由当前上下文构造解析输入。 */
 function buildInput(request: InsertRequest): Parameters<typeof resolveTargetDir>[0] {
-  const meta = readFrontMatter(request.文档文本)
+  const meta = readFrontMatter(request.docText)
   return {
     docDir: docDir(request.docPath),
     docName: request.docPath ? takeFileName(request.docPath) : null,
@@ -79,7 +79,7 @@ function quoteText(imagePath: string, request: InsertRequest): string {
     addDotPrefix: request.settings.relativePathWithDot,
     escapeUrl: request.settings.autoEscapeImageURL
   })
-  return buildImageSyntax(url, 生成替代文本(imagePath), syntax(request.settings))
+  return buildImageSyntax(url, buildAltText(imagePath), syntax(request.settings))
 }
 
 /**
@@ -92,7 +92,7 @@ function quoteText(imagePath: string, request: InsertRequest): string {
  */
 let cachedDefaultImageDir: string | null = null
 
-async function 取默认图片目录(): Promise<string> {
+async function takeDefaultImageDir(): Promise<string> {
   if (cachedDefaultImageDir) return cachedDefaultImageDir
   const filePath = await window.selfmd.app.getPaths()
   cachedDefaultImageDir = filePath.userImages
@@ -166,7 +166,7 @@ function failureNote(kind: '需要保存' | '上传'): string {
  * **优先按"文件"处理。** Windows 上从资源管理器复制图片时，剪贴板同时提供
  * 原图路径与一张可能是压缩预览的位图；先取位图会让用户粘进来一张糊图。
  */
-export async function 从剪贴板插入(request: InsertRequest): Promise<insertResult> {
+export async function insertFromClipboard(request: InsertRequest): Promise<insertResult> {
   const content = await window.selfmd.image.readClipboard()
 
   if (content.kind === '无') return { okCount: 0, error: '剪贴板里没有图片。' }
@@ -178,7 +178,7 @@ export async function 从剪贴板插入(request: InsertRequest): Promise<insert
     return { okCount: 0, error: failureNote(target.kind) }
   }
 
-  const dir = target.kind === '目录' ? target.filePath : await 取默认图片目录()
+  const dir = target.kind === '目录' ? target.filePath : await takeDefaultImageDir()
   const name = `${timestampImageName(new Date())}.png`
   const writeBack = await window.selfmd.image.saveBytes(dir, name, content.data)
   if (!writeBack) return { okCount: 0, error: '写入图片失败。' }
@@ -227,7 +227,7 @@ export async function insertFromFile(request: InsertRequest, paths: string[]): P
 export async function thisTargetDir(request: InsertRequest): Promise<string | null> {
   const target = resolveTargetDir(buildInput(request))
   if (target.kind === '目录') return target.filePath
-  if (target.kind === '不动') return 取默认图片目录()
+  if (target.kind === '不动') return takeDefaultImageDir()
   return null
 }
 

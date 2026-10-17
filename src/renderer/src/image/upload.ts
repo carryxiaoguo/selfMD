@@ -34,7 +34,7 @@ interface urlSpan {
 }
 
 /** 从 Image 节点里取出 URL 的精确区间。 */
-function 取地址区间(node: {
+function takeUrlSpan(node: {
   firstChild: unknown
 }): urlSpan | null {
   // 结构：LinkMark(![) → 文字 → LinkMark(]) → LinkMark(() → URL → [LinkTitle] → LinkMark())
@@ -55,9 +55,9 @@ export function collectDocImages(state: EditorState, localOnly = false): docImag
   const result: docImages[] = []
   const dir = takeDocDir()
 
-  语法Tree遍历(state, (node) => {
+  walkSyntaxTree(state, (node) => {
     if (node.name !== 'Image') return
-    const range = 取地址区间(node)
+    const range = takeUrlSpan(node)
     if (!range) return
 
     const url = state.sliceDoc(range.from, range.to).trim()
@@ -69,10 +69,10 @@ export function collectDocImages(state: EditorState, localOnly = false): docImag
     } catch {
       // 编码损坏就按原样试
     }
-    const 是绝对 = /^[a-zA-Z]:[\\/]/.test(filePath) || filePath.startsWith('/')
+    const isAbsolutePath = /^[a-zA-Z]:[\\/]/.test(filePath) || filePath.startsWith('/')
     const localPath =
-      isLocalImageUrl(url) && (是绝对 || dir)
-        ? 是绝对
+      isLocalImageUrl(url) && (isAbsolutePath || dir)
+        ? isAbsolutePath
           ? filePath
           : `${(dir as string).replace(/\\/g, '/').replace(/\/+$/, '')}/${filePath.replace(/^\.\//, '')}`
         : null
@@ -84,7 +84,7 @@ export function collectDocImages(state: EditorState, localOnly = false): docImag
 }
 
 /** 遍历语法树。抽出来只是为了让上面的逻辑读起来不被 iterate 的回调淹掉。 */
-function 语法Tree遍历(
+function walkSyntaxTree(
   state: EditorState,
   callback: (node: {
     name: string
@@ -181,10 +181,10 @@ export async function uploadAndFill(
 /** 在文档里重新定位某张图片的 URL 区间。 */
 function 取地址区间InDoc(state: EditorState, img: docImages): urlSpan | null {
   let result: urlSpan | null = null
-  语法Tree遍历(state, (node) => {
+  walkSyntaxTree(state, (node) => {
     if (result || node.name !== 'Image') return
     if (node.from !== img.from) return
-    result = 取地址区间(node)
+    result = takeUrlSpan(node)
   })
   return result
 }

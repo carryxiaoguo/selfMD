@@ -121,7 +121,7 @@ export function parseFenceInfo(rawValue: string): FenceInfo {
   const parts = tidy(rawValue).split(' ').filter(Boolean)
   const language = parts.shift() ?? ''
 
-  const 名称片段: string[] = []
+  const nameParts: string[] = []
   let style: codeBlockStyleName = 'follow'
   let font = 'follow'
 
@@ -142,10 +142,10 @@ export function parseFenceInfo(rawValue: string): FenceInfo {
         continue
       }
     }
-    名称片段.push(piece)
+    nameParts.push(piece)
   }
 
-  return { language, displayName: 名称片段.join(' '), style, font }
+  return { language, displayName: nameParts.join(' '), style, font }
 }
 
 /**

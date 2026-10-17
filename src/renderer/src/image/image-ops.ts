@@ -83,7 +83,7 @@ function 取替代(node: { from: number; to: number; firstChild: unknown }, stat
  *
  * 找不到时返回 null——菜单据此整体置灰，而不是让用户点了没反应。
  */
-export function 取当前图片(state: EditorState, position: number): imageContext | null {
+export function takeCurrentImage(state: EditorState, position: number): imageContext | null {
   let result: imageContext | null = null
 
   syntaxTree(state).iterate({
@@ -133,12 +133,12 @@ export function localAbsolutePath(url: string): string | null {
 }
 
 /** 由 live-preview 的显示地址模块提供的当前文档目录。 */
-let 目录提供者: (() => string | null) | null = null
-export function 设置目录提供者(提供者: () => string | null): void {
-  目录提供者 = 提供者
+let dirProvider: (() => string | null) | null = null
+export function setDirProvider(提供者: () => string | null): void {
+  dirProvider = 提供者
 }
 function currentDir(): string | null {
-  return 目录提供者?.() ?? null
+  return dirProvider?.() ?? null
 }
 
 // ---------------------------------------------------------------------------
@@ -157,9 +157,9 @@ function 转HTML(url: string, substitute: string): string {
  *
  * 只改 `![…](…)` 这一段，不动周围的文字。
  */
-export function 转换图片语法(view: EditorView, image: imageContext): boolean {
+export function convertImageSyntax(view: EditorView, image: imageContext): boolean {
   const HTML写法 = /^<img\b/i.test(image.url)
-  const 新语法 = HTML写法
+  const nextSyntax = HTML写法
     ? `![${image.substitute}](${image.url})`
     : 转HTML(image.url, image.substitute)
 
@@ -167,8 +167,8 @@ export function 转换图片语法(view: EditorView, image: imageContext): boole
   // 所以直接整段替换；Markdown 写法时也只换整段——
   // 反正两种写法下 `![` / `<img` 与结尾都要一起变。
   view.dispatch({
-    changes: { from: image.from, to: image.to, insert: 新语法 },
-    selection: EditorSelection.cursor(image.from + 新语法.length),
+    changes: { from: image.from, to: image.to, insert: nextSyntax },
+    selection: EditorSelection.cursor(image.from + nextSyntax.length),
     annotations: isolatedUndo,
     userEvent: 'input.switchImageSyntax'
   })
@@ -186,7 +186,7 @@ export function 转换图片语法(view: EditorView, image: imageContext): boole
  * 文档里已经指向一个不存在的路径，用户看到的是图裂，而且很难想到是
  * "移动失败但引用已经改了"。
  */
-export async function 重命名或移动图片(
+export async function renameOrMoveImage(
   view: EditorView,
   image: imageContext,
   targetDir: string,
@@ -233,7 +233,7 @@ export async function 重命名或移动图片(
  *
  * 与"移动"的区别是原文件保留——用户想把图片集中到 `assets/` 又不想删原件时用。
  */
-export async function 复制图片到(
+export async function copyImageTo(
   view: EditorView,
   image: imageContext,
   targetDir: string
@@ -285,7 +285,7 @@ export async function 复制图片到(
  *
  * 走系统回收站而不是直接删：误删一张图的代价不小，而回收站可以撤销。
  */
-export async function 删除图片文件(image: imageContext): Promise<{ success: boolean; error: string | null }> {
+export async function deleteImageFile(image: imageContext): Promise<{ success: boolean; error: string | null }> {
   if (!image.localPath) {
     return { success: false, error: '这是远程图片，没有本地文件可删除。' }
   }

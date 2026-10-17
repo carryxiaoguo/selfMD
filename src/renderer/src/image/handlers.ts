@@ -5,7 +5,7 @@ import {
   type InsertRequest,
   thisTargetDir,
   insertFromUrl,
-  从剪贴板插入,
+  insertFromClipboard,
   insertFromFile
 } from './insert'
 
@@ -25,7 +25,7 @@ export interface 图片处理依赖 {
   /** 构造插入请求；编辑器尚未就绪时返回 null。 */
   buildRequest: () => InsertRequest | null
   /** 用户可见的提示。 */
-  hint: (消息: string) => void
+  hint: (message: string) => void
 }
 
 /** 把 File 读成不含前缀的 base64。 */
@@ -34,8 +34,8 @@ function 读为base64(file: File): Promise<string> {
     const reader = new FileReader()
     reader.onload = () => {
       const result = String(reader.result ?? '')
-      const 逗号 = result.indexOf(',')
-      done(逗号 >= 0 ? result.slice(逗号 + 1) : '')
+      const commaChar = result.indexOf(',')
+      done(commaChar >= 0 ? result.slice(commaChar + 1) : '')
     }
     reader.onerror = () => failure(reader.error)
     reader.readAsDataURL(file)
@@ -52,7 +52,7 @@ function 取磁盘路径(file: File): string {
 }
 
 /** 拖放/粘贴进来的 File 列表里，第一张图片。 */
-function 找图片文件(list: FileList | null | undefined): File | null {
+function findImageFile(list: FileList | null | undefined): File | null {
   if (!list) return null
   for (const file of Array.from(list)) {
     if (file.type.startsWith('image/') || isImageFile(file.name)) return file
@@ -60,9 +60,9 @@ function 找图片文件(list: FileList | null | undefined): File | null {
   return null
 }
 
-export function 图片粘贴与拖放(deps: 图片处理依赖): Extension {
+export function imagePasteAndDrop(deps: 图片处理依赖): Extension {
   /** 处理"有图片文件"的公共路径。 */
-  const 处理文件 = async (file: File): Promise<void> => {
+  const handleFile = async (file: File): Promise<void> => {
     const request = deps.buildRequest()
     if (!request) return
 
@@ -105,11 +105,11 @@ export function 图片粘贴与拖放(deps: 图片处理依赖): Extension {
       if (!data) return false
 
       // 1) 剪贴板里就有图片文件（从资源管理器复制、截图工具等）
-      const image = 找图片文件(data.files)
+      const image = findImageFile(data.files)
       if (image) {
         // 有图就一定要 preventDefault：否则浏览器还会把图片当文件路径插成文本。
         event.preventDefault()
-        void 处理文件(image)
+        void handleFile(image)
         return true
       }
 
@@ -117,8 +117,8 @@ export function 图片粘贴与拖放(deps: 图片处理依赖): Extension {
       //    只要有非空文本，就放行给默认行为——绝不能吞掉正常粘贴。
       const docText = data.getData('text/plain')
       if (docText && docText.length > 0) return false
-      const 网页 = data.getData('text/html')
-      if (网页 && 网页.length > 0) return false
+      const webPage = data.getData('text/html')
+      if (webPage && webPage.length > 0) return false
 
       // 3) 到这里说明剪贴板既没有文件也没有文本，多半是一张位图。
       //    真实判定交给主进程（它能读系统剪贴板），失败时不影响用户。
@@ -126,7 +126,7 @@ export function 图片粘贴与拖放(deps: 图片处理依赖): Extension {
       void (async () => {
         const request = deps.buildRequest()
         if (!request) return
-        const result = await 从剪贴板插入(request)
+        const result = await insertFromClipboard(request)
         if (result.okCount === 0 && result.error && result.error !== '剪贴板里没有图片。') {
           deps.hint(result.error)
         }
@@ -138,10 +138,10 @@ export function 图片粘贴与拖放(deps: 图片处理依赖): Extension {
       const data = event.dataTransfer
       if (!data) return false
 
-      const image = 找图片文件(data.files)
+      const image = findImageFile(data.files)
       if (image) {
         event.preventDefault()
-        void 处理文件(image)
+        void handleFile(image)
         return true
       }
 

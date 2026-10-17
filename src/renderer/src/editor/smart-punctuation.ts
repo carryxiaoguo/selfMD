@@ -76,23 +76,23 @@ const 开引号前导 = /[\s([{<（【《「『〔〈“‘’”‘’—–-]/
  */
 export function swapQuotes(ch: '"' | "'", preamble: string): string {
   const previousOne = preamble.slice(-1)
-  const 是开头 = preamble.length === 0 || 开引号前导.test(previousOne)
+  const isLeading = preamble.length === 0 || 开引号前导.test(previousOne)
 
   if (ch === '"') {
-    return 是开头 ? '“' : '”'
+    return isLeading ? '“' : '”'
   }
 
   // 单引号多一种情况：跟在字母或数字后面时是撇号（don't、2020's），
   // 不是引号。中文里也普遍这么用，所以统一处理成右单引号。
   if (/[A-Za-z0-9\u4e00-\u9fff]/.test(previousOne)) return '’'
-  return 是开头 ? '‘' : '’'
+  return isLeading ? '‘' : '’'
 }
 
 // ---------------------------------------------------------------------------
 // 渲染时转换
 // ---------------------------------------------------------------------------
 
-export interface 渲染标点段 {
+export interface punctSegment {
   from: number
   to: number
   /** 屏幕上显示的字符。 */
@@ -113,8 +113,8 @@ export interface 渲染标点段 {
  * 扫描是**逐字符推进**而非逐个正则匹配：`---` 必须优先于 `--` 匹配，
  * 用正则轮流试会先命中 `--`，把破折号拆成"连接号 + 连字符"。
  */
-export function scanPunct(docText: string, baseline: number): 渲染标点段[] {
-  const result: 渲染标点段[] = []
+export function scanPunct(docText: string, baseline: number): punctSegment[] {
+  const result: punctSegment[] = []
   let i = 0
 
   while (i < docText.length) {
@@ -265,7 +265,7 @@ export function 智能标点(options: 智能标点选项): Extension {
 }
 
 /** 依据设置决定是否启用，以及转换哪些字符。 */
-export function 按设置构建智能标点(settings: Settings): Extension {
+export function buildSmartPunct(settings: Settings): Extension {
   // '渲染时转换' 尚未实现，此时不做输入期转换——否则两种模式会同时生效。
   if (settings.smartPunctuationMode !== 'input') return []
   return 智能标点({ quoteChar: settings.smartQuotes, dashChar: settings.smartDashes })

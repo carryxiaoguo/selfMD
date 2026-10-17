@@ -64,16 +64,16 @@ function closeSubmenu(): void {
  *
  * @param 是子菜单 子菜单不注册全局收尾，它的生死由父菜单管
  */
-function 建立菜单(items: menuItem[], 是子菜单 = false): HTMLElement {
+function makeMenu(items: menuItem[], 是子菜单 = false): HTMLElement {
   const menu = document.createElement('div')
   menu.className = 是子菜单 ? 'selfmd-menu selfmd-submenu' : 'selfmd-menu'
   menu.setAttribute('role', 'menu')
 
   for (const item of items) {
     if (item.separator) {
-      const 线 = document.createElement('div')
-      线.className = 'selfmd-menu-sep'
-      menu.append(线)
+      const lineEl = document.createElement('div')
+      lineEl.className = 'selfmd-menu-sep'
+      menu.append(lineEl)
       continue
     }
 
@@ -82,10 +82,10 @@ function 建立菜单(items: menuItem[], 是子菜单 = false): HTMLElement {
     line.type = 'button'
     line.setAttribute('role', 'menuitem')
 
-    const 有子项 = Boolean(item.children && item.children.length > 0) && !item.disabled
+    const hasChildren = Boolean(item.children && item.children.length > 0) && !item.disabled
     // 没有动作的一律当标题处理，视觉上也区分开。
     // 有子项的行不执行动作，但它**是可点的**——置灰会让人以为整族都不可用。
-    const clickable = (Boolean(item.action) || 有子项) && !item.disabled
+    const clickable = (Boolean(item.action) || hasChildren) && !item.disabled
     if (!clickable) line.classList.add('disabled')
     if (item.dangerFlag) line.classList.add('danger')
     line.disabled = !clickable
@@ -107,7 +107,7 @@ function 建立菜单(items: menuItem[], 是子菜单 = false): HTMLElement {
       line.append(hint)
     }
 
-    if (有子项) {
+    if (hasChildren) {
       const arrowGlyph = document.createElement('span')
       arrowGlyph.className = 'selfmd-menu-arrow'
       arrowGlyph.textContent = '▸'
@@ -149,13 +149,13 @@ function 建立菜单(items: menuItem[], 是子菜单 = false): HTMLElement {
 }
 
 /** 在某一行右侧展开子菜单；右边放不下就翻到左侧。 */
-function 展开子菜单(宿主行: HTMLElement, items: menuItem[]): void {
+function 展开子菜单(hostRow: HTMLElement, items: menuItem[]): void {
   closeSubmenu()
 
-  const child = 建立菜单(items, true)
+  const child = makeMenu(items, true)
   document.body.append(child)
 
-  const rowRect = 宿主行.getBoundingClientRect()
+  const rowRect = hostRow.getBoundingClientRect()
   const width = child.offsetWidth
 
   // 优先右侧；右边塞不下就翻到左侧。窄窗口下这是唯一能看全的办法。
@@ -167,7 +167,7 @@ function 展开子菜单(宿主行: HTMLElement, items: menuItem[]): void {
   // 指针从宿主行移进子菜单的途中会经过这里，所以子菜单也要接管
   child.addEventListener('mouseleave', (event) => {
     const related = event.relatedTarget as Node | null
-    if (related && (child.contains(related) || 宿主行.contains(related))) return
+    if (related && (child.contains(related) || hostRow.contains(related))) return
     closeSubmenu()
   })
 
@@ -182,7 +182,7 @@ function 展开子菜单(宿主行: HTMLElement, items: menuItem[]): void {
 export function popupMenu(position: { x: number; y: number }, items: menuItem[]): void {
   closeMenu()
 
-  const menu = 建立菜单(items)
+  const menu = makeMenu(items)
 
   // 先挂到 DOM 才能量尺寸，量完再定位，避免先闪一下再跳到正确位置
   document.body.append(menu)
@@ -197,14 +197,14 @@ export function popupMenu(position: { x: number; y: number }, items: menuItem[])
   currentMenu = menu
 
   // --- 收尾：任何一个来源触发都关掉 ---
-  const 按下别处 = (event: MouseEvent): void => {
+  const onOutsideDown = (event: MouseEvent): void => {
     const target = event.target as Node
     // 子菜单挂在 body 上，不在父菜单的 contains 里，
     // 漏掉它会让"点子菜单里的项"先触发关闭、动作再也执行不到。
     if (menu.contains(target) || activeSubmenu?.contains(target)) return
     closeMenu()
   }
-  const 按键 = (event: KeyboardEvent): void => {
+  const onKeyDown = (event: KeyboardEvent): void => {
     if (event.key === 'Escape') {
       event.preventDefault()
       event.stopPropagation()
@@ -215,16 +215,16 @@ export function popupMenu(position: { x: number; y: number }, items: menuItem[])
   const scroll = (): void => closeMenu()
 
   // 用捕获阶段：编辑器会吞掉一部分事件，冒泡到不了 document
-  document.addEventListener('mousedown', 按下别处, true)
-  document.addEventListener('keydown', 按键, true)
+  document.addEventListener('mousedown', onOutsideDown, true)
+  document.addEventListener('keydown', onKeyDown, true)
   window.addEventListener('resize', scroll)
   window.addEventListener('blur', scroll)
   // `scroll` 不冒泡，但捕获阶段能收到任意滚动容器的滚动
   document.addEventListener('scroll', scroll, true)
 
   cleanupFn = (): void => {
-    document.removeEventListener('mousedown', 按下别处, true)
-    document.removeEventListener('keydown', 按键, true)
+    document.removeEventListener('mousedown', onOutsideDown, true)
+    document.removeEventListener('keydown', onKeyDown, true)
     window.removeEventListener('resize', scroll)
     window.removeEventListener('blur', scroll)
     document.removeEventListener('scroll', scroll, true)

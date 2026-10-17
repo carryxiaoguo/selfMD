@@ -20,13 +20,13 @@ interface fileRow {
 
 export interface 快速打开选项 {
   /** 建立索引：返回候选文件。失败时返回空数组。 */
-  取文件: () => Promise<{ file: fileRow[]; truncated: boolean }>
+  takeFile: () => Promise<{ file: fileRow[]; truncated: boolean }>
   /** 用户选中某个文件。 */
   open: (filePath: string) => void
 }
 
 /** 打开快速打开面板。重复调用会先关掉已有面板。 */
-export async function 打开快速打开面板(options: 快速打开选项): Promise<void> {
+export async function openQuickOpen(options: 快速打开选项): Promise<void> {
   document.querySelector('.quick-open-mask')?.remove()
 
   const overlay = document.createElement('div')
@@ -59,7 +59,7 @@ export async function 打开快速打开面板(options: 快速打开选项): Pro
 
   const close = (): void => {
     overlay.remove()
-    document.removeEventListener('keydown', 全局键, true)
+    document.removeEventListener('keydown', globalKey, true)
   }
 
   /** 把当前命中列表画出来。 */
@@ -123,7 +123,7 @@ export async function 打开快速打开面板(options: 快速打开选项): Pro
   }
 
   /** 全局按键：面板打开期间接管键盘，避免编辑器同时响应。 */
-  const 全局键 = (event: KeyboardEvent): void => {
+  const globalKey = (event: KeyboardEvent): void => {
     if (event.key === 'Escape') {
       event.preventDefault()
       event.stopPropagation()
@@ -149,14 +149,14 @@ export async function 打开快速打开面板(options: 快速打开选项): Pro
   }
 
   input.addEventListener('input', filterBy)
-  input.addEventListener('keydown', 全局键)
+  input.addEventListener('keydown', globalKey)
   // 点遮罩空白处关闭（点面板内部不关）
   overlay.addEventListener('mousedown', (event) => {
     if (event.target === overlay) close()
   })
 
   try {
-    const result = await options.取文件()
+    const result = await options.takeFile()
     all = result.file
     // 索引是异步建的，期间用户可能已经打了不少字——这里必须按**当前**输入重算，
     // 而不是用建索引时捕获的旧值

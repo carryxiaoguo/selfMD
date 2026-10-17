@@ -29,7 +29,7 @@ export interface label {
   editorState: EditorState
 }
 
-export class 标签管理器 {
+export class tabManager {
   private tabs: label[] = []
   private currentIndex = -1
   private 下一个标识 = 1
@@ -140,11 +140,11 @@ export class 标签管理器 {
     if (subscript < 0) return null
     if (this.tabs.length <= 1) return null
 
-    const 被关 = this.tabs[subscript]
+    const closedFlag = this.tabs[subscript]
     // 关闭当前标签前先把编辑器状态写回，否则重新打开时拿到的是上一次切换时的快照
-    if (subscript === this.currentIndex) flushCurrent(被关)
+    if (subscript === this.currentIndex) flushCurrent(closedFlag)
 
-    this.closed.push({ state: { ...被关.state }, content })
+    this.closed.push({ state: { ...closedFlag.state }, content })
     // 只留最近 20 个：再多也没人会去翻，而且未保存的内容留在内存里是负担
     if (this.closed.length > 20) this.closed.shift()
 

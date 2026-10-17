@@ -23,7 +23,7 @@ import { sentenceRange, wordSpan } from './selection'
 import { readFrontMatter, setAttr, removeAttr } from '@shared/front-matter'
 import {
   uniqueFileName,
-  应当搬运,
+  shouldMove,
   resolveTargetDir,
   type ResolveTargetInput,
   type targetResult,
@@ -160,7 +160,7 @@ function 单例执行(
 }
 
 /** 运行全部用例，返回"用例名 → 输出"的对照表。 */
-export function 运行命令自测(view: EditorView, 恢复状态: EditorState): Record<string, string> {
+export function runCommandSelfTest(view: EditorView, 恢复状态: EditorState): Record<string, string> {
   const result: Record<string, string> = {}
   for (const item of 用例表) {
     result[`${item.name}：${item.input.replace(/\n/g, '⏎')}`] = 单例执行(view, item.input, item.selection, item.run)
@@ -180,7 +180,7 @@ export function 运行命令自测(view: EditorView, 恢复状态: EditorState):
  * 分割线而不是破折号、英文句点只有在词尾才断句、中日韩文字没有词边界……
  * 逐条断言是唯一能在重构时不走样的办法。
  */
-export function 运行纯函数自测(): Record<string, string> {
+export function runPureSelfTest(): Record<string, string> {
   const result: Record<string, string> = {}
 
   // --- 引号方向 ---------------------------------------------------------
@@ -258,7 +258,7 @@ function 显示目标(result: targetResult): string {
  * 未保存文档），而写错的症状是"图片跑到奇怪的地方去了"——靠手点几乎不可能
  * 穷举。做成纯函数并逐条断言，是唯一能保证不走样的办法。
  */
-export function 运行图片管线自测(): Record<string, string> {
+export function runImagePipelineSelfTest(): Record<string, string> {
   const result: Record<string, string> = {}
 
   // --- 目标目录解析 -----------------------------------------------------
@@ -314,7 +314,7 @@ export function 运行图片管线自测(): Record<string, string> {
     ['源与目标都为空', { source: '', targetDir: '' }]
   ]
   for (const [name, overwrite] of 搬运用例) {
-    result[`搬运·${name}`] = 应当搬运({ ...搬运基准, ...overwrite }) ? '搬运' : '不搬'
+    result[`搬运·${name}`] = shouldMove({ ...搬运基准, ...overwrite }) ? '搬运' : '不搬'
   }
 
   // --- 唯一文件名 -------------------------------------------------------
@@ -324,16 +324,16 @@ export function 运行图片管线自测(): Record<string, string> {
   result['命名·跳过已占用的连续编号'] = uniqueFileName('甲.png', (name) => 占用集合.has(name))
 
   // --- 前置元数据读写 ---------------------------------------------------
-  const 无元数据 = '# 标题\n\n正文'
+  const noMeta = '# 标题\n\n正文'
   const hasMeta = '---\ntitle: 甲\nimage-folder: imgs\n---\n\n正文'
 
-  result['元数据·无元数据'] = readFrontMatter(无元数据).exists ? '存在' : '不存在'
+  result['元数据·无元数据'] = readFrontMatter(noMeta).exists ? '存在' : '不存在'
 
-  const 读有 = readFrontMatter(hasMeta)
-  result['元数据·读取图片目录'] = 读有.attr['image-folder'] ?? '(缺失)'
-  result['元数据·读取标题'] = 读有.attr['title'] ?? '(缺失)'
+  const readYes = readFrontMatter(hasMeta)
+  result['元数据·读取图片目录'] = readYes.attr['image-folder'] ?? '(缺失)'
+  result['元数据·读取标题'] = readYes.attr['title'] ?? '(缺失)'
 
-  result['元数据·写入到无元数据的文档'] = setAttr(无元数据, 'image-folder', 'imgs')
+  result['元数据·写入到无元数据的文档'] = setAttr(noMeta, 'image-folder', 'imgs')
     .split('\n')
     .slice(0, 3)
     .join('⏎')
@@ -387,7 +387,7 @@ export function 运行图片管线自测(): Record<string, string> {
  * 断言用"有没有这段 HTML"而不是比整串：整串断言在加一个换行时就全红，
  * 而这里真正要钉住的是**结构**——标签名、嵌套、转义、属性。
  */
-export function 运行导出自测(): Record<string, string> {
+export function runExportSelfTest(): Record<string, string> {
   const docModel = [
     '# 标题一',
     '',
@@ -468,28 +468,28 @@ export function 运行导出自测(): Record<string, string> {
  * 顺带检查下拉项的值与数值区间是否自洽——选了却存不进去、
  * 或者被夹在边界上出不来，症状与键名写错一样安静。
  */
-export function 运行偏好设置自测(): Record<string, string> {
+export function runPrefsSelfTest(): Record<string, string> {
   const result: Record<string, string> = {}
   const items = allSettingItems()
 
   result['偏好设置·项目数'] = String(items.length)
   result['偏好设置·分区数'] = String(PrefsSchema.length)
 
-  const 坏键 = validateSchema()
-  result['偏好设置·键名全部有效'] = 坏键.length === 0 ? '有效' : `无效：${坏键.join('、')}`
+  const badKey = validateSchema()
+  result['偏好设置·键名全部有效'] = badKey.length === 0 ? '有效' : `无效：${badKey.join('、')}`
 
   // 重复键会让两项互相覆盖，界面上表现为"改了一个另一个也变"
-  const 键们 = items.map((item) => String(item.key))
-  const 重复 = 键们.filter((key, subscript) => 键们.indexOf(key) !== subscript)
-  result['偏好设置·无重复项'] = 重复.length === 0 ? '无重复' : `重复：${[...new Set(重复)].join('、')}`
+  const keys = items.map((item) => String(item.key))
+  const duplicate = keys.filter((key, subscript) => keys.indexOf(key) !== subscript)
+  result['偏好设置·无重复项'] = duplicate.length === 0 ? '无重复' : `重复：${[...new Set(duplicate)].join('、')}`
 
   // 下拉项必须有选项，否则渲染出一个空下拉框
-  const 空下拉 = items.filter((item) => item.kind === '下拉' && (item.options?.length ?? 0) === 0)
+  const emptySelect = items.filter((item) => item.kind === '下拉' && (item.options?.length ?? 0) === 0)
   result['偏好设置·下拉均有选项'] =
-    空下拉.length === 0 ? '均有' : `空下拉：${空下拉.map((item) => String(item.key)).join('、')}`
+    emptySelect.length === 0 ? '均有' : `空下拉：${emptySelect.map((item) => String(item.key)).join('、')}`
 
   // 数值项的上下界必须自洽，否则夹紧逻辑会把值卡在边界上出不来
-  const 界错 = items.filter(
+  const uiErr = items.filter(
     (item) =>
       item.kind === '数字' &&
       item.minValue !== undefined &&
@@ -497,20 +497,20 @@ export function 运行偏好设置自测(): Record<string, string> {
       item.minValue >= item.maxValue
   )
   result['偏好设置·数值区间自洽'] =
-    界错.length === 0 ? '自洽' : `区间错误：${界错.map((item) => String(item.key)).join('、')}`
+    uiErr.length === 0 ? '自洽' : `区间错误：${uiErr.map((item) => String(item.key)).join('、')}`
 
   // 每项都要有中文标签
-  const 无中文 = items.filter((item) => !/[\u4e00-\u9fff]/.test(item.label))
+  const noChinese = items.filter((item) => !/[\u4e00-\u9fff]/.test(item.label))
   result['偏好设置·标签均含中文'] =
-    无中文.length === 0 ? '均含' : `缺中文：${无中文.map((item) => String(item.key)).join('、')}`
+    noChinese.length === 0 ? '均含' : `缺中文：${noChinese.map((item) => String(item.key)).join('、')}`
 
   // 下拉项的当前默认值必须是合法选项之一，否则打开面板就是"选了个不存在的项"
   const defaultOutOfRange: string[] = []
   for (const item of items) {
     if (item.kind !== '下拉' || !item.options) continue
-    const 默认值 = String(DEFAULT_SETTINGS[item.key] ?? '')
-    if (!item.options.some((options) => options.value === 默认值)) {
-      defaultOutOfRange.push(`${String(item.key)}=${默认值}`)
+    const defaultVal = String(DEFAULT_SETTINGS[item.key] ?? '')
+    if (!item.options.some((options) => options.value === defaultVal)) {
+      defaultOutOfRange.push(`${String(item.key)}=${defaultVal}`)
     }
   }
   result['偏好设置·默认值在选项内'] =
@@ -529,7 +529,7 @@ export function 运行偏好设置自测(): Record<string, string> {
  * **最后那条停止条件是最关键的**：不设它，日志里出现的任何网址都会被当成结果，
  * 于是"上传 1 张图返回 3 个 URL"，回填时张冠李戴——而且看起来像是上传器的问题。
  */
-export function 运行上传自测(): Record<string, string> {
+export function runUploadSelfTest(): Record<string, string> {
   const result: Record<string, string> = {}
   const solved = (output: string, uploader: uploaderType = 'picgo-cli', expectedValue = 1): string => {
     const r = parseUploadResult(output, uploader, expectedValue)
@@ -619,7 +619,7 @@ export function 运行上传自测(): Record<string, string> {
  *   2. 结尾 `$` 前面不能是空白
  *   3. 内容不能为空
  */
-export function 运行数学自测(): Record<string, string> {
+export function runMathSelfTest(): Record<string, string> {
   const result: Record<string, string> = {}
   const sweep = (docText: string): string =>
     scanInlineMath(docText, 0)
@@ -668,7 +668,7 @@ export function 运行数学自测(): Record<string, string> {
  * **扫描的推进顺序**：`---` 必须先于 `--` 匹配，否则破折号会被拆成
  * "连接号 + 连字符"。
  */
-export function 运行渲染标点自测(): Record<string, string> {
+export function runTypographySelfTest(): Record<string, string> {
   const result: Record<string, string> = {}
   const sweep = (docText: string): string =>
     scanPunct(docText, 0)
@@ -711,7 +711,7 @@ export function 运行渲染标点自测(): Record<string, string> {
  * 敲 `md` 会把几百个文件全列出来而想要的排在最后——
  * 那还不如直接翻文件树。所以断言的都是相对顺序。
  */
-export function 运行模糊匹配自测(): Record<string, string> {
+export function runFuzzySelfTest(): Record<string, string> {
   const result: Record<string, string> = {}
 
   const 名单 = [
@@ -752,9 +752,9 @@ export function 运行模糊匹配自测(): Record<string, string> {
   result['评分·查询比文本长'] = fuzzyScore('abcdef', 'abc') === null ? '不匹配' : '匹配'
   result['评分·大小写不敏感'] = fuzzyScore('ABC', 'abc') === null ? '不匹配' : '匹配'
   // 完全包含要拿到高分，且位置越靠前分越高
-  const 靠前 = fuzzyScore('a', 'a___') ?? -1
-  const 靠后 = fuzzyScore('a', '___a') ?? -1
-  result['评分·靠前分更高'] = 靠前 > 靠后 ? '是' : `否(${靠前} vs ${靠后})`
+  const nearer = fuzzyScore('a', 'a___') ?? -1
+  const farther = fuzzyScore('a', '___a') ?? -1
+  result['评分·靠前分更高'] = nearer > farther ? '是' : `否(${nearer} vs ${farther})`
 
   // --- 路径末段 ---
   result['路径末段·反斜杠'] = pathTail('E:\\项目\\文档\\甲.md')
@@ -773,7 +773,7 @@ export function 运行模糊匹配自测(): Record<string, string> {
  * 覆盖的都是容易写错的边界：收尾井号、Setext 下划线算不算正文、
  * 光标在第一个标题之前该返回什么。
  */
-export function 运行大纲自测(): Record<string, string> {
+export function runOutlineSelfTest(): Record<string, string> {
   const docModel = [
     '前言文字。',
     '',

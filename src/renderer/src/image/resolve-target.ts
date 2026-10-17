@@ -54,12 +54,12 @@ export type targetResult =
 
 /** 上传哨兵值。通行做法用 `ipic` 与 `upload` 两个词表示同一件事。 */
 function 是上传标记(value: string): boolean {
-  const 小写 = value.toLowerCase()
-  return 小写 === 'ipic' || 小写 === 'upload'
+  const lowerCase = value.toLowerCase()
+  return lowerCase === 'ipic' || lowerCase === 'upload'
 }
 
 /** 把 `${filename}` 换成不含扩展名的文档名。 */
-function 替换文件名占位符(template: string, docName: string | null): string {
+function replaceNamePlaceholder(template: string, docName: string | null): string {
   const 基名 = docName ? stripExt(docName) : ''
   return template.replace(/\$\{filename\}/g, 基名)
 }
@@ -85,7 +85,7 @@ export function resolveTargetDir(input: ResolveTargetInput): targetResult {
     if ((input.autoUploadAllowed || input.强制上传) && 是上传标记(docLevel)) {
       return { kind: '上传', origin: '文档级设置' }
     }
-    const expand = 替换文件名占位符(docLevel, input.docName)
+    const expand = replaceNamePlaceholder(docLevel, input.docName)
     if (isAbsolute(expand)) return { kind: '目录', filePath: normalizePath(expand), origin: '文档级设置' }
     if (!input.docDir) return { kind: '需要保存' }
     return { kind: '目录', filePath: concat(input.docDir, expand), origin: '文档级设置' }
@@ -120,7 +120,7 @@ export function resolveTargetDir(input: ResolveTargetInput): targetResult {
       const template = input.customDir?.trim()
       // 自定义目录没填时退回"不动"，而不是悄悄把图片丢到某个默认位置。
       if (!template) return { kind: '不动' }
-      const expand = 替换文件名占位符(template, input.docName)
+      const expand = replaceNamePlaceholder(template, input.docName)
       if (isAbsolute(expand)) return { kind: '目录', filePath: normalizePath(expand), origin: '全局设置' }
       if (!input.docDir) return { kind: '需要保存' }
       return { kind: '目录', filePath: concat(input.docDir, expand), origin: '全局设置' }
@@ -163,14 +163,14 @@ export interface MoveDecisionInput {
  *   - `data:` 内联图片没有实体文件可搬
  *   - 用户关掉了对应来源的自动搬运
  */
-export function 应当搬运(input: MoveDecisionInput): boolean {
+export function shouldMove(input: MoveDecisionInput): boolean {
   const { source, targetDir } = input
   if (!source || !targetDir) return false
   // 已经在目标目录内：路径前缀匹配，且后面确实还有一层，不是目录本身。
-  const 归一目标 = targetDir.replace(/[\\/]+$/, '').replace(/\\/g, '/')
-  const 归一本源 = source.replace(/^file:\/\//, '').replace(/\\/g, '/')
-  if (归一本源 === 归一目标) return false
-  if (归一本源.startsWith(`${归一目标}/`)) return false
+  const normalizeTarget = targetDir.replace(/[\\/]+$/, '').replace(/\\/g, '/')
+  const normalizeSource = source.replace(/^file:\/\//, '').replace(/\\/g, '/')
+  if (normalizeSource === normalizeTarget) return false
+  if (normalizeSource.startsWith(`${normalizeTarget}/`)) return false
 
   if (是数据地址(source)) return false
   return 是远程来源(source) ? input.moveRemote : input.moveLocal

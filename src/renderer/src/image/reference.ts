@@ -108,7 +108,7 @@ export function buildRefUrl(
 }
 
 /** 由图片路径推断 alt 文本：取文件名去掉扩展名。 */
-export function 生成替代文本(imagePath: string): string {
+export function buildAltText(imagePath: string): string {
   return stripExt(takeFileName(imagePath))
 }
 
@@ -122,14 +122,14 @@ export type imageSyntax = 'markdown' | 'html'
  */
 export function buildImageSyntax(
   url: string,
-  替代文本: string,
+  altContent: string,
   syntax: imageSyntax = 'markdown'
 ): string {
   if (syntax === 'html') {
-    const escaped = 替代文本.replace(/"/g, '&quot;')
+    const escaped = altContent.replace(/"/g, '&quot;')
     return `<img src="${url}" alt="${escaped}" />`
   }
   // alt 里的 `]` 会提前闭合方括号，必须转义。
-  const 安全替代 = 替代文本.replace(/]/g, '\\]')
+  const 安全替代 = altContent.replace(/]/g, '\\]')
   return `![${安全替代}](${url})`
 }

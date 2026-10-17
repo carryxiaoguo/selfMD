@@ -23,11 +23,11 @@ export function fuzzyScore(query: string, docText: string): number | null {
   if (query.length === 0) return 0
   if (query.length > docText.length) return null
 
-  const 低查询 = query.toLowerCase()
-  const 低文本 = docText.toLowerCase()
+  const lowQuery = query.toLowerCase()
+  const lowText = docText.toLowerCase()
 
   // 完全包含时给一个很高的底分：这是最强的信号，不该被字符级评分超过
-  const directPos = 低文本.indexOf(低查询)
+  const directPos = lowText.indexOf(lowQuery)
   if (directPos >= 0) {
     return 1000 + 连续奖励(docText, directPos, query.length) - directPos
   }
@@ -37,12 +37,12 @@ export function fuzzyScore(query: string, docText: string): number | null {
   let textPos = 0
   let lastMatch = -1
 
-  for (const ch of 低查询) {
-    const found = 低文本.indexOf(ch, textPos)
+  for (const ch of lowQuery) {
+    const found = lowText.indexOf(ch, textPos)
     if (found < 0) return null
 
     if (found === lastMatch + 1) score += 8 // 连续
-    if (是词首(docText, found)) score += 6
+    if (isWordStart(docText, found)) score += 6
     score -= Math.min(found - textPos, 4) // 跳过的字符越多扣得越多，但有上限
 
     lastMatch = found
@@ -55,7 +55,7 @@ export function fuzzyScore(query: string, docText: string): number | null {
 }
 
 /** 该位置是不是一个词的开始（串首、分隔符之后、或小写转大写处）。 */
-function 是词首(docText: string, position: number): boolean {
+function isWordStart(docText: string, position: number): boolean {
   if (position === 0) return true
   const before = docText[position - 1]
   if (/[\s\-_/.\\]/.test(before)) return true
@@ -66,7 +66,7 @@ function 是词首(docText: string, position: number): boolean {
 /** 连续匹配的奖励：连着命中越多，加分越高。 */
 function 连续奖励(docText: string, position: number, length: number): number {
   let score = length * 2
-  if (是词首(docText, position)) score += 10
+  if (isWordStart(docText, position)) score += 10
   return score
 }
 
@@ -84,26 +84,26 @@ export interface candidate<T> {
  */
 export function fuzzyFilter<T>(
   query: string,
-  候选们: candidate<T>[],
+  candidates: candidate<T>[],
   取末段: (docText: string) => string,
   limit = 50
 ): T[] {
   if (query.trim().length === 0) {
-    return 候选们.slice(0, limit).map((c) => c.entry)
+    return candidates.slice(0, limit).map((c) => c.entry)
   }
 
-  const 查询段 = query.trim()
+  const querySegment = query.trim()
   const hit: { entry: T; score: number }[] = []
 
-  for (const candidate of 候选们) {
-    const 整体分 = fuzzyScore(查询段, candidate.docText)
-    const 段分 = fuzzyScore(查询段, 取末段(candidate.docText))
+  for (const candidate of candidates) {
+    const totalScoreValue = fuzzyScore(querySegment, candidate.docText)
+    const segmentScore = fuzzyScore(querySegment, 取末段(candidate.docText))
 
     // 两处都不匹配就淘汰
-    if (整体分 === null && 段分 === null) continue
+    if (totalScoreValue === null && segmentScore === null) continue
 
     // 末段命中权重更高：同样匹配上，文件名对得上的一定更接近用户意图
-    const score = (段分 ?? 0) * 3 + (整体分 ?? 0)
+    const score = (segmentScore ?? 0) * 3 + (totalScoreValue ?? 0)
     hit.push({ entry: candidate.entry, score })
   }
 

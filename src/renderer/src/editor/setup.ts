@@ -35,7 +35,7 @@ import {
 import { tags as t } from '@lezer/highlight'
 import type { Settings } from '@shared/types'
 import { livePreview } from './live-preview'
-import { 按设置构建智能标点 } from './smart-punctuation'
+import { buildSmartPunct } from './smart-punctuation'
 import { continueCodeFence, continueQuote, exitCodeBlock } from './commands'
 import { moveToAdjacentCell } from './table'
 
@@ -252,7 +252,7 @@ export function baseExtensions(options: EditorOptions): Extension[] {
     EditorView.contentAttributes.of({ id: 'write' }),
     // 智能标点与自动配对都依赖设置，但它们只在"键入"这一条路径上起作用，
     // 改动设置后重启编辑器即可生效，因此放在基础扩展里。
-    按设置构建智能标点(settings),
+    buildSmartPunct(settings),
     按设置构建配对(settings)
   ]
 

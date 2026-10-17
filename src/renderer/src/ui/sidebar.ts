@@ -16,34 +16,34 @@ import type { headingItem } from './outline'
 export type sidebarTabName = 'outline' | 'files' | 'articles'
 
 /** 文档列表里的一项。 */
-export interface 文档列表项 {
+export interface docListItem {
   id: number
   nameText: string
-  脏: boolean
+  dirtyFlag: boolean
   current: boolean
 }
 
-export interface 侧边栏依赖 {
+export interface sidebarDeps {
   /** 当前文档路径；未保存时为 null。 */
-  取文档路径: () => string | null
+  takeDocPath: () => string | null
   /** 点击大纲项时把光标移到该偏移。 */
-  跳转到: (position: number) => void
+  jumpTo: (position: number) => void
   /** 点击文件树项时打开该文件。 */
-  打开文件: (filePath: string) => void
+  openFile: (filePath: string) => void
   /** 点击文档列表项时切换到该文档。 */
-  点击文档: (id: number) => void
+  clickDoc: (id: number) => void
   /** 点击文档列表项的关闭按钮。 */
-  关闭文档: (id: number) => void
+  closeDoc: (id: number) => void
   /** 折叠 / 展开大纲某一段（当前不做折叠，保留接口）。 */
   saveState: (state: { visibleNow: boolean; label: sidebarTabName; widthPx: number }) => void
 }
 
-const 最小宽度 = 160
-const 最大宽度 = 520
+const minWidth = 160
+const maxWidth = 520
 
 export class sidebar {
   private host: HTMLElement
-  private deps: 侧边栏依赖
+  private deps: sidebarDeps
   private label: sidebarTabName = 'outline'
   private widthPx = 260
   private visibleNow = false
@@ -51,13 +51,13 @@ export class sidebar {
   private filesPanel!: HTMLElement
   private docsPanel!: HTMLElement
   /** 已打开的文档列表。由外层在多文档变化时推送。 */
-  private docList: 文档列表项[] = []
-  private 标签按钮 = new Map<sidebarTabName, HTMLButtonElement>()
+  private docList: docListItem[] = []
+  private tabButton = new Map<sidebarTabName, HTMLButtonElement>()
   private highlightIndex = -1
   /** 已展开的目录路径。文件树每次重绘都读它，折叠状态才不会丢。 */
   private expanded = new Set<string>()
 
-  constructor(host: HTMLElement, deps: 侧边栏依赖) {
+  constructor(host: HTMLElement, deps: sidebarDeps) {
     this.host = host
     this.deps = deps
     this.build()
@@ -84,7 +84,7 @@ export class sidebar {
       button.textContent = text
       button.addEventListener('click', () => this.setTab(value))
       tabBar.append(button)
-      this.标签按钮.set(value, button)
+      this.tabButton.set(value, button)
     }
 
     const mainBody = document.createElement('div')
@@ -113,12 +113,12 @@ export class sidebar {
   }
 
   private applyTab(): void {
-    for (const [value, button] of this.标签按钮) button.classList.toggle('active', value === this.label)
+    for (const [value, button] of this.tabButton) button.classList.toggle('active', value === this.label)
     this.outlinePanel.hidden = this.label !== 'outline'
     this.filesPanel.hidden = this.label !== 'files'
     this.docsPanel.hidden = this.label !== 'articles'
     if (this.label === 'files') void this.refreshFileTree()
-    if (this.label === 'articles') this.重绘文档列表()
+    if (this.label === 'articles') this.repaintDocList()
   }
 
   // ------------------------------------------------------------- 交互 ----
@@ -129,13 +129,13 @@ export class sidebar {
     const 起始宽 = this.widthPx
 
     const move = (event: MouseEvent): void => {
-      const width = Math.min(最大宽度, Math.max(最小宽度, 起始宽 + (event.clientX - fromPos)))
+      const width = Math.min(maxWidth, Math.max(minWidth, 起始宽 + (event.clientX - fromPos)))
       this.widthPx = width
       this.host.style.width = `${width}px`
     }
-    const 松开 = (): void => {
+    const onRelease = (): void => {
       document.removeEventListener('mousemove', move)
-      document.removeEventListener('mouseup', 松开)
+      document.removeEventListener('mouseup', onRelease)
       // 拖拽期间给 body 加类，避免选中文本、并把光标保持为左右拉伸
       document.body.classList.remove('resizing-sidebar')
       this.deps.saveState({ visibleNow: this.visibleNow, label: this.label, widthPx: this.widthPx })
@@ -143,7 +143,7 @@ export class sidebar {
 
     document.body.classList.add('resizing-sidebar')
     document.addEventListener('mousemove', move)
-    document.addEventListener('mouseup', 松开)
+    document.addEventListener('mouseup', onRelease)
   }
 
   // ------------------------------------------------------------- 对外 ----
@@ -180,7 +180,7 @@ export class sidebar {
   }
 
   setWidth(width: number): void {
-    this.widthPx = Math.min(最大宽度, Math.max(最小宽度, width))
+    this.widthPx = Math.min(maxWidth, Math.max(minWidth, width))
     this.host.style.width = `${this.widthPx}px`
   }
 
@@ -192,12 +192,12 @@ export class sidebar {
    * 只在内容真的变了时重建 DOM：光标每移动一次都会调用这个方法，
    * 每次都重建会让点击目标在鼠标按下的瞬间消失。
    */
-  private 上次大纲签名 = ''
+  private lastOutlineSig = ''
 
   setOutline(headings: headingItem[], currentIndex: number): void {
-    const 签名 = headings.map((t) => `${t.level}:${t.position}:${t.docText}`).join('|')
-    if (签名 !== this.上次大纲签名) {
-      this.上次大纲签名 = 签名
+    const signature = headings.map((t) => `${t.level}:${t.position}:${t.docText}`).join('|')
+    if (signature !== this.lastOutlineSig) {
+      this.lastOutlineSig = signature
       this.重绘大纲(headings)
     }
     this.高亮大纲(currentIndex)
@@ -231,7 +231,7 @@ export class sidebar {
       label.title = title.docText
 
       item.append(fold, label)
-      item.addEventListener('click', () => this.deps.跳转到(title.position))
+      item.addEventListener('click', () => this.deps.jumpTo(title.position))
       this.outlinePanel.append(item)
     })
   }
@@ -266,7 +266,7 @@ export class sidebar {
     // 用户显式打开过文件夹时以它为准；否则跟随当前文档所在目录。
     // 两种模式都要有：跟随文档是默认（打开一个文件就想看到它的邻居），
     // 而显式打开一个文件夹之后，切到别处的文档不该把树根也带走。
-    const docModel = this.deps.取文档路径()
+    const docModel = this.deps.takeDocPath()
     let root: string | null
     if (this.manualRoot) {
       root = this.manualRoot
@@ -316,12 +316,12 @@ export class sidebar {
   // --------------------------------------------------------- 文档列表 ----
 
   /** 推送已打开的文档列表并重绘。 */
-  设置文档列表(list: 文档列表项[]): void {
+  设置文档列表(list: docListItem[]): void {
     this.docList = list
-    if (this.label === 'articles') this.重绘文档列表()
+    if (this.label === 'articles') this.repaintDocList()
   }
 
-  private 重绘文档列表(): void {
+  private repaintDocList(): void {
     this.docsPanel.textContent = ''
 
     if (this.docList.length === 0) {
@@ -345,7 +345,7 @@ export class sidebar {
 
       // 未保存的标记。只是一个点，但它是"这个文档还有改动没落盘"的唯一提示，
       // 而文档列表恰恰是多文档下最容易忘记存盘的地方。
-      if (item.脏) {
+      if (item.dirtyFlag) {
         const dot = document.createElement('span')
         dot.className = 'article-dirty'
         dot.textContent = '•'
@@ -362,12 +362,12 @@ export class sidebar {
         off.title = '关闭'
         off.addEventListener('click', (event) => {
           event.stopPropagation()
-          this.deps.关闭文档(item.id)
+          this.deps.closeDoc(item.id)
         })
         line.append(off)
       }
 
-      line.addEventListener('click', () => this.deps.点击文档(item.id))
+      line.addEventListener('click', () => this.deps.clickDoc(item.id))
       this.docsPanel.append(line)
     }
   }
@@ -468,7 +468,7 @@ export class sidebar {
       } else {
         // 点击文件打开它。非文本文件也交给编辑器，由它给出提示——
         // 在这里按扩展名过滤会让"想打开 .txt / .markdown"的常见需求落空。
-        line.addEventListener('click', () => this.deps.打开文件(item.path))
+        line.addEventListener('click', () => this.deps.openFile(item.path))
       }
     }
   }

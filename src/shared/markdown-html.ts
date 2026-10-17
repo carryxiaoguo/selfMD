@@ -15,9 +15,9 @@ import { Autolink, Strikethrough, Table, TaskList, parser } from '@lezer/markdow
  */
 
 // 与编辑器同配置：表格、任务列表、删除线、自动链接
-const 解析器 = parser.configure([Table, TaskList, Strikethrough, Autolink])
+const parserRef = parser.configure([Table, TaskList, Strikethrough, Autolink])
 
-export interface 渲染选项 {
+export interface renderOptions {
   /** 代码块的语言类名前缀，默认 `language-`。 */
   语言类前缀?: string
 }
@@ -36,7 +36,7 @@ function escapeAttr(docText: string): string {
 }
 
 /** 这些节点只是 Markdown 的语法标记，输出时整段跳过。 */
-const 标记节点 = new Set([
+const markNode = new Set([
   'HeaderMark',
   'QuoteMark',
   'ListMark',
@@ -94,7 +94,7 @@ function 标签名(节点名: string): string | null {
 interface context {
   source: string
   output: string[]
-  options: 渲染选项
+  options: renderOptions
 }
 
 /**
@@ -109,7 +109,7 @@ function recursive(node: any, context: context): void {
     if (child.from > cursor) {
       context.output.push(escapeHtml(context.source.slice(cursor, child.from)))
     }
-    处理(child, context)
+    handle(child, context)
     cursor = child.to
   }
   if (cursor < node.to) {
@@ -127,11 +127,11 @@ function 取语言(node: any, context: context): string {
   return ''
 }
 
-function 处理(node: any, context: context): void {
+function handle(node: any, context: context): void {
   const name = node.name
 
   // --- 直接跳过的语法标记 ---
-  if (标记节点.has(name)) {
+  if (markNode.has(name)) {
     // Setext 的下划线是 HeaderMark，必须整段吃掉，否则会当成正文渲染出来
     return
   }
@@ -155,22 +155,22 @@ function 处理(node: any, context: context): void {
     case 'InlineCode': {
       // 去掉包裹的反引号：内容从第一个 CodeMark 之后到最后一个 CodeMark 之前
       let start = node.from
-      let 止 = node.to
+      let stopPos = node.to
       const head = node.firstChild
       if (head && head.name === 'CodeMark') start = head.to
       let tail = node.lastChild
-      if (tail && tail.name === 'CodeMark' && tail !== head) 止 = tail.from
-      const content = source.slice(start, 止).trim()
+      if (tail && tail.name === 'CodeMark' && tail !== head) stopPos = tail.from
+      const content = source.slice(start, stopPos).trim()
       output.push(`<code>${escapeHtml(content)}</code>`)
       return
     }
 
     // ------------------------------------------------------------ 图片 --
     case 'Image': {
-      const url = 取链接地址(node, context)
+      const url = takeLinkUrl(node, context)
       const substitute = 取图片替代文本(node, context)
       output.push(`<img src="${escapeAttr(url)}" alt="${escapeAttr(substitute)}"`)
-      const title = 取链接标题(node, context)
+      const title = takeLinkTitle(node, context)
       if (title) output.push(` title="${escapeAttr(title)}"`)
       output.push('>')
       return
@@ -178,9 +178,9 @@ function 处理(node: any, context: context): void {
 
     // ------------------------------------------------------------ 链接 --
     case 'Link': {
-      const url = 取链接地址(node, context)
+      const url = takeLinkUrl(node, context)
       output.push(`<a href="${escapeAttr(url)}"`)
-      const title = 取链接标题(node, context)
+      const title = takeLinkTitle(node, context)
       if (title) output.push(` title="${escapeAttr(title)}"`)
       output.push('>')
       // 只渲染 `[` 与 `]` 之间的部分。
@@ -206,8 +206,8 @@ function 处理(node: any, context: context): void {
       // 有序列表可能不从 1 开始（`3. 甲`），start 属性必须带上，
       // 否则导出的编号会悄悄从 1 重排。
       const originalText = source.slice(node.from, Math.min(node.to, node.from + 12))
-      const 起始 = /^\s*(\d+)[.)]/.exec(originalText)
-      const 起始值 = 起始 ? Number(起始[1]) : 1
+      const startAtValue = /^\s*(\d+)[.)]/.exec(originalText)
+      const 起始值 = startAtValue ? Number(startAtValue[1]) : 1
       output.push(起始值 === 1 ? '<ol>\n' : `<ol start="${起始值}">\n`)
       recursive(node, context)
       output.push('</ol>\n')
@@ -339,19 +339,19 @@ function 渲染链接文字(node: any, context: context): void {
     if (child.from > cursor) {
       context.output.push(escapeHtml(context.source.slice(cursor, child.from)))
     }
-    if (!标记节点.has(child.name)) 处理(child, context)
+    if (!markNode.has(child.name)) handle(child, context)
     cursor = child.to
   }
 }
 
-function 取链接地址(node: any, context: context): string {
+function takeLinkUrl(node: any, context: context): string {
   for (let child = node.firstChild; child; child = child.nextSibling) {
     if (child.name === 'URL') return context.source.slice(child.from, child.to)
   }
   return ''
 }
 
-function 取链接标题(node: any, context: context): string {
+function takeLinkTitle(node: any, context: context): string {
   for (let child = node.firstChild; child; child = child.nextSibling) {
     if (child.name === 'LinkTitle') {
       return context.source
@@ -433,8 +433,8 @@ function 取对齐(lineNode: any, context: context): (string | null)[] {
  * 返回的是**正文片段**（一组块级元素），不含 `<html>` / `<body>` 外壳——
  * 外壳由导出模板负责，因为"网页"与"内嵌预览"需要不同的外壳。
  */
-export function renderMarkdownToHtml(source: string, options: 渲染选项 = {}): string {
-  const tree = 解析器.parse(source)
+export function renderMarkdownToHtml(source: string, options: renderOptions = {}): string {
+  const tree = parserRef.parse(source)
   const context: context = { source, output: [], options }
   recursive(tree.topNode, context)
   return context.output.join('')
@@ -477,7 +477,7 @@ export function cleanHeadingText(originalText: string, 是ATX: boolean): string 
 
 /** 从 Markdown 文本里提取标题。用于导出时生成侧边目录。 */
 export function extractOutline(source: string): outlineEntry[] {
-  const tree = 解析器.parse(source)
+  const tree = parserRef.parse(source)
   const result: outlineEntry[] = []
 
   tree.iterate({

@@ -100,15 +100,15 @@ export function setAttr(docText: string, key: string, value: string): string {
   if (endLine < 0) return docText
 
   const targetLine = `^${key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*:`
-  let 已更新 = false
+  let updated = false
   for (let i = 1; i < endLine; i++) {
     if (new RegExp(targetLine).test(lineList[i])) {
       lineList[i] = newLine
-      已更新 = true
+      updated = true
       break
     }
   }
-  if (!已更新) lineList.splice(endLine, 0, newLine)
+  if (!updated) lineList.splice(endLine, 0, newLine)
 
   return lineList.join('\n')
 }
@@ -135,15 +135,15 @@ export function removeAttr(docText: string, key: string): string {
   if (endLine < 0) return docText
 
   const targetLine = new RegExp(`^${key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*:`)
-  const 剩余 = lineList.slice(1, endLine).filter((line) => !targetLine.test(line))
+  const remaining = lineList.slice(1, endLine).filter((line) => !targetLine.test(line))
 
-  if (剩余.length === 0) {
+  if (remaining.length === 0) {
     // 整个元数据块都没用了，连同其后可能存在的空行一起去掉。
     let fromPos = endLine + 1
     while (fromPos < lineList.length && lineList[fromPos].trim() === '') fromPos += 1
     return lineList.slice(fromPos).join('\n')
   }
 
-  lineList.splice(1, endLine - 1, ...剩余)
+  lineList.splice(1, endLine - 1, ...remaining)
   return lineList.join('\n')
 }

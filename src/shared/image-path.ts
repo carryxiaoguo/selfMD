@@ -71,20 +71,20 @@ export function 取目录(filePath: string): string {
 export function uniqueFileName(
   expectedName: string,
   /** 询问"该名字是否已被占用"。由调用方注入，便于测试与异步实现。 */
-  已存在: (候选名: string) => boolean
+  alreadyExists: (候选名: string) => boolean
 ): string {
-  if (!已存在(expectedName)) return expectedName
+  if (!alreadyExists(expectedName)) return expectedName
 
   const extPos = expectedName.lastIndexOf('.')
-  const 主干 = extPos > 0 ? expectedName.slice(0, extPos) : expectedName
+  const trunk = extPos > 0 ? expectedName.slice(0, extPos) : expectedName
   const ext = extPos > 0 ? expectedName.slice(extPos) : ''
 
   for (let i = 1; i < 1000; i++) {
-    const candidate = `${主干}-${i}${ext}`
-    if (!已存在(candidate)) return candidate
+    const candidate = `${trunk}-${i}${ext}`
+    if (!alreadyExists(candidate)) return candidate
   }
   // 极端情况：交给调用方用时间戳兜底。
-  return `${主干}-${Date.now()}${ext}`
+  return `${trunk}-${Date.now()}${ext}`
 }
 
 /**

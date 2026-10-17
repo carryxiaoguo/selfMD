@@ -62,11 +62,11 @@ export function cellRanges(lineText: string): cell[] {
 }
 
 /** 光标所在单元格的序号；不在表格行上时返回 -1。 */
-export function currentCellIndex(lineText: string, 行内偏移: number): number {
+export function currentCellIndex(lineText: string, inlineOffset: number): number {
   const ranges = cellRanges(lineText)
   for (let i = 0; i < ranges.length; i++) {
     const cellBox = ranges[i]
-    if (行内偏移 >= cellBox.start && 行内偏移 <= cellBox.end) return i
+    if (inlineOffset >= cellBox.start && inlineOffset <= cellBox.end) return i
   }
   // 落在最后一个竖线之后（行尾没有闭合竖线的情况）
   return ranges.length > 0 ? ranges.length - 1 : -1
@@ -98,14 +98,14 @@ function makeEmptyRow(templateLineText: string): string {
   const 前导竖线 = templateLineText.trimStart().startsWith('|')
   const 尾部竖线 = templateLineText.trimEnd().endsWith('|')
 
-  const 段们: string[] = []
+  const segments: string[] = []
   for (let i = 0; i < ranges.length; i++) {
     const cellBox = ranges[i]
     // 保留每格原来多宽，只把内容换成空格
     const width = Math.max(1, cellBox.end - cellBox.start)
-    段们.push(' '.repeat(width))
+    segments.push(' '.repeat(width))
   }
-  const 体 = 段们.join('|')
+  const 体 = segments.join('|')
   return 左缩进 + (前导竖线 ? '|' : '') + 体 + (尾部竖线 ? '|' : '')
 }
 
@@ -260,9 +260,9 @@ export function tableAlign(view: EditorView, alignKind: 'left' | 'center' | 'rig
   if (!tbl) return false
 
   // 对齐定义行是表头下面那一行
-  const 定义行号 = tbl.head + 1
-  if (定义行号 > tbl.tail) return false
-  const delimRow = state.doc.line(定义行号)
+  const delimLineNo = tbl.head + 1
+  if (delimLineNo > tbl.tail) return false
+  const delimRow = state.doc.line(delimLineNo)
   if (!isAlignRow(delimRow.text)) return false
 
   const ranges = cellRanges(delimRow.text)
@@ -282,6 +282,6 @@ export function tableAlign(view: EditorView, alignKind: 'left' | 'center' | 'rig
 }
 
 /** 光标是否在一张表里。给右键菜单判断用。 */
-export function 在表格里(state: EditorState): boolean {
+export function isInTable(state: EditorState): boolean {
   return isTableRow(state.doc.lineAt(state.selection.main.head).text)
 }

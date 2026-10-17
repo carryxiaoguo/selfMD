@@ -200,12 +200,12 @@ export function deleteLineOrSentence(view: EditorView): boolean {
 }
 
 /** 跳转到行首（第一次按到文字开头，已在文字开头时到行首缩进处）。 */
-export function 跳转到行首(view: EditorView): boolean {
+export function jumpToLineStart(view: EditorView): boolean {
   const state = view.state
   const main = state.selection.main
   const line = state.doc.lineAt(main.head)
-  const 首个非空白 = line.from + (line.text.length - line.text.trimStart().length)
-  const target = main.head === 首个非空白 ? line.from : 首个非空白
+  const firstNonBlankChar = line.from + (line.text.length - line.text.trimStart().length)
+  const target = main.head === firstNonBlankChar ? line.from : firstNonBlankChar
   view.dispatch({
     selection: EditorSelection.cursor(target),
     scrollIntoView: true,
@@ -215,7 +215,7 @@ export function 跳转到行首(view: EditorView): boolean {
 }
 
 /** 跳转到行尾。 */
-export function 跳转到行尾(view: EditorView): boolean {
+export function jumpToLineEnd(view: EditorView): boolean {
   const state = view.state
   const line = state.doc.lineAt(state.selection.main.head)
   view.dispatch({
@@ -227,7 +227,7 @@ export function 跳转到行尾(view: EditorView): boolean {
 }
 
 /** 跳转到文首 / 文末。 */
-export function 跳转到文首(view: EditorView): boolean {
+export function jumpToDocStart(view: EditorView): boolean {
   view.dispatch({
     selection: EditorSelection.cursor(0),
     scrollIntoView: true,
@@ -236,7 +236,7 @@ export function 跳转到文首(view: EditorView): boolean {
   return true
 }
 
-export function 跳转到文末(view: EditorView): boolean {
+export function jumpToDocEnd(view: EditorView): boolean {
   view.dispatch({
     selection: EditorSelection.cursor(view.state.doc.length),
     scrollIntoView: true,

@@ -16,10 +16,10 @@ import { 图表 } from './widgets'
  */
 
 /** 支持的图表语言标识。常见解析器认 `mermaid`，也认 `sequence` 与 `flow`。 */
-const 图表语言 = new Set(['mermaid', 'sequence', 'flow', 'flowchart', 'gantt', 'class'])
+const DIAGRAM_LANGS = new Set(['mermaid', 'sequence', 'flow', 'flowchart', 'gantt', 'class'])
 
 /** 取围栏的语言标识。 */
-function 取围栏语言(state: EditorState, node: { firstChild: unknown }): string {
+function takeFenceLang(state: EditorState, node: { firstChild: unknown }): string {
   let child = node.firstChild as { name: string; from: number; to: number; nextSibling: unknown } | null
   while (child) {
     if (child.name === 'CodeInfo') {
@@ -31,7 +31,7 @@ function 取围栏语言(state: EditorState, node: { firstChild: unknown }): str
 }
 
 /** 取围栏里的代码正文（排除围栏标记本身）。 */
-function 取围栏正文(state: EditorState, node: { firstChild: unknown; from: number; to: number }): string {
+function takeFenceBody(state: EditorState, node: { firstChild: unknown; from: number; to: number }): string {
   const segment: string[] = []
   let child = node.firstChild as { name: string; from: number; to: number; nextSibling: unknown } | null
   while (child) {
@@ -42,15 +42,15 @@ function 取围栏正文(state: EditorState, node: { firstChild: unknown; from: 
 
   // 兜底：没有 CodeText 子节点时，去掉首尾两行围栏
   const lines = state.sliceDoc(node.from, node.to).split('\n')
-  return 去掉围栏行(lines).join('\n')
+  return stripFenceLines(lines).join('\n')
 }
 
 /** 去掉首尾两行围栏标记。行数不足时返回空数组。 */
-function 去掉围栏行(lines: string[]): string[] {
+function stripFenceLines(lines: string[]): string[] {
   return lines.length > 2 ? lines.slice(1, -1) : []
 }
 
-export interface 图表字段选项 {
+export interface DiagramFieldOptions {
   /** 当前是否深色模式；决定 Mermaid 用哪套配色。 */
   isDarkFlag: () => boolean
 }
@@ -61,21 +61,21 @@ export interface 图表字段选项 {
  * 用工厂函数而不是模块级常量：暗色与否随设置变化，字段需要能读到最新值。
  * 直接把布尔值捕进来会在切换主题后失效——图表仍用旧配色。
  */
-export function createDiagramField(options: 图表字段选项): Extension {
+export function createDiagramField(options: DiagramFieldOptions): Extension {
   function build(state: EditorState): DecorationSet {
     const range: ReturnType<Decoration['range']>[] = []
     const cursor = state.selection.main
     const darkMode = options.isDarkFlag()
 
-    树遍历(state, (node) => {
+    walkTree(state, (node) => {
       if (node.name !== 'FencedCode') return
       // 光标落在围栏内时露出源码——正在写图表的人需要看到 DSL，
       // 而不是一张渲染失败的图。
       if (cursor.from >= node.from && cursor.to <= node.to) return
 
-      const language = 取围栏语言(state, node)
-      if (!图表语言.has(language)) return
-      const sourceCode = 取围栏正文(state, node).trim()
+      const language = takeFenceLang(state, node)
+      if (!DIAGRAM_LANGS.has(language)) return
+      const sourceCode = takeFenceBody(state, node).trim()
       if (sourceCode.length === 0) return
 
       range.push(
@@ -100,7 +100,7 @@ export function createDiagramField(options: 图表字段选项): Extension {
 }
 
 /** 遍历语法树找围栏。抽出来只是为了让上面的逻辑读起来清楚些。 */
-function 树遍历(
+function walkTree(
   state: EditorState,
   callback: (node: { name: string; from: number; to: number; firstChild: unknown }) => void
 ): void {

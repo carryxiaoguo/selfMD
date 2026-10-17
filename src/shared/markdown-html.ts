@@ -207,8 +207,8 @@ function handle(node: any, context: context): void {
       // 否则导出的编号会悄悄从 1 重排。
       const originalText = source.slice(node.from, Math.min(node.to, node.from + 12))
       const startAtValue = /^\s*(\d+)[.)]/.exec(originalText)
-      const 起始值 = startAtValue ? Number(startAtValue[1]) : 1
-      output.push(起始值 === 1 ? '<ol>\n' : `<ol start="${起始值}">\n`)
+      const startValue = startAtValue ? Number(startAtValue[1]) : 1
+      output.push(startValue === 1 ? '<ol>\n' : `<ol start="${startValue}">\n`)
       recursive(node, context)
       output.push('</ol>\n')
       return
@@ -238,10 +238,10 @@ function handle(node: any, context: context): void {
       for (let child = node.firstChild; child; child = child.nextSibling) {
         if (child.name === 'TableHeader') {
           output.push('<thead>\n')
-          渲染表格行(child, context, 'th')
+          renderTableRow(child, context, 'th')
           output.push('</thead>\n')
         } else if (child.name === 'TableRow') {
-          渲染表格行(child, context, 'td')
+          renderTableRow(child, context, 'td')
         }
       }
       output.push('</table>\n')
@@ -279,9 +279,9 @@ function handle(node: any, context: context): void {
   // 所以先把内容渲染到临时缓冲，再整体去掉首尾空白。
   const headingMatch = 标题模式.exec(name)
   if (headingMatch) {
-    const 子缓冲: string[] = []
-    recursive(node, { ...context, output: 子缓冲 })
-    output.push(`<h${headingMatch[1]}>${子缓冲.join('').trim()}</h${headingMatch[1]}>\n`)
+    const childBuffer: string[] = []
+    recursive(node, { ...context, output: childBuffer })
+    output.push(`<h${headingMatch[1]}>${childBuffer.join('').trim()}</h${headingMatch[1]}>\n`)
     return
   }
 
@@ -301,14 +301,14 @@ function handle(node: any, context: context): void {
 
 /** 代码块内容：只取 CodeText 子节点，避免把围栏符号也当内容。 */
 function 收集代码文本(node: any, context: context): void {
-  let 有内容 = false
+  let hasContent = false
   for (let child = node.firstChild; child; child = child.nextSibling) {
     if (child.name === 'CodeText') {
       context.output.push(escapeHtml(context.source.slice(child.from, child.to)))
-      有内容 = true
+      hasContent = true
     }
   }
-  if (!有内容) {
+  if (!hasContent) {
     // 兜底：没有 CodeText 子节点（空代码块或解析差异）时，
     // 从 CodeMark 之间取内容，免得导出成空块。
     const docText = context.source.slice(node.from, node.to)
@@ -365,34 +365,34 @@ function takeLinkTitle(node: any, context: context): string {
 
 /** 图片的 alt 取自 `![...]` 里的内容。 */
 function 取图片替代文本(node: any, context: context): string {
-  const 第一个标记 = node.firstChild
-  if (!第一个标记) return ''
+  const firstMark = node.firstChild
+  if (!firstMark) return ''
   // 结构是 LinkMark(`![`) → 文本 → LinkMark(`]`) → LinkMark(`(`) → URL → LinkMark(`)`)
   const collect: string[] = []
-  for (let child = 第一个标记.nextSibling; child; child = child.nextSibling) {
+  for (let child = firstMark.nextSibling; child; child = child.nextSibling) {
     if (child.name === 'LinkMark') break
     collect.push(context.source.slice(child.from, child.to))
   }
   return collect.join('')
 }
 
-function 渲染表格行(lineNode: any, context: context, 单元格标签: string): void {
+function renderTableRow(lineNode: any, context: context, cellLabel: string): void {
   const 对齐们 = 取对齐(lineNode, context)
   context.output.push('<tr>\n')
   let index = 0
   for (let child = lineNode.firstChild; child; child = child.nextSibling) {
     if (child.name !== 'TableCell') continue
     const alignKind = 对齐们[index]
-    context.output.push(`<${单元格标签}${alignKind ? ` style="text-align:${alignKind}"` : ''}>`)
+    context.output.push(`<${cellLabel}${alignKind ? ` style="text-align:${alignKind}"` : ''}>`)
     recursive(child, context)
-    context.output.push(`</${单元格标签}>\n`)
+    context.output.push(`</${cellLabel}>\n`)
     index++
   }
   context.output.push('</tr>\n')
 }
 
 /** 表格对齐信息来自分隔行 `|:--|--:|`，记在 Table 节点上，这里做一次缓存。 */
-const 对齐缓存 = new WeakMap<object, (string | null)[]>()
+const alignCache = new WeakMap<object, (string | null)[]>()
 
 /**
  * 取各列对齐方式。
@@ -404,8 +404,8 @@ const 对齐缓存 = new WeakMap<object, (string | null)[]>()
 function 取对齐(lineNode: any, context: context): (string | null)[] {
   const tbl = lineNode.parent
   if (!tbl) return []
-  const 已有 = 对齐缓存.get(tbl)
-  if (已有) return 已有
+  const alreadyHas = alignCache.get(tbl)
+  if (alreadyHas) return alreadyHas
 
   const result: (string | null)[] = []
   for (let child = tbl.firstChild; child; child = child.nextSibling) {
@@ -423,7 +423,7 @@ function 取对齐(lineNode: any, context: context): (string | null)[] {
       else result.push(null)
     }
   }
-  对齐缓存.set(tbl, result)
+  alignCache.set(tbl, result)
   return result
 }
 

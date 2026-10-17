@@ -16,7 +16,7 @@ import type { BuildContext, SyntaxNode } from './types'
  */
 
 /** 需要检查父节点才能确定含义的标记。 */
-function 是否行内标记(node: SyntaxNode): boolean {
+function isInlineMark(node: SyntaxNode): boolean {
   const parent = node.parent?.name
   switch (node.name) {
     case 'EmphasisMark':
@@ -45,7 +45,7 @@ export function handleInline(
   const lineNo = state.doc.lineAt(node.from).number
   const onActiveLine = context.activeLines.has(lineNo)
 
-  if (是否行内标记(node)) {
+  if (isInlineMark(node)) {
     if (!onActiveLine) {
       context.entry.push({ from: node.from, to: node.to, deco: hidden, rank: 1 })
     }
@@ -57,7 +57,7 @@ export function handleInline(
       context.entry.push({
         from: node.from,
         to: node.to,
-        deco: inlineStyles.强调,
+        deco: inlineStyles.emphasisMark,
         rank: 0
       })
       return true
@@ -75,7 +75,7 @@ export function handleInline(
       return true
 
     case 'Link':
-      context.entry.push({ from: node.from, to: node.to, deco: inlineStyles.链接文字, rank: 0 })
+      context.entry.push({ from: node.from, to: node.to, deco: inlineStyles.linkTextMark, rank: 0 })
       return true
 
     case 'URL': {
@@ -85,7 +85,7 @@ export function handleInline(
       if (parentName === 'Link' && !onActiveLine) {
         context.entry.push({ from: node.from, to: node.to, deco: hidden, rank: 1 })
       } else if (parentName === 'LinkReference') {
-        context.entry.push({ from: node.from, to: node.to, deco: inlineStyles.链接地址, rank: 0 })
+        context.entry.push({ from: node.from, to: node.to, deco: inlineStyles.linkUrlMark, rank: 0 })
       }
       return true
     }
@@ -99,7 +99,7 @@ export function handleInline(
 
     case 'LinkReference': {
       // 引用定义整行（`[名]: 地址 "标题"`）淡化，不隐藏：用户需要看见它。
-      context.entry.push({ from: node.from, to: node.to, deco: inlineStyles.引用定义, rank: 0 })
+      context.entry.push({ from: node.from, to: node.to, deco: inlineStyles.refDefinition, rank: 0 })
       return true
     }
 
@@ -110,10 +110,10 @@ export function handleInline(
       //
       // 不像别的行内标记那样按"整行"判断：图片通常独占一行，若按行判断，
       // 光标停在段落里任何位置都会让图片变回 `![…](…)`，等于图片一直在闪。
-      const 光标在里面 = cursor.from >= node.from && cursor.to <= node.to
-      if (光标在里面) return true
+      const cursorInside = cursor.from >= node.from && cursor.to <= node.to
+      if (cursorInside) return true
 
-      const { url, substitute } = 取图片信息(node, state)
+      const { url, substitute } = takeImageInfo(node, state)
       const show = parseImageUrl(url)
 
       // 图片独占一行时加个行装饰：CSS 据此把它居中并按块显示，
@@ -121,9 +121,9 @@ export function handleInline(
       const parent = node.parent
       if (parent && parent.name === 'Paragraph') {
         const paragraph = state.sliceDoc(parent.from, parent.to).trim()
-        const 自身 = state.sliceDoc(node.from, node.to).trim()
-        if (paragraph === 自身) {
-          addLineDeco(context, state.doc.lineAt(node.from).from, blockLineStyles.图片行)
+        const selfValue = state.sliceDoc(node.from, node.to).trim()
+        if (paragraph === selfValue) {
+          addLineDeco(context, state.doc.lineAt(node.from).from, blockLineStyles.imageLine)
         }
       }
 
@@ -149,7 +149,7 @@ export function handleInline(
  * `LinkMark(![)`、`LinkMark(])`、`LinkMark(()`、`URL`、`LinkMark())`——
  * "甲"根本不在其中。
  */
-function 取图片信息(node: SyntaxNode, state: EditorState): { url: string; substitute: string } {
+function takeImageInfo(node: SyntaxNode, state: EditorState): { url: string; substitute: string } {
   let url = ''
   let substitute = ''
   let collectAlt = false

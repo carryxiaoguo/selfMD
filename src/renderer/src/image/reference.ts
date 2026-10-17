@@ -36,9 +36,9 @@ export function relativeTo(fromSrc: string, toPos: string): string {
   // 只有一个根段相同时（例如 C: 对 C:），相对关系不成立。
   if (commonPart === 0) return normalizePath(toPos)
 
-  const 上行 = new Array(Math.max(0, alpha.length - commonPart)).fill('..')
-  const 下行 = beta.slice(commonPart)
-  const result = [...上行, ...下行].join('/')
+  const lineUp = new Array(Math.max(0, alpha.length - commonPart)).fill('..')
+  const lineDown = beta.slice(commonPart)
+  const result = [...lineUp, ...lineDown].join('/')
   return result.length > 0 ? result : '.'
 }
 
@@ -49,7 +49,7 @@ export function relativeTo(fromSrc: string, toPos: string): string {
  * 在 URL 里有语法含义（片段与查询），`%` 不转义会造成二次编码，
  * 尖括号与反引号在部分渲染器里会被当成 HTML。
  */
-const 需转义: Record<string, string> = {
+const needsEscape: Record<string, string> = {
   ' ': '%20',
   '#': '%23',
   '?': '%3F',
@@ -78,7 +78,7 @@ const 需转义: Record<string, string> = {
 export function escapeImageUrl(filePath: string): string {
   let result = ''
   // 逐字符处理：输出不再参与匹配，因此 `%` 只会被编码一次。
-  for (const ch of filePath) result += 需转义[ch] ?? ch
+  for (const ch of filePath) result += needsEscape[ch] ?? ch
   return result
 }
 
@@ -88,11 +88,11 @@ export function escapeImageUrl(filePath: string): string {
  * 判断顺序与通行做法一致：能相对就相对，不能就绝对。
  */
 export function buildRefUrl(
-  图片绝对路径: string,
+  imageAbsolutePath: string,
   docDir: string | null,
   options: quoteOptions
 ): string {
-  const image = normalizePath(图片绝对路径)
+  const image = normalizePath(imageAbsolutePath)
 
   let result = image
   if (options.useRelativePath && docDir && isAbsolute(image)) {
@@ -130,6 +130,6 @@ export function buildImageSyntax(
     return `<img src="${url}" alt="${escaped}" />`
   }
   // alt 里的 `]` 会提前闭合方括号，必须转义。
-  const 安全替代 = altContent.replace(/]/g, '\\]')
-  return `![${安全替代}](${url})`
+  const safeAlt = altContent.replace(/]/g, '\\]')
+  return `![${safeAlt}](${url})`
 }

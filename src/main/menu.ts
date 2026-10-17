@@ -63,17 +63,17 @@ function recentSubmenu(): MenuItemConstructorOptions[] {
 function themesSubmenu(): MenuItemConstructorOptions[] {
   const settings = getSettings()
   const themes = listThemes()
-  const 亮色 = settings.theme
-  const 深色 = settings.darkTheme
+  const lightMode = settings.theme
+  const darkModeFlag = settings.darkTheme
 
   // 单选组要反映"当前生效的那一个"：开了深色模式就用深色槽位的选中状态，
   // 否则用户会看到菜单勾在浅色主题上、屏幕上却是深色。
-  const 当前生效 = activeTheme(settings)
+  const currentlyActive = activeTheme(settings)
 
   const items: MenuItemConstructorOptions[] = themes.map((t) => ({
     label: t.name,
     type: 'radio',
-    checked: 当前生效 === t.id,
+    checked: currentlyActive === t.id,
     click: () => send('theme.apply', t.id)
   }))
 
@@ -83,7 +83,7 @@ function themesSubmenu(): MenuItemConstructorOptions[] {
     submenu: themes.map((t) => ({
       label: t.name,
       type: 'radio',
-      checked: 亮色 === t.id,
+      checked: lightMode === t.id,
       click: () => send('theme.setSlot', { slot: 'light', id: t.id })
     }))
   })
@@ -92,7 +92,7 @@ function themesSubmenu(): MenuItemConstructorOptions[] {
     submenu: themes.map((t) => ({
       label: t.name,
       type: 'radio',
-      checked: 深色 === t.id,
+      checked: darkModeFlag === t.id,
       click: () => send('theme.setSlot', { slot: 'dark', id: t.id })
     }))
   })
@@ -137,7 +137,7 @@ export function setPandocAvailability(available: boolean): void {
  * 置灰而不是隐藏：用户看不到 Word 会以为软件没这个功能，
  * 看到它灰着并附一句说明，才知道"装了 Pandoc 就能用"。
  */
-function 导出子菜单(): MenuItemConstructorOptions[] {
+function exportSubmenu(): MenuItemConstructorOptions[] {
   const item = (id: string, available = true): MenuItemConstructorOptions => {
     const definition = pick('File', id)
     return {
@@ -194,7 +194,7 @@ function fileMenu(): MenuItemConstructorOptions {
       toItem(pick('File', 'file.moveTo')),
       { type: 'separator' },
       toItem(pick('File', 'file.import')),
-      { label: '导出', submenu: 导出子菜单() },
+      { label: '导出', submenu: exportSubmenu() },
       toItem(pick('File', 'file.print')),
       { type: 'separator' },
       toItem(pick('File', 'file.preferences')),
@@ -358,7 +358,7 @@ function formatMenu(): MenuItemConstructorOptions {
       toItem(pick('Format', 'fmt.hyperlink')),
       toItem(pick('Format', 'fmt.image')),
       { type: 'separator' },
-      { label: '图像工具', submenu: 图像工具子菜单() },
+      { label: '图像工具', submenu: imageToolsSubmenu() },
       { type: 'separator' },
       toItem(pick('Format', 'fmt.clear'))
     ]
@@ -366,7 +366,7 @@ function formatMenu(): MenuItemConstructorOptions {
 }
 
 /** 图像工具子菜单。结构对应 zh-Hans 语言包的「图像工具」一组。 */
-function 图像工具子菜单(): MenuItemConstructorOptions[] {
+function imageToolsSubmenu(): MenuItemConstructorOptions[] {
   const s = getSettings()
   return [
     toItem(pick('Format', 'image.insertLocal')),
@@ -591,9 +591,9 @@ export function menuSummary(): string[] {
   const expand = (item: Electron.MenuItem, layerNo: number): void => {
     const label = item.label || item.role || '(无标题)'
     const key = item.accelerator ? `  [${item.accelerator}]` : ''
-    const 是命令 = Boolean(item.id)
+    const isCommand = Boolean(item.id)
     let phase = ''
-    if (是命令) {
+    if (isCommand) {
       if (!isImplemented(item.id)) phase = '  ← 未实现'
       else if (!item.enabled) phase = '  ← 暂不可用'
     }
@@ -608,8 +608,8 @@ export function menuSummary(): string[] {
   for (const topLevel of menu.items) {
     const children = topLevel.submenu?.items ?? []
     const notSeparator = children.filter((i) => i.type !== 'separator')
-    const 已启用 = notSeparator.filter((i) => i.enabled).length
-    line.push(`${topLevel.label || topLevel.role || '(无标题)'}（${已启用}/${notSeparator.length} 可用）`)
+    const enabledFlag = notSeparator.filter((i) => i.enabled).length
+    line.push(`${topLevel.label || topLevel.role || '(无标题)'}（${enabledFlag}/${notSeparator.length} 可用）`)
 
     for (const child of notSeparator) expand(child, 1)
   }

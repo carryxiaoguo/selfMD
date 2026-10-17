@@ -18,17 +18,17 @@ import type { EditorView } from '@codemirror/view'
 // ---------------------------------------------------------------------------
 
 /** 中日韩句末标点，以及英文分号——出现即断句。 */
-const 硬终止符 = /[。！？；]/
+const hardTerminator = /[。！？；]/
 
 /** 英文句点只有在"后面是空白或行尾"时才算断句，"3.14" 里的不算。 */
-function 是英文句点(lineText: string, position: number): boolean {
+function isLatinPeriod(lineText: string, position: number): boolean {
   if (lineText[position] !== '.') return false
   const after = lineText[position + 1]
   return after === undefined || /\s/.test(after)
 }
 
 function isTerminator(lineText: string, position: number): boolean {
-  return 硬终止符.test(lineText[position]) || 是英文句点(lineText, position)
+  return hardTerminator.test(lineText[position]) || isLatinPeriod(lineText, position)
 }
 
 /**
@@ -117,8 +117,8 @@ export function selectLineOrSentence(view: EditorView): boolean {
   const range = sentenceRange(line.text, main.head - line.from)
 
   // 整行已经选中时再按一次，扩展为整行（含首尾空白），给用户一个"退路"。
-  const 当前已满 = main.from === line.from + range.start && main.to === line.from + range.end
-  const target = 当前已满
+  const isFullNow = main.from === line.from + range.start && main.to === line.from + range.end
+  const target = isFullNow
     ? EditorSelection.single(line.from, line.to)
     : inlineSelection(state, main.head, range)
 
@@ -184,8 +184,8 @@ export function deleteLineOrSentence(view: EditorView): boolean {
   const end = line.from + range.end
 
   // 整行被选中时，连同行尾换行一起删除。
-  const 整行 = range.start === 0 && range.end === line.text.length
-  if (整行 && line.number < state.doc.lines) {
+  const wholeLine = range.start === 0 && range.end === line.text.length
+  if (wholeLine && line.number < state.doc.lines) {
     view.dispatch({
       changes: { from: line.from, to: line.to + 1 },
       userEvent: 'delete'

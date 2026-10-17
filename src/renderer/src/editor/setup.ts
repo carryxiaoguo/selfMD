@@ -177,11 +177,11 @@ const editorTheme = EditorView.theme({
  * 一对，反而要先删掉多余的半个。星号成对是"加粗"命令该干的事，不该由
  * 配对器抢着做。
  */
-export function 按设置构建配对(settings: Settings): Extension {
-  const 配对 = settings.enableInlineMath ? "()[]{}''\"\"``$$" : "()[]{}''\"\"``"
+export function buildPairsFromSettings(settings: Settings): Extension {
+  const pairs = settings.enableInlineMath ? "()[]{}''\"\"``$$" : "()[]{}''\"\"``"
   return [
     closeBrackets(),
-    EditorState.languageData.of(() => [{ closeBrackets: { brackets: [...配对] } }])
+    EditorState.languageData.of(() => [{ closeBrackets: { brackets: [...pairs] } }])
   ]
 }
 
@@ -253,7 +253,7 @@ export function baseExtensions(options: EditorOptions): Extension[] {
     // 智能标点与自动配对都依赖设置，但它们只在"键入"这一条路径上起作用，
     // 改动设置后重启编辑器即可生效，因此放在基础扩展里。
     buildSmartPunct(settings),
-    按设置构建配对(settings)
+    buildPairsFromSettings(settings)
   ]
 
   if (onChange) {

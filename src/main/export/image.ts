@@ -26,7 +26,7 @@ import { buildExportHtml, type ExportOptions } from './index'
  */
 
 /** 截图的宽度。与导出的正文宽度接近，太窄会换行、太宽会留白。 */
-const 默认宽度 = 900
+const defaultWidth = 900
 
 /**
  * 高度上限。
@@ -49,7 +49,7 @@ export interface imageResult {
 export async function copyAsImage(
   options: ExportOptions,
   /** 目标宽度；省略时用默认值。 */
-  width = 默认宽度
+  width = defaultWidth
 ): Promise<imageResult> {
   const failure = (error: string): imageResult => ({
     success: false,
@@ -116,9 +116,9 @@ export async function copyAsImage(
       'Math.max(document.body.scrollHeight, document.documentElement.scrollHeight)'
     )
     const contentHeight = typeof measuredHeight === 'number' && measuredHeight > 0 ? Math.ceil(measuredHeight) : 1200
-    const 目标高 = Math.min(contentHeight, maxHeight)
+    const targetHeight = Math.min(contentHeight, maxHeight)
 
-    win.setContentSize(width, 目标高)
+    win.setContentSize(width, targetHeight)
     // 改尺寸之后要再等一帧，布局才会按新高度重排
     await new Promise((done) => setTimeout(done, 180))
 

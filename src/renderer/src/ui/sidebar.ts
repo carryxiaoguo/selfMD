@@ -316,7 +316,7 @@ export class sidebar {
   // --------------------------------------------------------- 文档列表 ----
 
   /** 推送已打开的文档列表并重绘。 */
-  设置文档列表(list: docListItem[]): void {
+  setDocList(list: docListItem[]): void {
     this.docList = list
     if (this.label === 'articles') this.repaintDocList()
   }
@@ -474,7 +474,7 @@ export class sidebar {
   }
 
   /** 高亮文件树里对应当前文档的那一项。 */
-  高亮当前文件(filePath: string | null): void {
+  highlightCurrentFile(filePath: string | null): void {
     for (const line of Array.from(this.filesPanel.querySelectorAll('.file-list-item'))) {
       const isCurrentFlag = filePath !== null && (line as HTMLElement).dataset.path === filePath
       line.classList.toggle('active', isCurrentFlag)

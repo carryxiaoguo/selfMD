@@ -26,7 +26,7 @@ import type { SyntaxNode } from './syntax-node'
 // ---------------------------------------------------------------------------
 
 /** 光标是否位于"字面文本"之外——代码块、行内代码、URL、注释里都不该做标点转换。 */
-export function 在代码上下文(state: EditorState, position: number): boolean {
+export function inCodeContext(state: EditorState, position: number): boolean {
   // 显式标注可空：向上遍历父节点时类型必须允许 null 作为终点。
   let current: SyntaxNode | null = syntaxTree(state).resolveInner(position, -1)
   for (; current; current = current.parent) {
@@ -48,7 +48,7 @@ export function 在代码上下文(state: EditorState, position: number): boolea
 }
 
 /** 光标所在行、光标之前的文本。 */
-export function 本行前文(state: EditorState, position: number): string {
+export function linePrefix(state: EditorState, position: number): string {
   const line = state.doc.lineAt(position)
   return state.sliceDoc(line.from, position)
 }
@@ -63,7 +63,7 @@ export function 本行前文(state: EditorState, position: number): string {
  * 除空白与 ASCII 括号外，**必须包含全角括号**：中文写作里 `（"引用"）`
  * 远比 `("引用")` 常见，漏掉 `（`【《「` 会让中文场景下的判断整体反过来。
  */
-const 开引号前导 = /[\s([{<（【《「『〔〈“‘’”‘’—–-]/
+const openQuoteLead = /[\s([{<（【《「『〔〈“‘’”‘’—–-]/
 
 /**
  * 把直引号换成弯引号。
@@ -76,7 +76,7 @@ const 开引号前导 = /[\s([{<（【《「『〔〈“‘’”‘’—–-]/
  */
 export function swapQuotes(ch: '"' | "'", preamble: string): string {
   const previousOne = preamble.slice(-1)
-  const isLeading = preamble.length === 0 || 开引号前导.test(previousOne)
+  const isLeading = preamble.length === 0 || openQuoteLead.test(previousOne)
 
   if (ch === '"') {
     return isLeading ? '“' : '”'
@@ -161,7 +161,7 @@ export function scanPunct(docText: string, baseline: number): punctSegment[] {
 }
 
 
-export interface 破折号替换 {
+export interface dashReplacement {
   /** 需要回退删除的字符数。 */
   fallback: number
   /** 回退之后要插入的字符。 */
@@ -186,16 +186,16 @@ export interface 破折号替换 {
  *
  * @returns 需要替换时给出方案，否则返回 null 表示按原样插入
  */
-export function swapDashes(preamble: string): 破折号替换 | null {
+export function swapDashes(preamble: string): dashReplacement | null {
   const previousOne = preamble.slice(-1)
-  const 再前一个 = preamble.slice(-2, -1)
+  const beforePrevious = preamble.slice(-2, -1)
 
   // 已经转换出连接号，再敲一个连字符 → 升格为破折号。
   if (previousOne === '–') return { fallback: 1, insert: '—' }
 
   if (previousOne !== '-') return null
   // 文档里本来就存在的连续连字符不动它，避免把既有内容改坏。
-  if (再前一个 === '-') return null
+  if (beforePrevious === '-') return null
 
   // 行首（含仅缩进）的连字符属于**结构语法**而非标点：`---` 是水平分割线，
   // 也是 YAML 前置元数据的围栏，换成破折号会直接毁掉文档结构。
@@ -203,8 +203,8 @@ export function swapDashes(preamble: string): 破折号替换 | null {
   // 这里用"连字符之前还有没有正文"来判断，而不是"整行是不是只有连字符"——
   // 后者要预知用户接下来敲什么，做不到；前者只看已有内容，无状态且够用。
   // 代价是行首永远得不到连接号，这是刻意的取舍：结构正确优先于标点美观。
-  const 之前 = preamble.slice(0, -1)
-  if (之前.trim() === '') return null
+  const beforeFlag = preamble.slice(0, -1)
+  if (beforeFlag.trim() === '') return null
 
   return { fallback: 1, insert: '–' }
 }
@@ -213,7 +213,7 @@ export function swapDashes(preamble: string): 破折号替换 | null {
 // 扩展
 // ---------------------------------------------------------------------------
 
-export interface 智能标点选项 {
+export interface smartPunctOptions {
   /** 转换引号。 */
   quoteChar: boolean
   /** 转换破折号。 */
@@ -226,7 +226,7 @@ export interface 智能标点选项 {
  * 挂在 `EditorView.inputHandler` 上，只在用户**逐字键入**时触发；粘贴、
  * 程序化编辑、输入法提交多字符都不经过这里，因此不会破坏这些路径。
  */
-export function 智能标点(options: 智能标点选项): Extension {
+export function smartPunct(options: smartPunctOptions): Extension {
   if (!options.quoteChar && !options.dashChar) return []
 
   return EditorView.inputHandler.of((view, fromSrc, toPos, input) => {
@@ -236,8 +236,8 @@ export function 智能标点(options: 智能标点选项): Extension {
     if (fromSrc !== toPos) return false
 
     const state = view.state
-    if (在代码上下文(state, fromSrc)) return false
-    const preamble = 本行前文(state, fromSrc)
+    if (inCodeContext(state, fromSrc)) return false
+    const preamble = linePrefix(state, fromSrc)
 
     let plan: { fallback: number; insert: string } | null = null
 
@@ -268,5 +268,5 @@ export function 智能标点(options: 智能标点选项): Extension {
 export function buildSmartPunct(settings: Settings): Extension {
   // '渲染时转换' 尚未实现，此时不做输入期转换——否则两种模式会同时生效。
   if (settings.smartPunctuationMode !== 'input') return []
-  return 智能标点({ quoteChar: settings.smartQuotes, dashChar: settings.smartDashes })
+  return smartPunct({ quoteChar: settings.smartQuotes, dashChar: settings.smartDashes })
 }

@@ -44,14 +44,14 @@ export interface InsertRequest {
 // ---------------------------------------------------------------------------
 
 /** 取路径的父目录（保留盘符形态）。 */
-function 去掉末段(filePath: string): string {
+function dropLastSegment(filePath: string): string {
   const normalize = filePath.replace(/\\/g, '/')
   const position = normalize.lastIndexOf('/')
   return position <= 0 ? normalize : normalize.slice(0, position)
 }
 
 function docDir(docPath: string | null): string | null {
-  return docPath ? 去掉末段(docPath) : null
+  return docPath ? dropLastSegment(docPath) : null
 }
 
 /** 由当前上下文构造解析输入。 */
@@ -117,11 +117,11 @@ async function takeDefaultImageDir(): Promise<string> {
 function writeRef(view: EditorView, quote: string): void {
   const state = view.state
   const main = state.selection.main
-  const insertPoint = 避开前置元数据(state, main.from)
-  const 终点 = Math.max(insertPoint, main.to)
+  const insertPoint = skipFrontMatter(state, main.from)
+  const endPoint = Math.max(insertPoint, main.to)
 
   view.dispatch({
-    changes: { from: insertPoint, to: 终点, insert: quote },
+    changes: { from: insertPoint, to: endPoint, insert: quote },
     selection: EditorSelection.cursor(insertPoint + quote.length),
     userEvent: 'input.insertImage',
     annotations: isolatedUndo,
@@ -130,7 +130,7 @@ function writeRef(view: EditorView, quote: string): void {
 }
 
 /** 光标落在前置元数据块内（或之前）时，把插入点推到块之后。 */
-function 避开前置元数据(state: EditorState, position: number): number {
+function skipFrontMatter(state: EditorState, position: number): number {
   if (position === 0) {
     // 快速路径：文首必然在块内，无需解析全文。
     const meta = readFrontMatter(state.doc.toString())

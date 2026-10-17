@@ -49,7 +49,7 @@ export class tabManager {
   }
 
   /** 还能不能关闭。最后一个标签关掉之后就没有编辑器了，所以留一个。 */
-  get 可以关闭(): boolean {
+  get canClose(): boolean {
     return this.tabs.length > 1
   }
 
@@ -119,7 +119,7 @@ export class tabManager {
   }
 
   /** 按方向循环切换，用于 Ctrl+Tab。 */
-  循环(direction: 1 | -1, flushCurrent: (current: label) => void): label | null {
+  loopIt(direction: 1 | -1, flushCurrent: (current: label) => void): label | null {
     if (this.tabs.length < 2) return null
     const targetIndex = (this.currentIndex + direction + this.tabs.length) % this.tabs.length
     const current = this.tabs[this.currentIndex]

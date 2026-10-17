@@ -31,7 +31,7 @@ export interface imageContext {
 }
 
 /** 从语法节点里取 URL 区间。 */
-function 取URL区间(node: {
+function takeUrlSpanIn(node: {
   firstChild: unknown
 }): { from: number; to: number } | null {
   let child = node.firstChild as {
@@ -48,7 +48,7 @@ function 取URL区间(node: {
 }
 
 /** 取 `![` 与 `]` 之间的替代文字（填空式：它在两个 LinkMark 的间隙里）。 */
-function 取替代(node: { from: number; to: number; firstChild: unknown }, state: EditorState): string {
+function takeAlt(node: { from: number; to: number; firstChild: unknown }, state: EditorState): string {
   let docText = ''
   let collect = false
   let cursor = node.from
@@ -98,7 +98,7 @@ export function takeCurrentImage(state: EditorState, position: number): imageCon
       if (node.name !== 'Image') return true
       if (position < node.from || position > node.to) return true
 
-      const range = 取URL区间(node)
+      const range = takeUrlSpanIn(node)
       if (!range) return false
       const url = state.sliceDoc(range.from, range.to).trim()
       result = {
@@ -107,7 +107,7 @@ export function takeCurrentImage(state: EditorState, position: number): imageCon
         urlFrom: range.from,
         urlTo: range.to,
         url,
-        substitute: 取替代(node, state),
+        substitute: takeAlt(node, state),
         localPath: localAbsolutePath(url)
       }
       return false
@@ -134,8 +134,8 @@ export function localAbsolutePath(url: string): string | null {
 
 /** 由 live-preview 的显示地址模块提供的当前文档目录。 */
 let dirProvider: (() => string | null) | null = null
-export function setDirProvider(提供者: () => string | null): void {
-  dirProvider = 提供者
+export function setDirProvider(provider: () => string | null): void {
+  dirProvider = provider
 }
 function currentDir(): string | null {
   return dirProvider?.() ?? null
@@ -146,7 +146,7 @@ function currentDir(): string | null {
 // ---------------------------------------------------------------------------
 
 /** 转成 HTML 写法：`<img src="…" alt="…" />`，alt 为空时省略该属性。 */
-function 转HTML(url: string, substitute: string): string {
+function toHtml(url: string, substitute: string): string {
   const attr = [`src="${url.replace(/"/g, '&quot;')}"`]
   if (substitute) attr.push(`alt="${substitute.replace(/"/g, '&quot;')}"`)
   return `<img ${attr.join(' ')} />`
@@ -158,10 +158,10 @@ function 转HTML(url: string, substitute: string): string {
  * 只改 `![…](…)` 这一段，不动周围的文字。
  */
 export function convertImageSyntax(view: EditorView, image: imageContext): boolean {
-  const HTML写法 = /^<img\b/i.test(image.url)
-  const nextSyntax = HTML写法
+  const htmlForm = /^<img\b/i.test(image.url)
+  const nextSyntax = htmlForm
     ? `![${image.substitute}](${image.url})`
-    : 转HTML(image.url, image.substitute)
+    : toHtml(image.url, image.substitute)
 
   // HTML 写法时 URL 区间取的不对（整段就是一个 HTML 节点），
   // 所以直接整段替换；Markdown 写法时也只换整段——
@@ -190,13 +190,13 @@ export async function renameOrMoveImage(
   view: EditorView,
   image: imageContext,
   targetDir: string,
-  新文件名: string
+  nextFileName: string
 ): Promise<{ success: boolean; error: string | null; nextSrc: string | null }> {
   if (!image.localPath) {
     return { success: false, error: '这是远程图片，没有本地文件可移动。', nextSrc: null }
   }
 
-  const nextPath = `${targetDir.replace(/[\\/]+$/, '')}/${新文件名}`
+  const nextPath = `${targetDir.replace(/[\\/]+$/, '')}/${nextFileName}`
   try {
     await window.selfmd.file.move(image.localPath, nextPath)
   } catch (error) {

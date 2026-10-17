@@ -19,7 +19,7 @@ import { execFileSync } from 'node:child_process'
  *   3. 把用户送到系统设置的那一页。那是唯一可靠的办法，绕不过去
  */
 
-export interface 关联状态 {
+export interface assocStatus {
   /** 系统里 `.md` 当前生效的打开方式（ProgID 或可执行文件名）。 */
   current: string
   /** 是否就是本程序。 */
@@ -29,7 +29,7 @@ export interface 关联状态 {
 }
 
 const extension = '.md'
-const 本程序ProgId = 'selfMD.md'
+const SELF_PROG_ID = 'selfMD.md'
 
 /** 读一个注册表值；不存在或读不到时返回空串。 */
 function readRegistry(key: string, value: string): string {
@@ -55,7 +55,7 @@ function readRegistry(key: string, value: string): string {
 }
 
 /** 查某个注册表键是否存在。 */
-function 键存在(key: string): boolean {
+function keyExistsFlag(key: string): boolean {
   if (process.platform !== 'win32') return false
   try {
     execFileSync('reg', ['query', key], { windowsHide: true, stdio: 'ignore' })
@@ -75,15 +75,15 @@ function 键存在(key: string): boolean {
  * 只看后者会得出错误结论：明明用户在设置里选了别的程序，
  * `Classes\.md` 可能还指着 selfMD。
  */
-export function getAssocStatus(): 关联状态 {
-  const 用户选择 = readRegistry(`HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\FileExts\\${extension}\\UserChoice`, 'ProgId')
-  const 类默认 = readRegistry(`HKCU\\Software\\Classes\\${extension}`, '(默认)')
-  const current = 用户选择 || 类默认
+export function getAssocStatus(): assocStatus {
+  const userChoice = readRegistry(`HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\FileExts\\${extension}\\UserChoice`, 'ProgId')
+  const classDefault = readRegistry(`HKCU\\Software\\Classes\\${extension}`, '(默认)')
+  const current = userChoice || classDefault
 
   return {
     current,
-    isDefaultFlag: current === 本程序ProgId,
-    hasShellNew: 键存在(`HKCU\\Software\\Classes\\${extension}\\ShellNew`)
+    isDefaultFlag: current === SELF_PROG_ID,
+    hasShellNew: keyExistsFlag(`HKCU\\Software\\Classes\\${extension}\\ShellNew`)
   }
 }
 

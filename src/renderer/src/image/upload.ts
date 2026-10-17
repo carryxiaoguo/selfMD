@@ -148,7 +148,7 @@ export async function uploadAndFill(
     if (!url) continue
     // 只替换 URL 那一段，保留 `![替代文字](` 与 `)`。
     // 整段替换会丢掉替代文字——那是用户写的，不该被上传动作改掉。
-    const range = 取地址区间InDoc(view.state, img)
+    const range = takeUrlSpanInDoc(view.state, img)
     if (!range) continue
     diffCount.push({ from: range.from, to: range.to, insert: escapeImageUrl(url) })
   }
@@ -165,7 +165,7 @@ export async function uploadAndFill(
     changes: diffCount,
     // 光标位置按"它前面插入了多少字符"平移，否则大批替换后光标会跳回文首
     selection: EditorSelection.cursor(
-      cursor + diffCount.filter((amend) => amend.from < cursor).reduce((和, amend) => 和 + (amend.insert.length - (amend.to - amend.from)), 0)
+      cursor + diffCount.filter((amend) => amend.from < cursor).reduce((andValue, amend) => andValue + (amend.insert.length - (amend.to - amend.from)), 0)
     ),
     annotations: isolatedUndo,
     userEvent: 'input.uploadImage'
@@ -179,7 +179,7 @@ export async function uploadAndFill(
 }
 
 /** 在文档里重新定位某张图片的 URL 区间。 */
-function 取地址区间InDoc(state: EditorState, img: docImages): urlSpan | null {
+function takeUrlSpanInDoc(state: EditorState, img: docImages): urlSpan | null {
   let result: urlSpan | null = null
   walkSyntaxTree(state, (node) => {
     if (result || node.name !== 'Image') return

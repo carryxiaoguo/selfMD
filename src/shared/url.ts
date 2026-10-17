@@ -60,7 +60,7 @@ export function decodeLocalToken(token: string): string | null {
  * 或在其同名子目录里，所以**主题 CSS 内部的相对 URL 天然可用**；
  * 这个函数用于需要绝对地址的场合。
  */
-export function 主题文件Url(relativeTo: string): string {
+export function themeFileUrl(relativeTo: string): string {
   const 安全 = relativeTo
     .split('/')
     .filter((segment) => segment.length > 0 && segment !== '.' && segment !== '..')
@@ -71,10 +71,10 @@ export function 主题文件Url(relativeTo: string): string {
 
 /** 全局自定义 CSS（对所有主题生效）。 */
 export function baseUserCssUrl(): string {
-  return 主题文件Url('base.user.css')
+  return themeFileUrl('base.user.css')
 }
 
 /** 某个主题专属的自定义 CSS（只对该主题生效）。 */
 export function themeUserCssUrl(themeId: string): string {
-  return 主题文件Url(`${themeId}.user.css`)
+  return themeFileUrl(`${themeId}.user.css`)
 }

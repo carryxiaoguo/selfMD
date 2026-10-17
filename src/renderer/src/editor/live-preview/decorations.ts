@@ -75,14 +75,14 @@ export function typographyDeco(show: string): Decoration {
 // ---------------------------------------------------------------------------
 
 export const inlineStyles = {
-  强调: Decoration.mark({ class: 'cm-md-emphasis' }),
+  emphasisMark: Decoration.mark({ class: 'cm-md-emphasis' }),
   加粗: Decoration.mark({ class: 'cm-md-strong' }),
   删除线: Decoration.mark({ class: 'cm-md-strikethrough' }),
   行内代码: Decoration.mark({ class: 'cm-md-code' }),
-  链接文字: Decoration.mark({ class: 'cm-md-link' }),
-  链接地址: Decoration.mark({ class: 'cm-md-url' }),
+  linkTextMark: Decoration.mark({ class: 'cm-md-link' }),
+  linkUrlMark: Decoration.mark({ class: 'cm-md-url' }),
   引用文字: Decoration.mark({ class: 'cm-md-quote' }),
-  引用定义: Decoration.mark({ class: 'cm-md-refdef' }),
+  refDefinition: Decoration.mark({ class: 'cm-md-refdef' }),
   HTML: Decoration.mark({ class: 'cm-md-html' })
 } as const
 
@@ -99,7 +99,7 @@ export function headingLineDeco(levelNo: number): Decoration {
 }
 
 export const blockLineStyles = {
-  引言: Decoration.line({ class: 'cm-lp-quote' }),
+  blockquote: Decoration.line({ class: 'cm-lp-quote' }),
   /**
    * 提示框（`> [!NOTE]`）。
    *
@@ -118,19 +118,19 @@ export const blockLineStyles = {
   代码块首行: Decoration.line({ class: 'cm-lp-code cm-lp-code-first md-fences' }),
   代码块中间行: Decoration.line({ class: 'cm-lp-code md-fences' }),
   代码块末行: Decoration.line({ class: 'cm-lp-code cm-lp-code-last md-fences' }),
-  任务项行: Decoration.line({ class: 'md-task-list-item' }),
+  taskItemLine: Decoration.line({ class: 'md-task-list-item' }),
   frontMatter: Decoration.line({ class: 'cm-lp-frontmatter' }),
   mathBlock: Decoration.line({ class: 'cm-lp-math md-math-block' }),
-  HTML块: Decoration.line({ class: 'cm-lp-html' }),
+  htmlBlockLine: Decoration.line({ class: 'cm-lp-html' }),
   table: Decoration.line({ class: 'cm-lp-table' }),
-  表头行: Decoration.line({ class: 'cm-lp-table cm-lp-table-head' }),
+  tableHeadLine: Decoration.line({ class: 'cm-lp-table cm-lp-table-head' }),
   // 刻意不带 cm-lp-table：对齐定义行被折叠后只剩一条分隔线，
   // 类名与数据行分开，统计时才不会互相污染。
-  表格分隔行: Decoration.line({ class: 'cm-lp-table-sep' }),
-  水平线行: Decoration.line({ class: 'cm-lp-hr' }),
+  tableSepLine: Decoration.line({ class: 'cm-lp-table-sep' }),
+  horizontalRuleLine: Decoration.line({ class: 'cm-lp-hr' }),
   // 图片独占一行时用：CSS 据此把它居中并按块显示；
   // 夹在句子中间的图片不加这个类，仍按行内处理。
-  图片行: Decoration.line({ class: 'cm-lp-image-line' })
+  imageLine: Decoration.line({ class: 'cm-lp-image-line' })
 } as const
 
 /**

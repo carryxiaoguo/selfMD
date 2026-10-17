@@ -94,9 +94,9 @@ function wholeTable(
 function makeEmptyRow(templateLineText: string): string {
   const ranges = cellRanges(templateLineText)
   if (ranges.length === 0) return templateLineText
-  const 左缩进 = /^\s*/.exec(templateLineText)?.[0] ?? ''
-  const 前导竖线 = templateLineText.trimStart().startsWith('|')
-  const 尾部竖线 = templateLineText.trimEnd().endsWith('|')
+  const leftIndent = /^\s*/.exec(templateLineText)?.[0] ?? ''
+  const leadingPipe = templateLineText.trimStart().startsWith('|')
+  const trailingPipe = templateLineText.trimEnd().endsWith('|')
 
   const segments: string[] = []
   for (let i = 0; i < ranges.length; i++) {
@@ -105,8 +105,8 @@ function makeEmptyRow(templateLineText: string): string {
     const width = Math.max(1, cellBox.end - cellBox.start)
     segments.push(' '.repeat(width))
   }
-  const 体 = segments.join('|')
-  return 左缩进 + (前导竖线 ? '|' : '') + 体 + (尾部竖线 ? '|' : '')
+  const bodyText = segments.join('|')
+  return leftIndent + (leadingPipe ? '|' : '') + bodyText + (trailingPipe ? '|' : '')
 }
 
 /**
@@ -133,8 +133,8 @@ export function moveToAdjacentCell(view: EditorView, direction: 1 | -1): boolean
   if (target >= 0 && target < ranges.length) {
     const cellBox = ranges[target]
     // 落在单元格内容区的起点：跳过 `| ` 之后的空白，光标贴在第一个字上
-    const 内容起 = line.from + cellBox.start + (/^\s*/.exec(line.text.slice(cellBox.start))?.[0].length ?? 0)
-    view.dispatch({ selection: { anchor: 内容起 }, scrollIntoView: true, userEvent: 'select' })
+    const contentStart = line.from + cellBox.start + (/^\s*/.exec(line.text.slice(cellBox.start))?.[0].length ?? 0)
+    view.dispatch({ selection: { anchor: contentStart }, scrollIntoView: true, userEvent: 'select' })
     return true
   }
 
@@ -184,10 +184,10 @@ export function tableDeleteRow(view: EditorView): boolean {
 
   const start = line.number === tbl.head ? line.from : line.from - 1
   const end = line.number === tbl.head ? line.to + 1 : line.to
-  const 新位置 = Math.min(start, state.doc.length)
+  const nextPos = Math.min(start, state.doc.length)
   view.dispatch({
     changes: { from: start, to: Math.min(end, state.doc.length) },
-    selection: { anchor: 新位置 },
+    selection: { anchor: nextPos },
     userEvent: 'delete'
   })
   return true

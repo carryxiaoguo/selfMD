@@ -21,7 +21,7 @@ import {
  * 所以策略是**只在有把握时才接管**，其余一律放行给默认行为。
  */
 
-export interface 图片处理依赖 {
+export interface imageDeps {
   /** 构造插入请求；编辑器尚未就绪时返回 null。 */
   buildRequest: () => InsertRequest | null
   /** 用户可见的提示。 */
@@ -29,7 +29,7 @@ export interface 图片处理依赖 {
 }
 
 /** 把 File 读成不含前缀的 base64。 */
-function 读为base64(file: File): Promise<string> {
+function readAsBase64(file: File): Promise<string> {
   return new Promise((done, failure) => {
     const reader = new FileReader()
     reader.onload = () => {
@@ -43,7 +43,7 @@ function 读为base64(file: File): Promise<string> {
 }
 
 /** 从 File 对象取磁盘路径；浏览器拖来的图没有路径，返回空串。 */
-function 取磁盘路径(file: File): string {
+function takeDiskPath(file: File): string {
   try {
     return window.selfmdExtra.webUtils.pathForFile(file) || ''
   } catch {
@@ -60,13 +60,13 @@ function findImageFile(list: FileList | null | undefined): File | null {
   return null
 }
 
-export function imagePasteAndDrop(deps: 图片处理依赖): Extension {
+export function imagePasteAndDrop(deps: imageDeps): Extension {
   /** 处理"有图片文件"的公共路径。 */
   const handleFile = async (file: File): Promise<void> => {
     const request = deps.buildRequest()
     if (!request) return
 
-    const filePath = 取磁盘路径(file)
+    const filePath = takeDiskPath(file)
     if (filePath && isImageFile(filePath)) {
       const result = await insertFromFile(request, [filePath])
       if (result.error) deps.hint(result.error)
@@ -76,7 +76,7 @@ export function imagePasteAndDrop(deps: 图片处理依赖): Extension {
     // 没有磁盘路径（从浏览器或截图工具拖来的）：把字节读出来再落盘。
     // 这条分支必须存在，否则"从网页拖一张图进来"会完全没反应。
     try {
-      const data = await 读为base64(file)
+      const data = await readAsBase64(file)
       if (!data) {
         deps.hint('无法读取图片数据。')
         return
@@ -163,8 +163,8 @@ export function imagePasteAndDrop(deps: 图片处理依赖): Extension {
     dragover(event, view) {
       // 只有真的拖着图片时才拦截，否则会破坏编辑器内的文字拖动。
       const kind = event.dataTransfer?.types ?? []
-      const 有文件 = Array.from(kind).includes('Files')
-      if (!有文件) return false
+      const hasFile = Array.from(kind).includes('Files')
+      if (!hasFile) return false
       event.preventDefault()
       view.dom.classList.add('cm-drop-target')
       return false

@@ -24,7 +24,7 @@ import { pathToFileURL } from 'node:url'
  */
 
 const exportIncludeRegex = /^\s*@include-when-export\s+(url)?\s*([('"]+)([^)"']+)([)'"]+)/gim
-const 导入正则 = /^\s*@import\s+(url)?\s*([('"]+)([^)"']+)([)'"]+)/gim
+const importRegex = /^\s*@import\s+(url)?\s*([('"]+)([^)"']+)([)'"]+)/gim
 
 /** 递归深度上限。CSS 里的 @import 环路会让内联永不终止。 */
 const maxDepth = 8
@@ -46,8 +46,8 @@ async function takeResource(
       const response = await net.fetch(url)
       if (!response.ok) return null
       // 远程样式表里的相对地址以它自己的 URL 为基准
-      const 新基准 = new URL('.', url).toString()
-      return { content: await response.text(), baseline: 新基准 }
+      const nextBaseline = new URL('.', url).toString()
+      return { content: await response.text(), baseline: nextBaseline }
     } catch {
       // 离线或对方不可达：导出不该因此失败，只是少了这段样式。
       return null
@@ -94,7 +94,7 @@ async function inlineFlag(
   // 屏幕模式下也内联 @import：主题的深色子样式表本来依赖旁边的文件，
   // 而预览协议虽能服务子目录，内联后一次请求就够。
   const importedItem: { originalText: string; url: string }[] = []
-  for (const match of result.matchAll(导入正则)) {
+  for (const match of result.matchAll(importRegex)) {
     importedItem.push({ originalText: match[0], url: match[3] })
   }
   for (const { originalText, url } of importedItem) {

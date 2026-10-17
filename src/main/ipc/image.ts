@@ -36,7 +36,7 @@ const maxDownloadBytes = 50 * 1024 * 1024
  * 通行做法同样额外读取了 `FileNameW`，这里比它多做一步：按空字符切分，
  * 因此一次复制多张图也能识别。
  */
-function 读剪贴板(): ClipboardContent {
+function readClipboard(): ClipboardContent {
   try {
     const fileNameBuffer = clipboard.readBuffer('FileNameW')
     if (fileNameBuffer && fileNameBuffer.length > 0) {
@@ -72,8 +72,8 @@ function 读剪贴板(): ClipboardContent {
 /** 在目录内挑一个不冲突的名字。 */
 function arrangePath(dir: string, expectedName: string): string {
   mkdirSync(dir, { recursive: true })
-  const 最终名 = uniqueFileName(expectedName, (candidate) => existsSync(join(dir, candidate)))
-  return join(dir, 最终名)
+  const finalName = uniqueFileName(expectedName, (candidate) => existsSync(join(dir, candidate)))
+  return join(dir, finalName)
 }
 
 /**
@@ -82,7 +82,7 @@ function arrangePath(dir: string, expectedName: string): string {
  * 服务端返回的 `Content-Type` 比 URL 里的后缀更可信：很多图床把图片挂在
  * 没有后缀的路径上，也有些把 `.jpg` 实际返回 PNG 内容。有类型就按类型走。
  */
-function 校正扩展名(displayName: string, kind: string | null): string {
+function correctExt(displayName: string, kind: string | null): string {
   const shouldByKind = extByKind(kind)
   if (!shouldByKind) return displayName
   const existing = kindByExt(displayName)
@@ -91,7 +91,7 @@ function 校正扩展名(displayName: string, kind: string | null): string {
 }
 
 export function registerImageIpc(): void {
-  ipcMain.handle(CH.imageReadClipboard, (): ClipboardContent => 读剪贴板())
+  ipcMain.handle(CH.imageReadClipboard, (): ClipboardContent => readClipboard())
 
   ipcMain.handle(
     CH.imageSaveBytes,
@@ -160,7 +160,7 @@ export function registerImageIpc(): void {
         if (buffer.length === 0) return failure('下载内容为空')
         if (buffer.length > maxDownloadBytes) return failure('图片过大')
 
-        const filePath = arrangePath(dir, 校正扩展名(displayName, kind))
+        const filePath = arrangePath(dir, correctExt(displayName, kind))
         writeFileSync(filePath, buffer)
         return { success: true, filePath: normalizePath(filePath), kind, error: null }      } catch (error) {
         return failure(error instanceof Error ? error.message : String(error))

@@ -57,7 +57,7 @@ export function stripExt(name: string): string {
 }
 
 /** 取所在目录；没有分隔符时返回空串。 */
-export function 取目录(filePath: string): string {
+export function takeDir(filePath: string): string {
   const position = Math.max(filePath.lastIndexOf('/'), filePath.lastIndexOf('\\'))
   return position <= 0 ? '' : filePath.slice(0, position)
 }

@@ -161,8 +161,8 @@ async function switchTab(id: number): Promise<void> {
 }
 
 /** 循环切换，用于"应用内窗口切换"。 */
-async function 循环标签(direction: 1 | -1): Promise<void> {
-  const target = tabSet.循环(direction, flushCurrentTab)
+async function loopLabel(direction: 1 | -1): Promise<void> {
+  const target = tabSet.loopIt(direction, flushCurrentTab)
   if (!target) {
     toast('只有一个文档，无需切换')
     return
@@ -179,7 +179,7 @@ async function 循环标签(direction: 1 | -1): Promise<void> {
 async function closeTab(id: number): Promise<void> {
   const target = tabSet.list.find((t) => t.id === id)
   if (!target) return
-  if (!tabSet.可以关闭) {
+  if (!tabSet.canClose) {
     toast('至少要保留一个文档')
     return
   }
@@ -189,7 +189,7 @@ async function closeTab(id: number): Promise<void> {
   const content = isCurrentOne ? currentText() : target.editorState.doc.toString()
 
   if (target.state.dirty) {
-    const 确认 = await window.selfmd.dialog.message({
+    const confirmAction = await window.selfmd.dialog.message({
       type: 'question',
       title: '关闭文档',
       message: `「${target.state.name}」有未保存的改动`,
@@ -198,7 +198,7 @@ async function closeTab(id: number): Promise<void> {
       defaultId: 1,
       cancelId: 1
     })
-    if (确认.response !== 0) return
+    if (confirmAction.response !== 0) return
   }
 
   const nextTabTo = tabSet.close(id, content, flushCurrentTab)
@@ -217,7 +217,7 @@ async function closeTab(id: number): Promise<void> {
  * "侧边栏还列着刚关掉的文档"这类看着像缓存的问题。
  */
 function refreshTabUi(): void {
-  sidebar?.设置文档列表(
+  sidebar?.setDocList(
     tabSet.list.map((t) => ({
       id: t.id,
       nameText: t.state.name,
@@ -292,16 +292,16 @@ function editorExtensions(): Extension[] {
     EditorView.updateListener.of((update) => {
       if (update.docChanged) {
         refreshOutline(true)
-        安排自动保存()
+        scheduleAutosave()
       } else if (update.selectionSet) {
         refreshOutline(false)
         // 打字机模式：光标换行时把该行重新滚到垂直中央。
         // 只在**行号真的变了**时才滚——否则在一行内左右移动光标也会触发滚动，
         // 用户会看到画面无谓地跳动。
         if (settings.typewriterMode) {
-          const 旧行 = update.startState.doc.lineAt(update.startState.selection.main.head).number
+          const oldLine = update.startState.doc.lineAt(update.startState.selection.main.head).number
           const newLine = update.state.doc.lineAt(update.state.selection.main.head).number
-          if (旧行 !== newLine) centerCursorLine(update.view)
+          if (oldLine !== newLine) centerCursorLine(update.view)
         }
       }
     }),
@@ -361,7 +361,7 @@ function refreshModeUi(): void {
  * 3 秒是个折中：太短会让快速打字时频繁写盘（大文档上能感觉到卡顿），
  * 太长则崩溃时丢的内容多。通行的自动保存也是"停顿后才写"的思路。
  */
-const 自动保存延迟 = 3000
+const autosaveDelay = 3000
 
 let autosaveTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -372,13 +372,13 @@ let autosaveTimer: ReturnType<typeof setTimeout> | null = null
  * 自动保存关掉时直接返回，但不清掉已有的待写草稿：用户可能在打字中途关掉开关，
  * 那部分内容仍然值得落一次盘。
  */
-function 安排自动保存(): void {
+function scheduleAutosave(): void {
   if (!settings.autoSave) return
   if (autosaveTimer !== null) clearTimeout(autosaveTimer)
   autosaveTimer = setTimeout(() => {
     autosaveTimer = null
     void saveDraftNow()
-  }, 自动保存延迟)
+  }, autosaveDelay)
 }
 
 /** 立刻把当前内容写成草稿（切换文档、关窗、以及防抖到期时调用）。 */
@@ -399,7 +399,7 @@ async function saveDraftNow(): Promise<void> {
  * 单独做成一个函数是因为它需要与用户交互：列出可恢复的文档，让用户选。
  * 直接静默恢复是错的——用户可能已经确认过那些改动不要了。
  */
-async function 检查崩溃恢复(): Promise<void> {
+async function checkCrashRecovery(): Promise<void> {
   let toRecover: DraftInfo[] = []
   try {
     toRecover = await window.selfmd.draft.pending()
@@ -480,7 +480,7 @@ function refreshOutline(recompute: boolean): void {
   if (!sidebar || !view) return
   if (recompute) headingCache = extractHeadings(view.state)
   sidebar.setOutline(headingCache, locateHeading(headingCache, view.state.selection.main.head))
-  if (recompute) sidebar.高亮当前文件(doc.current.path)
+  if (recompute) sidebar.highlightCurrentFile(doc.current.path)
 }
 
 /**
@@ -489,7 +489,7 @@ function refreshOutline(recompute: boolean): void {
  * 验证协议层能服务主题目录下的**任意文件**，而不仅是 `<主题名>.css`——
  * 主题的字体、图片、深色子样式表都靠这一点。同时验证目录穿越被挡住。
  */
-async function 运行主题自测(): Promise<string> {
+async function runThemeSelfTest(): Promise<string> {
   const take = async (filePath: string): Promise<string> => {
     try {
       const response = await fetch(`selfmd://theme/${filePath}`)
@@ -2110,7 +2110,7 @@ async function runCommand(payload: MenuCommandPayload): Promise<void> {
     }
 
     case 'view.switchDocument':
-      await 循环标签(1)
+      await loopLabel(1)
       return
 
     case 'view.articles':
@@ -3394,7 +3394,7 @@ async function openPath(path: string): Promise<void> {
       modeResult = await 运行模式自测()
       prefsUiResult = await 运行偏好界面自测()
       imageMenuResult = await 运行图片菜单自测()
-      themeResult = await 运行主题自测()
+      themeResult = await runThemeSelfTest()
     }
 
     await window.selfmd.doc.notifyOpened({
@@ -3586,7 +3586,7 @@ async function boot(): Promise<void> {
 
   // 启动时检查崩溃残留的草稿。放在最后：先让编辑器可用，
   // 万一恢复流程出问题，用户至少还能正常打开文档。
-  void 检查崩溃恢复()
+  void checkCrashRecovery()
 
   // --- main -> renderer -----------------------------------------------------
   window.selfmd.on.menuCommand((payload) => {

@@ -47,7 +47,7 @@ export function 识别地址行(line: string): string | null {
  * 从最后一行往前扫，收到地址就继续，遇到非地址行就停——因为日志头在输出上方，
  * 结果在下方。
  */
-export function 解析命令行输出(output: string): string[] {
+export function parseCliOutput(output: string): string[] {
   const lines = output.split(/\r?\n/)
   const result: string[] = []
 
@@ -100,26 +100,26 @@ function 解析JSON应答(docText: string): string[] | null {
 export function parseUploadResult(
   output: string,
   uploader: uploaderType,
-  期望数量: number
+  expectedCount: number
 ): { url: string[]; error: string | null } {
   const 用JSON = uploader === 'picgo-app' || uploader === 'piclist-app'
 
   let url: string[] = []
   if (用JSON) {
-    const JSON结果 = 解析JSON应答(output)
-    if (JSON结果 !== null) url = JSON结果
-    else url = 解析命令行输出(output)
+    const jsonResult = 解析JSON应答(output)
+    if (jsonResult !== null) url = jsonResult
+    else url = parseCliOutput(output)
   } else {
-    url = 解析命令行输出(output)
+    url = parseCliOutput(output)
   }
 
   // 数量对不上就不能用：宁可报错也不要让用户拿着错位的地址去回填，
   // 那会把 A 图的地址写到 B 图上，而且看起来"上传成功了"。
-  if (url.length !== 期望数量) {
+  if (url.length !== expectedCount) {
     return {
       url,
       error:
-        `上传返回了 ${url.length} 个地址，但本次上传了 ${期望数量} 张图片。` +
+        `上传返回了 ${url.length} 个地址，但本次上传了 ${expectedCount} 张图片。` +
         `原始输出：${output.trim().slice(0, 300) || '（空）'}`
     }
   }
@@ -177,8 +177,8 @@ export function buildUploadCmd(
       // 但也不能无条件加——用户模板里可能已经写了 `"${filepath}"`，
       // 再加一层就变成 `""C:/a.png""`。
       return template
-        .replace(/\$\{filepath\}/g, 按需引号(filePath))
-        .replace(/\$\{filename\}/g, 按需引号(name))
+        .replace(/\$\{filepath\}/g, quoteWhenNeeded(filePath))
+        .replace(/\$\{filename\}/g, quoteWhenNeeded(name))
     }
     default:
       return null
@@ -201,7 +201,7 @@ export function quoteChar(filePath: string): string {
  * 用于用户自定义命令的占位符替换：值里有空白才需要包起来，
  * 而模板里已经写了引号的情况不能再包一层。
  */
-export function 按需引号(value: string): string {
+export function quoteWhenNeeded(value: string): string {
   const docText = value.trim()
   if (docText.length === 0) return value
   // 模板里已经带了引号

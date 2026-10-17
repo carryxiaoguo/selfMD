@@ -21,8 +21,8 @@ import { getAppPaths } from '../util/paths'
 function computeKey(rawPath: string | null): string {
   if (!rawPath) return '未命名'
   const name = basename(rawPath, extname(rawPath)).replace(/[\\/:*?"<>|]/g, '_').slice(0, 60)
-  const 哈希 = createHash('sha1').update(rawPath.toLowerCase()).digest('hex').slice(0, 8)
-  return `${name}-${哈希}`
+  const hashValue = createHash('sha1').update(rawPath.toLowerCase()).digest('hex').slice(0, 8)
+  return `${name}-${hashValue}`
 }
 
 function contentFile(key: string): string {
@@ -56,7 +56,7 @@ export function writeDraft(rawPath: string | null, content: string): boolean {
 }
 
 /** 原文件当前的字符数；读不到返回 null。 */
-function 取原文件字符数(rawPath: string | null): number | null {
+function takeOriginalCharCount(rawPath: string | null): number | null {
   if (!rawPath || !existsSync(rawPath)) return null
   try {
     return readFileSync(rawPath, 'utf8').length
@@ -95,7 +95,7 @@ export function listDrafts(): DraftInfo[] {
         rawPath,
         savedAt: meta.savedAt ?? 0,
         originalMtime,
-        originalCharCount: 取原文件字符数(rawPath),
+        originalCharCount: takeOriginalCharCount(rawPath),
         draftChars
       })
     } catch {

@@ -71,7 +71,7 @@ const languageOptions: { value: string; name: string }[] = (() => {
 })()
 
 /** 围栏在文档中的位置。头部栏的所有动作都要靠它换算回文档坐标。 */
-export interface 代码块位置 {
+export interface CodeBlockPos {
   fenceStart: number
   fenceEnd: number
   firstLineStart: number
@@ -95,7 +95,7 @@ export interface 代码块位置 {
 export class 代码块头部 extends WidgetType {
   constructor(
     readonly info: FenceInfo,
-    readonly position: 代码块位置
+    readonly position: CodeBlockPos
   ) {
     super()
   }
@@ -189,7 +189,7 @@ export class 代码块头部 extends WidgetType {
     copy.textContent = '复制'
     copy.title = '复制代码'
     copy.addEventListener('click', () => {
-      void navigator.clipboard.writeText(this.取代码(view)).then(
+      void navigator.clipboard.writeText(this.takeCode(view)).then(
         () => hint(copy, '已复制'),
         () => hint(copy, '复制失败')
       )
@@ -200,10 +200,10 @@ export class 代码块头部 extends WidgetType {
   }
 
   /** 造一个下拉；三个下拉的公共部分收在这里，免得样式类名写漏。 */
-  private makeSelect(className: string, 无障碍名: string): HTMLSelectElement {
+  private makeSelect(className: string, ariaLabel: string): HTMLSelectElement {
     const el = document.createElement('select')
     el.className = `cm-w-codehead-select ${className}`
-    el.setAttribute('aria-label', 无障碍名)
+    el.setAttribute('aria-label', ariaLabel)
     return el
   }
 
@@ -213,7 +213,7 @@ export class 代码块头部 extends WidgetType {
    * 从**文档**里现取，而不是缓存进 widget：用户按下复制的那一刻，
    * 内容多半已经和 widget 构造时不一样了。
    */
-  private 取代码(view: EditorView): string {
+  private takeCode(view: EditorView): string {
     const state = view.state
     const start = Math.min(this.position.fenceStart, state.doc.length)
     const end = Math.min(this.position.fenceEnd, state.doc.length)
@@ -226,7 +226,7 @@ export class 代码块头部 extends WidgetType {
   }
 
   /** 把改动写回围栏首行的信息串。 */
-  private patchInfo(view: EditorView, 部分: Partial<FenceInfo>): void {
+  private patchInfo(view: EditorView, partial: Partial<FenceInfo>): void {
     const state = view.state
     const line = state.doc.lineAt(Math.min(this.position.firstLineStart, state.doc.length))
     const lineText = state.sliceDoc(line.from, line.to)
@@ -236,7 +236,7 @@ export class 代码块头部 extends WidgetType {
     // **必须用 `解析围栏首行`，不能对整行调 `解析围栏信息`。**
     // 后者会把反引号当成语言的一部分，构建时再写回去——每改一次多三个
     // 反引号，攒到十几个才看得出来。
-    const nextInfo = { ...parseFenceFirstLine(lineText), ...部分 }
+    const nextInfo = { ...parseFenceFirstLine(lineText), ...partial }
     const nextText = buildFenceInfo(nextInfo)
     if (nextText === lineText.slice(range.start, range.end)) return
 
@@ -543,7 +543,7 @@ export class tableSeparatorDeco extends WidgetType {
 /** Mermaid 模块只在首次遇到图表时加载。 */
 let mermaidModule: Promise<typeof import('mermaid').default> | null = null
 
-async function 取Mermaid(): Promise<typeof import('mermaid').default> {
+async function loadMermaid(): Promise<typeof import('mermaid').default> {
   mermaidModule ??= import('mermaid').then((modulo) => {
     const take = modulo as unknown as { default?: unknown }
     return (take.default ?? modulo) as unknown as typeof import('mermaid').default
@@ -556,8 +556,8 @@ let initialized = false
 let themesInitialized = ''
 
 /** 初始化 Mermaid，并在主题变化时重新初始化。 */
-async function 确保初始化(theme: 'default' | 'dark'): Promise<typeof import('mermaid').default> {
-  const mermaid = await 取Mermaid()
+async function ensureInit(theme: 'default' | 'dark'): Promise<typeof import('mermaid').default> {
+  const mermaid = await loadMermaid()
   // 主题变了必须重新 initialize，否则旧主题的配色会一直用下去
   if (!initialized || themesInitialized !== theme) {
     mermaid.initialize({
@@ -617,7 +617,7 @@ export class 图表 extends WidgetType {
 
     void (async () => {
       try {
-        const mermaid = await 确保初始化(this.darkMode ? 'dark' : 'default')
+        const mermaid = await ensureInit(this.darkMode ? 'dark' : 'default')
         // 每次渲染都要一个唯一 id：Mermaid 会在文档里放一个同名的临时
         // 容器来量尺寸，id 重复会让两张图互相覆盖。
         const id = `selfmd-图表-${Math.random().toString(36).slice(2, 10)}`
@@ -674,7 +674,7 @@ export function computeLevel(state: EditorState, lineStart: number): number {
 /** KaTeX 模块只在首次用到时加载。 */
 let katexModule: Promise<{ render: typeof import('katex').default.render }> | null = null
 
-async function 取KaTeX(): Promise<{ render: typeof import('katex').default.render }> {
+async function loadKatex(): Promise<{ render: typeof import('katex').default.render }> {
   katexModule ??= import('katex').then((modulo) => {
     // Vite 对 CommonJS 的默认导出处理：有的形态挂在 `.default` 上
     const take = modulo as unknown as { default?: { render: unknown }; render?: unknown }
@@ -718,7 +718,7 @@ export class 数学公式 extends WidgetType {
 
     void (async () => {
       try {
-        const katex = await 取KaTeX()
+        const katex = await loadKatex()
         katex.render(this.formula, box, {
           displayMode: this.blockLevel,
           throwOnError: false,

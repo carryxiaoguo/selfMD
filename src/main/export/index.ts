@@ -61,7 +61,7 @@ export interface exportResult {
  * 表格斑马纹全部变白底。导出的 PDF 与屏幕所见完全不同，而用户只会认为
  * "导出功能坏了"，很难联想到是打印色彩策略。
  */
-const 导出基础样式 = `
+const exportBaseCss = `
 /* --- 页面 --- */
 html { background: var(--bg-color); }
 body.selfmd-export {
@@ -140,7 +140,7 @@ body.selfmd-export * { -webkit-print-color-adjust: exact; print-color-adjust: ex
 `
 
 /** 生成导出时的侧边目录 HTML。 */
-function 构建目录(source: string): string {
+function buildDir(source: string): string {
   const headings = extractOutline(source)
   if (headings.length === 0) return ''
   const shallowest = Math.min(...headings.map((t) => t.level))
@@ -166,7 +166,7 @@ ${line}
 // 图片
 // ---------------------------------------------------------------------------
 
-const 图片MIME: Record<string, string> = {
+const imageMime: Record<string, string> = {
   '.png': 'image/png',
   '.jpg': 'image/jpeg',
   '.jpeg': 'image/jpeg',
@@ -183,7 +183,7 @@ const 图片MIME: Record<string, string> = {
  * 远程图片保持不变——下载它们既慢又可能失败，而且用户放一个远程地址在
  * 文档里，本来就不指望它离线可见。
  */
-function 内嵌本地图片(html: string, docPath: string | null): string {
+function embedLocalImages(html: string, docPath: string | null): string {
   return html.replace(/(<img[^>]+src=")([^"]+)(")/gi, (wholeText, before: string, url: string, after: string) => {
     if (/^(https?:|data:)/i.test(url)) return wholeText
     // 还原百分号编码，中文路径才找得到文件
@@ -196,7 +196,7 @@ function 内嵌本地图片(html: string, docPath: string | null): string {
     const baseline = docPath ? dirname(docPath) : getAppPaths().userImages
     const whole = isAbsolute(filePath) ? filePath : resolve(baseline, filePath)
     if (!existsSync(whole)) return wholeText
-    const kind = 图片MIME[extname(whole).toLowerCase()]
+    const kind = imageMime[extname(whole).toLowerCase()]
     if (!kind) return wholeText
     try {
       const data = readFileSync(whole).toString('base64')
@@ -224,14 +224,14 @@ function tempDir(): string {
 }
 
 /** 取当前主题的完整样式（三层级联），并做导出处理。 */
-async function 收集样式(): Promise<string> {
+async function collectStyles(): Promise<string> {
   const settings = getSettings()
   const id = activeTheme(settings)
   const partEl: string[] = []
 
   // 基础样式：带上设计变量与排版规则，否则导出的 HTML 无样式可依。
   // 它同时定义了两层变量契约（通用变量层 + 本项目层）。
-  const variable = 读基础样式()
+  const variable = readBaseCss()
   if (variable) partEl.push(variable)
 
   const theme = themePath(id)
@@ -260,7 +260,7 @@ async function 收集样式(): Promise<string> {
 }
 
 /** 基础样式表：优先读打包产物，开发时读源码目录。 */
-function 读基础样式(): string | null {
+function readBaseCss(): string | null {
   const candidate = [
     join(app.getAppPath(), 'src', 'renderer', 'src', 'styles', 'base.css'),
     join(__dirname, '..', '..', '..', 'src', 'renderer', 'src', 'styles', 'base.css')
@@ -279,10 +279,10 @@ function 读基础样式(): string | null {
 
 export async function buildExportHtml(options: ExportOptions): Promise<string> {
   const withOutline = options.withOutline ?? true
-  const 内嵌 = options.embeddedImage ?? true
+  const embedded = options.embeddedImage ?? true
 
   let body = renderMarkdownToHtml(options.source)
-  if (内嵌) body = 内嵌本地图片(body, options.docPath)
+  if (embedded) body = embedLocalImages(body, options.docPath)
 
   // 无样式模式：只出结构，不带任何 CSS
   if (options.format === 'html-plain') {
@@ -300,9 +300,9 @@ ${body}</div>
 `
   }
 
-  const style = await 收集样式()
+  const style = await collectStyles()
   const cls = `selfmd-export${withOutline ? ' selfmd-export-show-outline' : ''}`
-  const dir = withOutline ? 构建目录(options.source) : ''
+  const dir = withOutline ? buildDir(options.source) : ''
 
   return `<!doctype html>
 <html lang="zh-Hans">
@@ -312,7 +312,7 @@ ${body}</div>
 <meta name="generator" content="selfMD">
 <title>${escapeHeading(options.docPath)}</title>
 <style>
-${导出基础样式}
+${exportBaseCss}
 ${style}
 </style>
 </head>
@@ -341,7 +341,7 @@ function escapeHeading(docPath: string | null): string {
  * 用一个**隐藏窗口**加载生成好的 HTML，再调 `printToPDF`。
  * 这是 Electron 白拿的能力——不需要装任何外部程序。
  */
-async function 导出PDF(options: ExportOptions): Promise<exportResult> {
+async function exportPdf(options: ExportOptions): Promise<exportResult> {
   const html = await buildExportHtml({ ...options, format: 'html' })
 
   // 落一个临时 HTML：data: URL 在超长文档时会超出长度限制，
@@ -437,7 +437,7 @@ export async function takePandocVersion(): Promise<string | null> {
 }
 
 /** 各格式对应的 Pandoc 输出名。 */
-const PANDOC格式: Record<string, string> = {
+const PANDOC_FORMATS: Record<string, string> = {
   docx: 'docx',
   latex: 'latex',
   epub: 'epub',
@@ -445,7 +445,7 @@ const PANDOC格式: Record<string, string> = {
   odt: 'odt'
 }
 
-async function 导出经Pandoc(options: ExportOptions): Promise<exportResult> {
+async function exportViaPandoc(options: ExportOptions): Promise<exportResult> {
   const program = await detectPandoc()
   if (!program) {
     return {
@@ -457,7 +457,7 @@ async function 导出经Pandoc(options: ExportOptions): Promise<exportResult> {
     }
   }
 
-  const targetFormat = PANDOC格式[options.format]
+  const targetFormat = PANDOC_FORMATS[options.format]
   if (!targetFormat) {
     return { success: false, filePath: null, error: `不支持的导出格式：${options.format}` }
   }
@@ -534,7 +534,7 @@ export async function availableFormats(): Promise<Record<exportFormat, boolean>>
 
 export async function runExport(options: ExportOptions): Promise<exportResult> {
   try {
-    if (options.format === 'pdf') return await 导出PDF(options)
+    if (options.format === 'pdf') return await exportPdf(options)
 
     if (options.format === 'html' || options.format === 'html-plain') {
       const html = await buildExportHtml(options)
@@ -543,7 +543,7 @@ export async function runExport(options: ExportOptions): Promise<exportResult> {
       return { success: true, filePath: options.target, error: null }
     }
 
-    return await 导出经Pandoc(options)
+    return await exportViaPandoc(options)
   } catch (error) {
     return {
       success: false,

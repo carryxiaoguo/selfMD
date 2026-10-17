@@ -36,15 +36,15 @@ import type { BuildContext, DecoEntry, SyntaxNode } from './types'
  *
  * 只读状态直接返回空集：只读时没有光标，全部按渲染态显示。
  */
-function 计算活动行(state: EditorState): Set<number> {
+function computeActiveLines(state: EditorState): Set<number> {
   const lineSetBox = new Set<number>()
   if (state.readOnly) return lineSetBox
   for (const selection of state.selection.ranges) {
     const firstLine = state.doc.lineAt(selection.from).number
     const lastLine = state.doc.lineAt(selection.to).number
     // 选区可能跨越成千上万行，设一个上限避免全量展开。
-    const 跨度 = Math.min(lastLine - firstLine, 200)
-    for (let n = firstLine; n <= firstLine + 跨度; n++) lineSetBox.add(n)
+    const spanWidth = Math.min(lastLine - firstLine, 200)
+    for (let n = firstLine; n <= firstLine + spanWidth; n++) lineSetBox.add(n)
   }
   return lineSetBox
 }
@@ -53,10 +53,10 @@ function 计算活动行(state: EditorState): Set<number> {
 // 构建
 // ---------------------------------------------------------------------------
 
-function 构建装饰(view: EditorView): DecorationSet {
+function buildDecorations(view: EditorView): DecorationSet {
   const state = view.state
   const context: BuildContext = {
-    activeLines: 计算活动行(state),
+    activeLines: computeActiveLines(state),
     usedDecoLanes: new Set<number>(),
     headerReplaced: new Set<number>(),
     entry: [] as DecoEntry[]
@@ -111,7 +111,7 @@ function 构建装饰(view: EditorView): DecorationSet {
 // 插件
 // ---------------------------------------------------------------------------
 
-class 实时预览 implements PluginValue {
+class livePreviewExt implements PluginValue {
   decorations: DecorationSet
   private lastError = ''
 
@@ -128,7 +128,7 @@ class 实时预览 implements PluginValue {
   private safeBuild(view: EditorView): DecorationSet {
     try {
       this.lastError = ''
-      return 构建装饰(view)
+      return buildDecorations(view)
     } catch (error) {
       const docText = error instanceof Error ? error.message : String(error)
       // 同一条错误只打印一次，避免每次按键刷屏。
@@ -141,8 +141,8 @@ class 实时预览 implements PluginValue {
   }
 }
 
-const 实时预览插件 = ViewPlugin.fromClass(实时预览, {
-  decorations: (实例) => 实例.decorations
+const livePreviewPlugin = ViewPlugin.fromClass(livePreviewExt, {
+  decorations: (instance) => instance.decorations
 })
 
 /**
@@ -157,5 +157,5 @@ export function livePreview(enable: boolean, isDarkFlag: () => boolean = () => f
   // 块级替换（数学公式、Mermaid 图表）来自 StateField——插件不能提供块级装饰；
   // 其余装饰来自插件，因为那里能拿到 view.visibleRanges 做视口虚拟化。
   // 两类都通过 EditorView.decorations 汇入，CodeMirror 会把它们合并。
-  return [实时预览插件, mathFieldExt, createDiagramField({ isDarkFlag })]
+  return [livePreviewPlugin, mathFieldExt, createDiagramField({ isDarkFlag })]
 }

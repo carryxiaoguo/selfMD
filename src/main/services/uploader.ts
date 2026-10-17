@@ -31,12 +31,12 @@ import { getSettings } from './settings'
 const run = promisify(exec)
 
 /** 单次上传的输出上限，照抄 值。 */
-const 输出上限 = 2097152
+const outputLimit = 2097152
 
 /** app 模式的重试等待。应用启动需要时间，立刻重试必然失败。 */
 const startupWait = 5000
 
-export interface 上传成功项 {
+export interface uploadSuccess {
   rawPath: string
   url: string
 }
@@ -47,7 +47,7 @@ export interface uploadFailure {
 }
 
 export interface uploadResult {
-  success: 上传成功项[]
+  success: uploadSuccess[]
   failure: uploadFailure[]
 }
 
@@ -76,7 +76,7 @@ async function tryHttpUpload(paths: string[]): Promise<string | null> {
 }
 
 /** 启动 PicGo / PicList 应用。启动失败只记录，不影响后续重试。 */
-async function 启动应用(program: string): Promise<void> {
+async function launchApp(program: string): Promise<void> {
   if (program.length === 0) return
   try {
     // 用 exec 而不是 spawn + detached：这里只关心"把它拉起来"，
@@ -91,7 +91,7 @@ async function 启动应用(program: string): Promise<void> {
 }
 
 /** 应用模式的完整流程：先试 HTTP，失败则启动应用后重试一次。 */
-async function 应用模式上传(paths: string[]): Promise<{ url: string[]; error: string | null }> {
+async function appModeUpload(paths: string[]): Promise<{ url: string[]; error: string | null }> {
   const settings = getSettings()
 
   const firstTime = await tryHttpUpload(paths)
@@ -116,7 +116,7 @@ async function 应用模式上传(paths: string[]): Promise<{ url: string[]; err
     return { url: [], error: `配置的路径不存在：${program}` }
   }
 
-  await 启动应用(program)
+  await launchApp(program)
   await new Promise((done) => setTimeout(done, startupWait))
 
   const retryCount = await tryHttpUpload(paths)
@@ -130,7 +130,7 @@ async function 应用模式上传(paths: string[]): Promise<{ url: string[]; err
 }
 
 /** 命令行模式的完整流程。 */
-async function 命令行上传(
+async function cliUpload(
   uploader: uploaderType,
   paths: string[]
 ): Promise<{ url: string[]; error: string | null }> {
@@ -157,7 +157,7 @@ async function 命令行上传(
     }
 
     try {
-      const { stdout } = await run(command, { maxBuffer: 输出上限, windowsHide: true })
+      const { stdout } = await run(command, { maxBuffer: outputLimit, windowsHide: true })
       const singleOne = parseUploadResult(stdout, uploader, 1)
       if (singleOne.error) return { url: [], error: singleOne.error }
       url.push(...singleOne.url)
@@ -175,9 +175,9 @@ async function 命令行上传(
  *
  * 返回一一对应的「原路径 → 远程地址」。上层据此改写文档里的引用。
  */
-export async function uploadImage(文件路径们: string[]): Promise<uploadResult> {
+export async function uploadImage(filePaths: string[]): Promise<uploadResult> {
   const settings = getSettings()
-  const pendingUpload = 文件路径们.filter((filePath) => filePath.length > 0)
+  const pendingUpload = filePaths.filter((filePath) => filePath.length > 0)
 
   if (pendingUpload.length === 0) return { success: [], failure: [] }
 
@@ -191,9 +191,9 @@ export async function uploadImage(文件路径们: string[]): Promise<uploadResu
     }
   }
 
-  const 缺失 = pendingUpload.filter((filePath) => !existsSync(filePath))
+  const missingFlag = pendingUpload.filter((filePath) => !existsSync(filePath))
   const exists = pendingUpload.filter((filePath) => existsSync(filePath))
-  const failure: uploadFailure[] = 缺失.map((rawPath) => ({
+  const failure: uploadFailure[] = missingFlag.map((rawPath) => ({
     rawPath,
     reason: '文件不存在（可能已被移动或删除）'
   }))
@@ -201,8 +201,8 @@ export async function uploadImage(文件路径们: string[]): Promise<uploadResu
   if (exists.length === 0) return { success: [], failure }
 
   const reply = isAppMode(settings.imageUploader)
-    ? await 应用模式上传(exists)
-    : await 命令行上传(settings.imageUploader, exists)
+    ? await appModeUpload(exists)
+    : await cliUpload(settings.imageUploader, exists)
 
   if (reply.error) {
     return {

@@ -50,7 +50,7 @@ interface manualBlock {
 }
 
 /** 首行 `---` 开头、后续某行 `---` 或 `...` 收尾，即视为 YAML 前置元数据。 */
-function 检测前置元数据(state: EditorState): manualBlock | null {
+function detectFrontMatter(state: EditorState): manualBlock | null {
   if (state.doc.lines < 2) return null
   const firstLine = state.doc.line(1)
   if (firstLine.text.trim() !== '---') return null
@@ -77,7 +77,7 @@ function 检测前置元数据(state: EditorState): manualBlock | null {
  * 渲染时转换必须跳过这些区间：`代码里的 " 引号 " 与 -- 是内容本身`，
  * 替换成弯引号会让人以为文档里存的就是排版字符。
  */
-function 收集行内代码区间(node: SyntaxNode): { from: number; to: number }[] {
+function collectInlineCodeSpans(node: SyntaxNode): { from: number; to: number }[] {
   const result: { from: number; to: number }[] = []
   let child = node.firstChild
   while (child) {
@@ -112,8 +112,8 @@ export function detectMathBlock(state: EditorState): manualBlock[] {
   return result
 }
 
-function 落在手工块内(position: number, 手工块列表: manualBlock[]): boolean {
-  for (const block of 手工块列表) {
+function insideManualBlock(position: number, manualBlockList: manualBlock[]): boolean {
+  for (const block of manualBlockList) {
     if (position >= block.from && position <= block.to) return true
   }
   return false
@@ -131,7 +131,7 @@ export interface ManualScanResult {
 
 /** 第一遍：处理语法树里不存在的两类块，并把它们占用的行登记好。 */
 export function scanManualBlocks(state: EditorState, context: BuildContext): ManualScanResult {
-  const frontMatter = 检测前置元数据(state)
+  const frontMatter = detectFrontMatter(state)
   const mathBlock = detectMathBlock(state)
 
   const allBlocks: manualBlock[] = []
@@ -166,7 +166,7 @@ export function handleBlock(
   manualScan: ManualScanResult
 ): boolean {
   // 落在手工块内部的节点交给手工扫描处理（主要是别把 `---` 画成水平线）。
-  if (落在手工块内(node.from, manualScan.allBlocks)) return true
+  if (insideManualBlock(node.from, manualScan.allBlocks)) return true
 
   const lineNo = state.doc.lineAt(node.from).number
   const onActiveLine = context.activeLines.has(lineNo)
@@ -199,10 +199,10 @@ export function handleBlock(
       // 否则用户敲下 `"` 却看到 `“`，会以为文档里存的就是弯引号。
       // 这与行内标记"活动行露出源码"是同一条规则。
       if (typographyEnabled() && !onActiveLine) {
-        const 代码区间 = 收集行内代码区间(node)
+        const codeSpan = collectInlineCodeSpans(node)
         for (const segment of scanPunct(originalText, paragraphStart)) {
           // 行内代码里的引号与连字符是内容，不能替换
-          if (代码区间.some((sel) => segment.from >= sel.from && segment.to <= sel.to)) continue
+          if (codeSpan.some((sel) => segment.from >= sel.from && segment.to <= sel.to)) continue
           context.entry.push({
             from: segment.from,
             to: segment.to,
@@ -260,7 +260,7 @@ export function handleBlock(
       // 行装饰**一行只能有一条**（`加行装饰` 会把重复的挡掉），
       // 所以提示框与普通引用是在这里二选一，不能先加引言再加提示框。
       for (let n = firstLine.number; n <= lastLine.number; n++) {
-        addLineDeco(context, state.doc.line(n).from, mark ? blockLineStyles.callout : blockLineStyles.引言)
+        addLineDeco(context, state.doc.line(n).from, mark ? blockLineStyles.callout : blockLineStyles.blockquote)
       }
 
       // 首行的标记换成一个小标签；光标停在这一行时露源码，方便改回普通引用
@@ -431,7 +431,7 @@ export function handleBlock(
       if (!parent) return true
       if (context.headerReplaced.has(state.doc.lineAt(parent.from).from)) return true
 
-      const langNode = 找子节点(parent, 'CodeInfo')
+      const langNode = findChildNode(parent, 'CodeInfo')
       const language = langNode ? state.sliceDoc(langNode.from, langNode.to).trim() : ''
       const lineEnd = state.doc.lineAt(parent.from).to
       context.entry.push({
@@ -446,7 +446,7 @@ export function handleBlock(
     // --------------------------------------------------------- 水平线 ----
     case 'HorizontalRule': {
       const line = state.doc.lineAt(node.from)
-      addLineDeco(context, line.from, blockLineStyles.水平线行)
+      addLineDeco(context, line.from, blockLineStyles.horizontalRuleLine)
       if (!onActiveLine) {
         context.entry.push({
           from: node.from,
@@ -460,7 +460,7 @@ export function handleBlock(
 
     // ----------------------------------------------------------- 表格 ----
     case 'TableHeader': {
-      addLineDeco(context, state.doc.lineAt(node.from).from, blockLineStyles.表头行)
+      addLineDeco(context, state.doc.lineAt(node.from).from, blockLineStyles.tableHeadLine)
       return false
     }
 
@@ -473,7 +473,7 @@ export function handleBlock(
       const parentName = node.parent?.name
       if (parentName === 'Table') {
         // 对齐定义行（`| :--- | :--: |`）整行折叠，只留一条分隔视觉。
-        addLineDeco(context, state.doc.lineAt(node.from).from, blockLineStyles.表格分隔行)
+        addLineDeco(context, state.doc.lineAt(node.from).from, blockLineStyles.tableSepLine)
         if (!onActiveLine) {
           context.entry.push({ from: node.from, to: node.to, deco: hidden, rank: 1 })
         }
@@ -496,7 +496,7 @@ export function handleBlock(
       if (node.parent?.name !== 'Task') return false
       // 整行挂 `md-task-list-item`：这是通用的类名，
       // 挂上之后针对它写的规则（缩进、行高、完成态淡化）可直接生效。
-      addLineDeco(context, state.doc.lineAt(node.from).from, blockLineStyles.任务项行)
+      addLineDeco(context, state.doc.lineAt(node.from).from, blockLineStyles.taskItemLine)
       const originalText = state.sliceDoc(node.from, node.to)
       const checkedFlag = /\[[xX]\]/.test(originalText)
       // 复选框始终替换，即使光标在本行——否则勾选后光标会把标记"撑开"。
@@ -514,7 +514,7 @@ export function handleBlock(
       const firstLine = state.doc.lineAt(node.from)
       const lastLine = state.doc.lineAt(Math.max(node.from, node.to - 1))
       for (let n = firstLine.number; n <= lastLine.number; n++) {
-        addLineDeco(context, state.doc.line(n).from, blockLineStyles.HTML块)
+        addLineDeco(context, state.doc.line(n).from, blockLineStyles.htmlBlockLine)
       }
       return true
     }
@@ -525,9 +525,9 @@ export function handleBlock(
 }
 
 /** 在直接子节点中按名字查找。 */
-function 找子节点(parent: SyntaxNode, nameText: string): SyntaxNode | null {
-  const 带子节点 = parent as SyntaxNode & { firstChild?: SyntaxNode | null; nextSibling?: SyntaxNode | null }
-  let current = 带子节点.firstChild ?? null
+function findChildNode(parent: SyntaxNode, nameText: string): SyntaxNode | null {
+  const withChildNode = parent as SyntaxNode & { firstChild?: SyntaxNode | null; nextSibling?: SyntaxNode | null }
+  let current = withChildNode.firstChild ?? null
   while (current) {
     if (current.name === nameText) return current
     current = (current as SyntaxNode & { nextSibling?: SyntaxNode | null }).nextSibling ?? null

@@ -79,7 +79,7 @@ export function whenDocumentOpened(): Promise<void> {
 }
 
 /** 各导出格式对应的文件扩展名。 */
-function 格式扩展名(format: string): string {
+function formatExt(format: string): string {
   switch (format) {
     case 'html':
     case 'html-plain':
@@ -270,7 +270,7 @@ export function registerAppIpc(): void {
         embeddedImage?: boolean
       }
     ) => {
-      const ext = 格式扩展名(request.format)
+      const ext = formatExt(request.format)
       const win = windowOf(e)
       const { dialog } = await import('electron')
       const options: Electron.SaveDialogOptions = {

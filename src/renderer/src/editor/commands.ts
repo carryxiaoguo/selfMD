@@ -41,13 +41,13 @@ function affectedLines(state: EditorState): { head: number; tail: number } {
 /** 生成"整行替换"的变更集，用于块级命令。 */
 function wholeLineChange(
   state: EditorState,
-  转换: (lineText: string, lineNo: number) => string
+  convertValue: (lineText: string, lineNo: number) => string
 ): ChangeSpec[] {
   const { head, tail } = affectedLines(state)
   const changes: ChangeSpec[] = []
   for (let no = head; no <= tail; no++) {
     const line = state.doc.line(no)
-    const nextTextValue = 转换(line.text, no)
+    const nextTextValue = convertValue(line.text, no)
     if (nextTextValue !== line.text) {
       changes.push({ from: line.from, to: line.to, insert: nextTextValue })
     }
@@ -136,18 +136,18 @@ const bulletRegex = /^(\s*)[-*+]\s+/
 const orderedRegex = /^(\s*)\d+[.)]\s+/
 const taskRegex = /^(\s*)[-*+]\s+\[[ xX]\]\s+/
 
-export type 列表类型 = '无序' | '有序' | '任务'
+export type listKind = '无序' | '有序' | '任务'
 
-export function toggleList(view: EditorView, kind: 列表类型): boolean {
+export function toggleList(view: EditorView, kind: listKind): boolean {
   const state = view.state
   const { head, tail } = affectedLines(state)
 
   // 已经全是该类型则取消。
-  const 匹配器 =
+  const matcher =
     kind === '无序' ? bulletRegex : kind === '有序' ? orderedRegex : taskRegex
   let allAreTarget = true
   for (let no = head; no <= tail; no++) {
-    if (!匹配器.test(state.doc.line(no).text)) {
+    if (!matcher.test(state.doc.line(no).text)) {
       allAreTarget = false
       break
     }
@@ -199,14 +199,14 @@ export function adjustIndent(view: EditorView, direction: 1 | -1): boolean {
 // ---------------------------------------------------------------------------
 
 /** 在光标处插入一段文本，并把光标放到指定偏移。 */
-function insertBlock(view: EditorView, docText: string, 光标偏移: number): boolean {
+function insertBlock(view: EditorView, docText: string, cursorOffset: number): boolean {
   const main = view.state.selection.main
   // 保证块级语法前后各有一个空行，否则会与相邻块粘连。
   const before = main.from > 0 && view.state.sliceDoc(main.from - 1, main.from) !== '\n' ? '\n' : ''
   const content = before + docText
   view.dispatch({
     changes: { from: main.from, to: main.to, insert: content },
-    selection: EditorSelection.cursor(main.from + before.length + 光标偏移),
+    selection: EditorSelection.cursor(main.from + before.length + cursorOffset),
     userEvent: 'input.insertBlock',
     annotations: isolatedUndo
   })
@@ -296,9 +296,9 @@ export function wrapInline(view: EditorView, before: string, after: string = bef
   const nextSelection: { anchor: number; head: number }[] = []
 
   // 多个选区时从后往前处理，避免前面的改动影响后面的偏移。
-  const 选区们 = [...state.selection.ranges].sort((alpha, beta) => beta.from - alpha.from)
+  const selections = [...state.selection.ranges].sort((alpha, beta) => beta.from - alpha.from)
 
-  for (const selection of 选区们) {
+  for (const selection of selections) {
     if (selection.empty) {
       changes.push({ from: selection.from, to: selection.to, insert: before + after })
       nextSelection.push({ anchor: selection.from + before.length, head: selection.from + before.length })
@@ -306,10 +306,10 @@ export function wrapInline(view: EditorView, before: string, after: string = bef
     }
 
     const originalText = state.sliceDoc(selection.from, selection.to)
-    const 外前 = state.sliceDoc(Math.max(0, selection.from - before.length), selection.from)
-    const 外后 = state.sliceDoc(selection.to, Math.min(state.doc.length, selection.to + after.length))
+    const outerBefore = state.sliceDoc(Math.max(0, selection.from - before.length), selection.from)
+    const outerAfter = state.sliceDoc(selection.to, Math.min(state.doc.length, selection.to + after.length))
 
-    if (外前 === before && 外后 === after) {
+    if (outerBefore === before && outerAfter === after) {
       // 标记在选区外侧：连同标记一起替换掉
       changes.push({
         from: selection.from - before.length,
@@ -362,7 +362,7 @@ export function insertLink(view: EditorView): boolean {
 }
 
 /** 行内标记的集合，供"清除格式"使用。 */
-const 可清除标记 = [
+const clearableMark = [
   ['**', '**'],
   ['~~', '~~'],
   ['`', '`'],
@@ -392,7 +392,7 @@ export function clearFormat(view: EditorView): boolean {
 
     // 用 split/join 做字面量剥离：标记里含 `*` `[` `\` 等正则元字符，
     // 走正则反而要逐个转义，容易出错。
-    for (const [before, after] of 可清除标记) {
+    for (const [before, after] of clearableMark) {
       docText = docText.split(before).join('').split(after).join('')
     }
     // 链接保留可见文字，丢弃地址。
@@ -498,8 +498,8 @@ export function continueCodeFence(view: EditorView): boolean {
 
   // 已经有闭合围栏就不补。块内每按一次回车都补一个围栏，
   // 比不补更烦人——那是在替用户"纠正"他并没有犯的错。
-  const 余下 = state.sliceDoc(line.to, Math.min(fence.to, state.doc.length))
-  if (/\n\s*(`{3,}|~{3,})\s*$/.test(余下)) return false
+  const restPart = state.sliceDoc(line.to, Math.min(fence.to, state.doc.length))
+  if (/\n\s*(`{3,}|~{3,})\s*$/.test(restPart)) return false
 
   const indent = /^\s*/.exec(lineText)?.[0] ?? ''
   const fenceMark = lineText.trim().startsWith('~') ? '~~~' : '```'
@@ -563,9 +563,9 @@ export function exitCodeBlock(view: EditorView): boolean {
     return true
   }
 
-  const 下一行 = state.doc.line(lastLine.number + 1)
+  const nextRow = state.doc.line(lastLine.number + 1)
   view.dispatch({
-    selection: { anchor: 下一行.from },
+    selection: { anchor: nextRow.from },
     scrollIntoView: true,
     userEvent: 'select'
   })

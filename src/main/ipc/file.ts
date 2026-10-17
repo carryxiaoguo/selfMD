@@ -186,7 +186,7 @@ export function registerFileIpc(): void {
   ipcMain.handle(CH.fileWalk, (_e, root: string, options?: { limit?: number; depth?: number }) => {
     const limit = Math.min(options?.limit ?? 4000, 20000)
     const maxDepth = Math.min(options?.depth ?? 8, 16)
-    const 跳过 = new Set([
+    const skipIt = new Set([
       'node_modules',
       '.git',
       '.svn',
@@ -216,7 +216,7 @@ export function registerFileIpc(): void {
       for (const item of entry) {
         if (truncated) return
         if (item.name.startsWith('.')) continue
-        if (item.isDirectory() && 跳过.has(item.name)) continue
+        if (item.isDirectory() && skipIt.has(item.name)) continue
         const fullPathArg = join(dir, item.name)
         if (item.isDirectory()) {
           goThrough(fullPathArg, depth + 1)

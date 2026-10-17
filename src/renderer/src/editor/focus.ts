@@ -33,7 +33,7 @@ import type { SyntaxNode } from './syntax-node'
  */
 
 /** 参与"专注"的块级节点。命中最内层的那个，而不是最外层的容器。 */
-const 可专注块 = new Set([
+const focusableBlock = new Set([
   'Paragraph',
   'ATXHeading1',
   'ATXHeading2',
@@ -54,13 +54,13 @@ const 可专注块 = new Set([
 ])
 
 /** 当前光标所在的块。找不到时返回整行。 */
-function 取当前块(state: EditorState): { from: number; to: number } | null {
+function takeCurrentBlock(state: EditorState): { from: number; to: number } | null {
   const position = state.selection.main.head
   const line = state.doc.lineAt(position)
 
   let node: SyntaxNode | null = syntaxTree(state).resolveInner(position, -1) as unknown as SyntaxNode
   while (node) {
-    if (可专注块.has(node.name)) {
+    if (focusableBlock.has(node.name)) {
       // 空行、或在列表标记上时，节点可能是整个 Item 之外的东西；
       // 用节点区间，但如果它跨了多行而只有一行属于光标，就退回单行。
       return { from: node.from, to: node.to }
@@ -71,10 +71,10 @@ function 取当前块(state: EditorState): { from: number; to: number } | null {
   return { from: line.from, to: line.to }
 }
 
-const 专注行 = Decoration.line({ class: 'md-focus' })
+const focusRow = Decoration.line({ class: 'md-focus' })
 
 function computeFocus(state: EditorState): DecorationSet {
-  const block = 取当前块(state)
+  const block = takeCurrentBlock(state)
   if (!block) return Decoration.none
 
   const firstLine = state.doc.lineAt(block.from).number
@@ -82,16 +82,16 @@ function computeFocus(state: EditorState): DecorationSet {
   const range = []
   for (let no = firstLine; no <= lastLine; no++) {
     const line = state.doc.line(no)
-    range.push(专注行.range(line.from))
+    range.push(focusRow.range(line.from))
   }
   return Decoration.set(range, true)
 }
 
-const 专注插件 = ViewPlugin.fromClass(
+const focusPlugin = ViewPlugin.fromClass(
   class {
     decorations: DecorationSet
-    constructor(查看: EditorView) {
-      this.decorations = computeFocus(查看.state)
+    constructor(inspect: EditorView) {
+      this.decorations = computeFocus(inspect.state)
     }
     update(update: ViewUpdate): void {
       // 文档、选区、视口任一变化都要重算：视口变化时新进入视野的行
@@ -101,12 +101,12 @@ const 专注插件 = ViewPlugin.fromClass(
       }
     }
   },
-  { decorations: (插件) => 插件.decorations }
+  { decorations: (plugin) => plugin.decorations }
 )
 
 /** 专注模式的编辑器扩展。是否启用由 body 类控制显示，所以扩展常驻即可。 */
 export function focusModeExtension(): Extension {
-  return 专注插件
+  return focusPlugin
 }
 
 /** 把某一行滚到视口垂直中央。 */

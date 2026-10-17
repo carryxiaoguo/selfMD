@@ -18,7 +18,7 @@ import { EditorState } from '@codemirror/state'
  * `@codemirror/search` 的 `dist/index.js` 提取出的全部 10 个键。
  * 多注册几个无害，注册错了只是不生效，不会报错——所以宁可多列。
  */
-export const 中文短语: Record<string, string> = {
+export const cjkPhrase: Record<string, string> = {
   // --- @codemirror/search 实测用到的 10 个 ---
   Find: '查找',
   Replace: '替换为',
@@ -47,4 +47,4 @@ export const 中文短语: Record<string, string> = {
 }
 
 /** 注册中文界面文案。放在编辑器扩展里即可全局生效。 */
-export const uiLocalization = EditorState.phrases.of(中文短语)
+export const uiLocalization = EditorState.phrases.of(cjkPhrase)

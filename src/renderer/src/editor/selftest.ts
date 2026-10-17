@@ -41,7 +41,7 @@ import { buildImageSyntax, buildRefUrl, type quoteOptions } from '../image/refer
  * 只在 `--smoke-test` 下运行，不进入正常使用路径。
  */
 
-interface 用例 {
+interface testCase {
   name: string
   input: string
   /** 选区 [起点, 终点]；省略表示光标在文首。 */
@@ -50,7 +50,7 @@ interface 用例 {
   run: (view: EditorView) => void
 }
 
-const 用例表: 用例[] = [
+const caseTable: testCase[] = [
   {
     name: '设为二级标题',
     input: '甲',
@@ -133,7 +133,7 @@ const 用例表: 用例[] = [
   }
 ]
 
-function 单例执行(
+function runCase(
   view: EditorView,
   input: string,
   selection: [number, number] | undefined,
@@ -160,12 +160,12 @@ function 单例执行(
 }
 
 /** 运行全部用例，返回"用例名 → 输出"的对照表。 */
-export function runCommandSelfTest(view: EditorView, 恢复状态: EditorState): Record<string, string> {
+export function runCommandSelfTest(view: EditorView, restoreState: EditorState): Record<string, string> {
   const result: Record<string, string> = {}
-  for (const item of 用例表) {
-    result[`${item.name}：${item.input.replace(/\n/g, '⏎')}`] = 单例执行(view, item.input, item.selection, item.run)
+  for (const item of caseTable) {
+    result[`${item.name}：${item.input.replace(/\n/g, '⏎')}`] = runCase(view, item.input, item.selection, item.run)
   }
-  view.setState(恢复状态)
+  view.setState(restoreState)
   return result
 }
 
@@ -184,7 +184,7 @@ export function runPureSelfTest(): Record<string, string> {
   const result: Record<string, string> = {}
 
   // --- 引号方向 ---------------------------------------------------------
-  const 引号用例: [string, '"' | "'", string][] = [
+  const quoteCase: [string, '"' | "'", string][] = [
     ['行首双引号', '"', ''],
     ['空格后双引号', '"', '他说 '],
     ['字母后双引号', '"', 'said'],
@@ -193,12 +193,12 @@ export function runPureSelfTest(): Record<string, string> {
     ['词中单引号（撇号）', "'", 'don'],
     ['中文后单引号（撇号）', "'", '他']
   ]
-  for (const [name, ch, preamble] of 引号用例) {
+  for (const [name, ch, preamble] of quoteCase) {
     result[`引号·${name}`] = swapQuotes(ch, preamble)
   }
 
   // --- 破折号 -----------------------------------------------------------
-  const 破折号用例: [string, string][] = [
+  const dashCase: [string, string][] = [
     ['空行', ''],
     ['行首一个连字符', '-'],
     ['行首两个连字符（须保留给水平分割线）', '--'],
@@ -208,13 +208,13 @@ export function runPureSelfTest(): Record<string, string> {
     ['文档里既有的连续连字符（不改动）', '文字--'],
     ['缩进后的连字符（仍属行首）', '    -']
   ]
-  for (const [name, preamble] of 破折号用例) {
+  for (const [name, preamble] of dashCase) {
     const plan = swapDashes(preamble)
     result[`破折号·${name}`] = plan ? `回退${plan.fallback}→${plan.insert}` : '不转换'
   }
 
   // --- 句子边界 ---------------------------------------------------------
-  const 句子用例: [string, string, number][] = [
+  const sentenceCase: [string, string, number][] = [
     ['第一句内', '甲。乙。丙。', 1],
     ['第二句内', '甲。乙。丙。', 3],
     ['英文句点断句', 'Hello. World.', 7],
@@ -222,19 +222,19 @@ export function runPureSelfTest(): Record<string, string> {
     ['无终止符则整行', '没有句号的一行', 3],
     ['分号也断句', '甲；乙', 2]
   ]
-  for (const [name, docText, offset] of 句子用例) {
+  for (const [name, docText, offset] of sentenceCase) {
     const { start, end } = sentenceRange(docText, offset)
     result[`句子·${name}`] = `[${start},${end}) = ${JSON.stringify(docText.slice(start, end))}`
   }
 
   // --- 词边界 -----------------------------------------------------------
-  const 词用例: [string, string, number][] = [
+  const wordCase: [string, string, number][] = [
     ['拉丁词中间', 'hello world', 2],
     ['拉丁词边界', 'hello world', 5],
     ['中文单字', '中文测试', 2],
     ['空白处', '   ', 1]
   ]
-  for (const [name, docText, offset] of 词用例) {
+  for (const [name, docText, offset] of wordCase) {
     const range = wordSpan(docText, offset)
     result[`词·${name}`] = range ? JSON.stringify(docText.slice(range.start, range.end)) : '无词'
   }
@@ -247,7 +247,7 @@ export function runPureSelfTest(): Record<string, string> {
 // ---------------------------------------------------------------------------
 
 /** 把目标解析结果压成一行，方便断言。 */
-function 显示目标(result: targetResult): string {
+function showTarget(result: targetResult): string {
   return result.kind === '目录' ? `目录 ${result.filePath}（${result.origin}）` : result.kind
 }
 
@@ -271,7 +271,7 @@ export function runImagePipelineSelfTest(): Record<string, string> {
     customDir: './${filename}',
     autoUploadAllowed: false
   }
-  const 目标用例: [string, Partial<ResolveTargetInput>][] = [
+  const targetCase: [string, Partial<ResolveTargetInput>][] = [
     ['默认策略（不做特殊处理）', {}],
     ['当前文件夹', { globalPolicy: 'folder' }],
     ['assets 子目录', { globalPolicy: 'assets' }],
@@ -292,18 +292,18 @@ export function runImagePipelineSelfTest(): Record<string, string> {
     ['未保存文档 + 不动策略', { docDir: null, docName: null, globalPolicy: '' }],
     ['未保存文档 + 绝对自定义目录', { docDir: null, docName: null, globalPolicy: 'custom', customDir: 'D:/图' }]
   ]
-  for (const [name, overwrite] of 目标用例) {
-    result[`目标·${name}`] = 显示目标(resolveTargetDir({ ...baseline, ...overwrite }))
+  for (const [name, overwrite] of targetCase) {
+    result[`目标·${name}`] = showTarget(resolveTargetDir({ ...baseline, ...overwrite }))
   }
 
   // --- 是否搬运 ---------------------------------------------------------
-  const 搬运基准: MoveDecisionInput = {
+  const moveBaseline: MoveDecisionInput = {
     source: 'C:/下载/照片.png',
     targetDir: 'C:/笔记/imgs',
     moveLocal: true,
     moveRemote: false
   }
-  const 搬运用例: [string, Partial<MoveDecisionInput>][] = [
+  const moveCase: [string, Partial<MoveDecisionInput>][] = [
     ['本地图片 + 开启本地搬运', {}],
     ['已关闭本地搬运', { moveLocal: false }],
     ['已在目标目录内', { source: 'C:/笔记/imgs/照片.png' }],
@@ -313,15 +313,15 @@ export function runImagePipelineSelfTest(): Record<string, string> {
     ['在线图片 + 开启在线搬运', { source: 'https://example.com/a.png', moveRemote: true }],
     ['源与目标都为空', { source: '', targetDir: '' }]
   ]
-  for (const [name, overwrite] of 搬运用例) {
-    result[`搬运·${name}`] = shouldMove({ ...搬运基准, ...overwrite }) ? '搬运' : '不搬'
+  for (const [name, overwrite] of moveCase) {
+    result[`搬运·${name}`] = shouldMove({ ...moveBaseline, ...overwrite }) ? '搬运' : '不搬'
   }
 
   // --- 唯一文件名 -------------------------------------------------------
-  const 占用集合 = new Set(['甲.png', '甲-1.png'])
+  const usedSet = new Set(['甲.png', '甲-1.png'])
   result['命名·不重名'] = uniqueFileName('乙.png', () => false)
   result['命名·重名一次'] = uniqueFileName('甲.png', () => false)
-  result['命名·跳过已占用的连续编号'] = uniqueFileName('甲.png', (name) => 占用集合.has(name))
+  result['命名·跳过已占用的连续编号'] = uniqueFileName('甲.png', (name) => usedSet.has(name))
 
   // --- 前置元数据读写 ---------------------------------------------------
   const noMeta = '# 标题\n\n正文'
@@ -359,7 +359,7 @@ export function runImagePipelineSelfTest(): Record<string, string> {
     : '残留'
 
   // --- 引用地址生成 -----------------------------------------------------
-  const 引用用例: [string, string, string | null, quoteOptions][] = [
+  const refCase: [string, string, string | null, quoteOptions][] = [
     ['同目录相对路径', 'C:/笔记/图/甲.png', 'C:/笔记', { useRelativePath: true, addDotPrefix: false, escapeUrl: false }],
     ['加 ./ 前缀', 'C:/笔记/图/甲.png', 'C:/笔记', { useRelativePath: true, addDotPrefix: true, escapeUrl: false }],
     ['上级目录相对路径', 'C:/笔记/图/甲.png', 'C:/笔记/子', { useRelativePath: true, addDotPrefix: false, escapeUrl: false }],
@@ -369,8 +369,8 @@ export function runImagePipelineSelfTest(): Record<string, string> {
     ['中文保持可读', 'C:/笔记/图/样本.png', 'C:/笔记', { useRelativePath: true, addDotPrefix: false, escapeUrl: true }],
     ['井号被转义', 'C:/笔记/图/甲#1.png', 'C:/笔记', { useRelativePath: true, addDotPrefix: false, escapeUrl: true }]
   ]
-  for (const [name, image, 文档目录值, options] of 引用用例) {
-    result[`引用·${name}`] = buildRefUrl(image, 文档目录值, options)
+  for (const [name, image, docDirValue, options] of refCase) {
+    result[`引用·${name}`] = buildRefUrl(image, docDirValue, options)
   }
 
   result['语法·Markdown'] = buildImageSyntax('图/甲.png', '甲')
@@ -714,7 +714,7 @@ export function runTypographySelfTest(): Record<string, string> {
 export function runFuzzySelfTest(): Record<string, string> {
   const result: Record<string, string> = {}
 
-  const 名单 = [
+  const nameRoster = [
     'E:/项目/文档/无关.md',
     'E:/项目/README.md',
     'E:/项目/src/error.md',
@@ -725,7 +725,7 @@ export function runFuzzySelfTest(): Record<string, string> {
   const filterOut = (query: string): string =>
     fuzzyFilter(
       query,
-      名单.map((p) => ({ entry: p, docText: p })),
+      nameRoster.map((p) => ({ entry: p, docText: p })),
       pathTail
     )
       .map((p) => pathTail(p))

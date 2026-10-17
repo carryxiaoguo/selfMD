@@ -19,7 +19,7 @@
  * 还要求开头的 `$` 前面不是 `\`（转义）或另一个 `$`（那是块级）。
  */
 
-export interface 数学区间 {
+export interface mathSpan {
   /** 在传入文本中的起始偏移（含 `$`）。 */
   from: number
   /** 结束偏移（不含结尾的 `$`）。 */
@@ -31,10 +31,10 @@ export interface 数学区间 {
 }
 
 /** 判断一个位置上的 `$` 是否是转义的。 */
-function 被转义(docText: string, position: number): boolean {
-  let 反斜杠数 = 0
-  for (let i = position - 1; i >= 0 && docText[i] === '\\'; i--) 反斜杠数++
-  return 反斜杠数 % 2 === 1
+function escapedFlag(docText: string, position: number): boolean {
+  let backslashCount = 0
+  for (let i = position - 1; i >= 0 && docText[i] === '\\'; i--) backslashCount++
+  return backslashCount % 2 === 1
 }
 
 /**
@@ -61,9 +61,9 @@ export function findBlockMath(docText: string): string | null {
  * @param 基准 文本在文档中的起始偏移（返回的区间是文档坐标）
  * @param 启用 设置里是否开启了行内公式；关闭时直接返回空数组
  */
-export function scanInlineMath(docText: string, baseline: number, enable = true): 数学区间[] {
+export function scanInlineMath(docText: string, baseline: number, enable = true): mathSpan[] {
   if (!enable) return []
-  const result: 数学区间[] = []
+  const result: mathSpan[] = []
 
   let i = 0
   while (i < docText.length) {
@@ -76,7 +76,7 @@ export function scanInlineMath(docText: string, baseline: number, enable = true)
       continue
     }
     // 转义的 `\$` 不是公式
-    if (被转义(docText, position)) {
+    if (escapedFlag(docText, position)) {
       i = position + 1
       continue
     }
@@ -92,7 +92,7 @@ export function scanInlineMath(docText: string, baseline: number, enable = true)
     let endAt = -1
     for (let j = mathStart; j < docText.length; j++) {
       if (docText[j] !== '$') continue
-      if (被转义(docText, j)) continue
+      if (escapedFlag(docText, j)) continue
       // 规则 2：结尾 `$` 前面不能是空白
       if (/\s/.test(docText[j - 1] ?? '')) continue
       endAt = j

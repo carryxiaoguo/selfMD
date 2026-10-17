@@ -19,7 +19,7 @@ import { stripExt, isAbsolute, normalizePath, concat } from '@shared/image-path'
 
 // 路径工具从 shared 转出，方便调用方只 import 一处。
 export { isAbsolute, normalizePath, concat, stripExt } from '@shared/image-path'
-export { takeFileName, 取目录, uniqueFileName, timestampImageName } from '@shared/image-path'
+export { takeFileName, takeDir, uniqueFileName, timestampImageName } from '@shared/image-path'
 
 // ---------------------------------------------------------------------------
 // 解析
@@ -41,7 +41,7 @@ export interface ResolveTargetInput {
   /** 是否允许依据文档级设置自动上传。 */
   autoUploadAllowed: boolean
   /** 用户显式要求上传（例如点了"上传图片"），可越过 `允许自动上传`。 */
-  强制上传?: boolean
+  forceUpload?: boolean
 }
 
 export type targetResult =
@@ -53,15 +53,15 @@ export type targetResult =
   | { kind: '需要保存' }
 
 /** 上传哨兵值。通行做法用 `ipic` 与 `upload` 两个词表示同一件事。 */
-function 是上传标记(value: string): boolean {
+function isUploadMark(value: string): boolean {
   const lowerCase = value.toLowerCase()
   return lowerCase === 'ipic' || lowerCase === 'upload'
 }
 
 /** 把 `${filename}` 换成不含扩展名的文档名。 */
 function replaceNamePlaceholder(template: string, docName: string | null): string {
-  const 基名 = docName ? stripExt(docName) : ''
-  return template.replace(/\$\{filename\}/g, 基名)
+  const baseName = docName ? stripExt(docName) : ''
+  return template.replace(/\$\{filename\}/g, baseName)
 }
 
 /**
@@ -82,7 +82,7 @@ export function resolveTargetDir(input: ResolveTargetInput): targetResult {
   // --- 2. 文档级设置优先于全局 ------------------------------------------
   const docLevel = input.docSettings?.trim()
   if (docLevel && docLevel.length > 0) {
-    if ((input.autoUploadAllowed || input.强制上传) && 是上传标记(docLevel)) {
+    if ((input.autoUploadAllowed || input.forceUpload) && isUploadMark(docLevel)) {
       return { kind: '上传', origin: '文档级设置' }
     }
     const expand = replaceNamePlaceholder(docLevel, input.docName)
@@ -136,11 +136,11 @@ export function resolveTargetDir(input: ResolveTargetInput): targetResult {
 // ---------------------------------------------------------------------------
 
 /** 判定图片来源。 */
-export function 是远程来源(source: string): boolean {
+export function isRemoteOrigin(source: string): boolean {
   return /^\s*(https?|ftp):\/\//i.test(source)
 }
 
-export function 是数据地址(source: string): boolean {
+export function isDataUrl(source: string): boolean {
   return /^\s*data:/i.test(source)
 }
 
@@ -172,7 +172,7 @@ export function shouldMove(input: MoveDecisionInput): boolean {
   if (normalizeSource === normalizeTarget) return false
   if (normalizeSource.startsWith(`${normalizeTarget}/`)) return false
 
-  if (是数据地址(source)) return false
-  return 是远程来源(source) ? input.moveRemote : input.moveLocal
+  if (isDataUrl(source)) return false
+  return isRemoteOrigin(source) ? input.moveRemote : input.moveLocal
 }
 

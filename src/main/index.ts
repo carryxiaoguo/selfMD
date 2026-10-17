@@ -113,7 +113,7 @@ if (!gotLock) {
     if (fromArgv.path) {
       createWindow(fromArgv)
     } else if (SMOKE_IMAGE) {
-      const fixtureName = 准备图片素材()
+      const fixtureName = prepareImageFixture()
       console.log(`[selfMD] 图片测试素材：文档=${fixtureName.docModel} 图片=${fixtureName.image}`)
       createWindow({ path: fixtureName.docModel })
     } else {
@@ -170,7 +170,7 @@ function smokeOpen(): { path?: string } {
  * ` 引用字体）。
  * 只服务 `<主题名>.css` 会让这些引用全部 404。
  */
-function 准备主题素材(): void {
+function prepareThemeFixture(): void {
   const dir = getAppPaths().themes
   const subDir = join(dir, '__冒烟__')
   mkdirSync(subDir, { recursive: true })
@@ -179,7 +179,7 @@ function 准备主题素材(): void {
 }
 
 /** 清掉冒烟测试造的主题素材，避免污染用户真实的主题目录。 */
-function 清理主题素材(): void {
+function cleanupThemeFixture(): void {
   const dir = getAppPaths().themes
   try {
     rmSync(join(dir, '__冒烟__.css'), { force: true })
@@ -199,7 +199,7 @@ const SMOKE_EXPORT = process.argv.includes('--smoke-export')
 const SMOKE_DRAFTS = process.argv.includes('--smoke-drafts')
 
 /** 导出测试用的文档：刻意覆盖标题、列表、代码块、表格、任务列表与大纲。 */
-const 导出测试文档 = `# 导出测试标题
+const exportTestDoc = `# 导出测试标题
 
 正文含 **粗体**、\`代码\` 与 [链接](https://example.com)。
 
@@ -219,14 +219,14 @@ const a = 1 < 2
 > 引用一行
 `
 
-async function 运行导出测试(): Promise<boolean> {
+async function runExportTest(): Promise<boolean> {
   const dir = join(app.getPath('temp'), `selfmd-导出测试-${Date.now()}`)
   mkdirSync(dir, { recursive: true })
   const target = join(dir, '导出测试.html')
 
   const result = await runExport({
     target,
-    source: 导出测试文档,
+    source: exportTestDoc,
     docPath: null,
     format: 'html',
     withOutline: true,
@@ -276,7 +276,7 @@ async function 运行导出测试(): Promise<boolean> {
  * 如果保存成功后无条件删草稿，那部分新内容就永远丢了。
  * 所以只有在「草稿内容 === 刚保存的内容」时才清——下面这条断言就是在钉它。
  */
-async function 运行草稿测试(): Promise<boolean> {
+async function runDraftTest(): Promise<boolean> {
   const dir = join(app.getPath('temp'), `selfmd-草稿测试-${Date.now()}`)
   mkdirSync(dir, { recursive: true })
   const docModel = join(dir, '草稿测试.md')
@@ -352,7 +352,7 @@ async function 运行草稿测试(): Promise<boolean> {
 }
 
 /** 图标是否真的能解码，而不是"文件存在"就算数。 */
-function 报告图标(): void {  const file = iconPath('icon-256.png')
+function reportIcon(): void {  const file = iconPath('icon-256.png')
   if (!file) {
     console.log('[selfMD] 窗口图标：未找到（将使用系统默认图标）')
     return
@@ -378,7 +378,7 @@ function 报告图标(): void {  const file = iconPath('icon-256.png')
 const SMOKE_IMAGE = process.argv.includes('--smoke-image')
 
 /** 1×1 的合法 PNG。内容不重要，能被识别成图片即可。 */
-const 最小PNG = Buffer.from(
+const minimalPng = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
   'base64'
 )
@@ -389,7 +389,7 @@ const 最小PNG = Buffer.from(
  * 刻意在文档里写上 `image-folder: 图`：它同时验证了
  * "能读出 YAML 前置元数据"与"文档级设置压过全局"两条规则。
  */
-function 准备图片素材(): { docModel: string; image: string; targetDir: string } {
+function prepareImageFixture(): { docModel: string; image: string; targetDir: string } {
   const root = join(app.getPath('temp'), `selfmd-图片测试-${Date.now()}`)
   const targetDir = join(root, '图')
   mkdirSync(targetDir, { recursive: true })
@@ -398,7 +398,7 @@ function 准备图片素材(): { docModel: string; image: string; targetDir: str
   writeFileSync(docModel, '---\nimage-folder: 图\n---\n\n# 图片测试\n\n', 'utf8')
 
   const image = join(root, '样本.png')
-  writeFileSync(image, 最小PNG)
+  writeFileSync(image, minimalPng)
 
   return { docModel, image, targetDir }
 }
@@ -435,23 +435,23 @@ function smokeOpenPath(): string | null {
  * `before-input-event`，与用户按键完全同一条路；直接调 `setFullScreen(false)`
  * 就测不到任何东西了。
  */
-async function 运行全屏自测(): Promise<string> {
+async function runFullscreenSelfTest(): Promise<string> {
   const win = BrowserWindow.getAllWindows()[0]
   if (!win) return '没有窗口，未测'
 
-  const 原本 = win.isFullScreen()
+  const originally = win.isFullScreen()
   try {
     win.setFullScreen(true)
     await new Promise((done) => setTimeout(done, 500))
-    const 进入 = win.isFullScreen()
+    const onEnter = win.isFullScreen()
 
     win.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'Escape' })
     await new Promise((done) => setTimeout(done, 500))
-    const 按Esc后仍全屏 = win.isFullScreen()
+    const fullscreenAfterEsc = win.isFullScreen()
 
-    return `进入全屏=${进入} 按Esc后仍全屏=${按Esc后仍全屏}`
+    return `进入全屏=${onEnter} 按Esc后仍全屏=${fullscreenAfterEsc}`
   } finally {
-    if (!win.isDestroyed()) win.setFullScreen(原本)
+    if (!win.isDestroyed()) win.setFullScreen(originally)
   }
 }
 
@@ -460,13 +460,13 @@ async function runSmokeTest(): Promise<void> {  const target = smokeOpenPath()
 
   // 图标是否真的能解码，而不是"文件存在"就算数：路径写错、PNG 损坏、
   // 分辨率不对，都只有实际加载一次才知道。
-  报告图标()
+  reportIcon()
   // 主题资源子目录能否加载，只有真的去取一次才知道。
-  准备主题素材()
+  prepareThemeFixture()
 
   if (SMOKE_EXPORT) {
     // 计时器还没建，失败就直接退出——app.exit 会终止进程，不需要清理。
-    const passed = await 运行导出测试()
+    const passed = await runExportTest()
     if (!passed) {
       app.exit(1)
       return
@@ -474,7 +474,7 @@ async function runSmokeTest(): Promise<void> {  const target = smokeOpenPath()
   }
 
   if (SMOKE_DRAFTS) {
-    const passed = await 运行草稿测试()
+    const passed = await runDraftTest()
     if (!passed) {
       app.exit(1)
       return
@@ -502,7 +502,7 @@ async function runSmokeTest(): Promise<void> {  const target = smokeOpenPath()
     console.log('[selfMD] 冒烟：文档已加载')
   }
 
-  console.log(`[selfMD] 全屏自测：${await 运行全屏自测()}`)
+  console.log(`[selfMD] 全屏自测：${await runFullscreenSelfTest()}`)
   // 文件关联是可读的状态而不是"设好了没有"的布尔值：
   // 用户以为设好了、其实没有，是这件事上最常见的误会。
   {
@@ -514,7 +514,7 @@ async function runSmokeTest(): Promise<void> {  const target = smokeOpenPath()
   }
 
   clearTimeout(timer)
-  清理主题素材()
+  cleanupThemeFixture()
   console.log('[selfMD] 冒烟测试通过')
   app.exit(0)
 }

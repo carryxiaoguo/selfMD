@@ -398,6 +398,8 @@ export interface SelfMdApi {
       contextMenuResult?: string
       /** 仅冒烟测试模式：代码块头部栏自测结果。 */
       codeBlockHeaderResult?: string
+      /** 仅冒烟测试模式：表格编辑自测结果。 */
+      tableResult?: string
       /** 仅冒烟测试模式：代码块交互自测结果。 */
       codeBlockResult?: string
       /** 仅冒烟测试模式：交互反馈自测结果。 */

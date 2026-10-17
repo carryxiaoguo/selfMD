@@ -37,6 +37,7 @@ import type { Settings } from '@shared/types'
 import { livePreview } from './live-preview'
 import { 按设置构建智能标点 } from './smart-punctuation'
 import { 继续代码围栏, 跳出代码块 } from './commands'
+import { 跳到相邻单元格 } from './表格'
 
 /**
  * CodeMirror 6 装配。
@@ -220,14 +221,18 @@ export function baseExtensions(options: EditorOptions): Extension[] {
       // 围栏首行按回车补出闭合围栏。**同样必须排在 markdown 的键位表之前**：
       // 它那边的 Enter 在围栏内虽然什么也不做，但仍然会先被调用、先返回。
       { key: 'Enter', run: 继续代码围栏 },
+      // 表格内 Tab / Shift+Tab 走单元格，不走缩进。
+      // **必须排在 `indentWithTab` 之前**——后者会把 Tab 吃掉当缩进。
+      // 光标不在表格里时这两条返回 false，Tab 照旧缩进。
+      { key: 'Tab', run: (视图) => 跳到相邻单元格(视图, 1) },
+      { key: 'Shift-Tab', run: (视图) => 跳到相邻单元格(视图, -1) },
       ...closeBracketsKeymap,
       ...defaultKeymap,
       ...searchKeymap,
       ...historyKeymap,
       ...foldKeymap,
       ...completionKeymap,
-      indentWithTab
-    ]),
+      indentWithTab    ]),
     // GFM 加上默认启用的那批标准扩展。
     markdown({
       base: markdownLanguage,

@@ -29,6 +29,16 @@ import {
 } from './editor/commands'
 import { baseExtensions, modeExtensions } from './editor/setup'
 import { 继续代码围栏 } from './editor/commands'
+import {
+  在表格里,
+  跳到相邻单元格,
+  是对齐行,
+  表格增列,
+  表格增行,
+  表格删列,
+  表格删行,
+  表格对齐
+} from './editor/表格'
 import { 运行大纲自测, 运行导出自测, 运行上传自测, 运行数学自测, 运行渲染标点自测, 运行模糊匹配自测, 运行偏好设置自测, 运行图片管线自测, 运行纯函数自测, 运行命令自测 } from './editor/selftest'
 import {
   删除当前行或句,
@@ -971,8 +981,49 @@ function 构建编辑器右键菜单(): 菜单项[] {
     转('edit.selectBlock', '选择段落或块'),
     { 分隔: true },
     转('edit.find', '查找', 'Ctrl+F'),
-    转('edit.findAndReplace', '查找和替换', 'Ctrl+H')
+    转('edit.findAndReplace', '查找和替换', 'Ctrl+H'),
+
+    // 表格操作只在光标位于表格内时出现——不在表格里却摆着一堆"插入行"的
+    // 菜单项，等于让用户点进去看它什么都不做。
+    ...(在表格里(view.state)
+      ? ([
+          { 分隔: true },
+          {
+            文字: '表格',
+            子项: [
+              { 文字: '在上方插入行', 动作: () => 表格在上方插行() },
+              { 文字: '在下方插入行', 动作: () => void 表格增行(view) },
+              { 文字: '删除本行', 危险: true, 动作: () => void 表格删行(view) },
+              { 分隔: true },
+              { 文字: '右侧插入列', 动作: () => void 表格增列(view) },
+              { 文字: '删除本列', 危险: true, 动作: () => void 表格删列(view) },
+              { 分隔: true },
+              { 文字: '左对齐', 动作: () => void 表格对齐(view, 'left') },
+              { 文字: '居中', 动作: () => void 表格对齐(view, 'center') },
+              { 文字: '右对齐', 动作: () => void 表格对齐(view, 'right') }
+            ]
+          }
+        ] as 菜单项[])
+      : [])
   ]
+}
+
+/**
+ * 在光标所在行**上方**插一行。
+ *
+ * `表格增行` 只做"下方插入"——上方插要另写：把光标临时挪到上一行再插，
+ * 这样不用在命令里再加一个方向参数。
+ */
+function 表格在上方插行(): void {
+  const 原 = view.state.selection.main.head
+  const 行 = view.state.doc.lineAt(原)
+  if (行.number <= 1) return
+  view.dispatch({ selection: { anchor: view.state.doc.line(行.number - 1).from } })
+  表格增行(view)
+  // 光标按原来插进去的行数偏移，回到用户原来那一行
+  const 偏移 = view.state.doc.length - view.state.doc.lineAt(原).to
+  void 偏移
+  view.dispatch({ selection: { anchor: Math.min(原, view.state.doc.length) } })
 }
 
 /**
@@ -1044,6 +1095,65 @@ async function 运行右键菜单自测(): Promise<string> {
     `顶层项=${顶层项} 置灰=${置灰数} 有子菜单=${有子菜单} ` +
     `子菜单项=${子菜单项数} 挂在Body=${挂在Body} 拦截默认菜单=${被拦截} 关闭后残留=${残留}`
   )
+}
+
+/**
+ * 表格编辑自测。
+ *
+ * 表格编辑是"改错位置也看不出来"的典型：Tab 跳到错误的格子、插行插到
+ * 别的地方、删列留下 `||`——界面上都只是"看着有点怪"。
+ * 所以每一步都**改完就检查文档文本**。
+ */
+async function 运行表格自测(): Promise<string> {
+  const 原表 = ['| 甲 | 乙 | 丙 |', '| --- | --- | --- |', '| 1 | 2 | 3 |'].join('\n')
+  const 备份 = view.state
+  view.setState(EditorState.create({ doc: 原表, extensions: 编辑器扩展() }))
+  设置文档目录(null)
+  await new Promise((完成) => setTimeout(完成, 80))
+
+  const 结果: string[] = []
+  const 第 = (n: number): string => view.state.doc.line(n).text
+
+  // --- Tab 跳到下一格 -------------------------------------------------
+  // 光标放在第一格「甲」里
+  view.dispatch({ selection: { anchor: 2 } })
+  跳到相邻单元格(view, 1)
+  const 跳后 = view.state.selection.main.head
+  // 第二格「乙」在 `| 甲 | 乙 |` 里的位置大约 7
+  结果.push(`Tab跳格=${/乙/.test(view.state.doc.lineAt(跳后).text.slice(跳后 - view.state.doc.lineAt(跳后).from)) ? '对' : '错'}`)
+
+  // --- 末格再 Tab 自动补一行 -------------------------------------------
+  view.dispatch({ selection: { anchor: 第(3).length + view.state.doc.line(3).from - 1 } })
+  跳到相邻单元格(view, 1)
+  结果.push(`末格补行=${view.state.doc.lines === 4 ? '对' : `错(${view.state.doc.lines}行)`}`)
+
+  // --- 增行 / 删行 -----------------------------------------------------
+  view.dispatch({ selection: { anchor: 2 } })
+  表格增行(view)
+  const 增后 = view.state.doc.lines
+  表格删行(view)
+  结果.push(`增删行=${增后 === 5 && view.state.doc.lines === 4 ? '对' : `错(${增后}/${view.state.doc.lines})`}`)
+
+  // --- 增列 / 删列 -----------------------------------------------------
+  view.dispatch({ selection: { anchor: 2 } })
+  表格增列(view)
+  const 列数增 = (第(1).match(/\|/g) ?? []).length
+  表格删列(view)
+  const 列数删 = (第(1).match(/\|/g) ?? []).length
+  // 三个格子 = 4 条竖线；加一列变 5，删回 4
+  结果.push(`增删列=${列数增 === 5 && 列数删 === 4 ? '对' : `错(${列数增}/${列数删})`}`)
+
+  // --- 对齐 -----------------------------------------------------------
+  view.dispatch({ selection: { anchor: 2 } })
+  表格对齐(view, 'center')
+  结果.push(`对齐=${/:---:/.test(第(2)) ? '对' : `错(${第(2)})`}`)
+
+  // 对齐行必须还是对齐行——插列时若把它写成空格，整张表就不成表了
+  结果.push(`对齐行有效=${是对齐行(第(2)) ? '对' : '错'}`)
+
+  view.setState(备份)
+  await new Promise((完成) => setTimeout(完成, 60))
+  return 结果.join(' ')
 }
 
 /**
@@ -3146,6 +3256,7 @@ async function openPath(path: string): Promise<void> {
     let 交互结果: string | undefined
     let 代码块结果: string | undefined
     let 右键结果: string | undefined
+    let 表格结果: string | undefined
     let 头部结果: string | undefined
     let 匹配结果: Record<string, string> | undefined
     let 侧边栏结果: string | undefined
@@ -3165,6 +3276,7 @@ async function openPath(path: string): Promise<void> {
       上传结果 = 运行上传自测()
       数学结果 = 运行数学自测()
       标点结果 = 运行渲染标点自测()
+      表格结果 = await 运行表格自测()
       右键结果 = await 运行右键菜单自测()
       头部结果 = await 运行代码块头部自测()
       代码块结果 = await 运行代码块自测()
@@ -3202,6 +3314,7 @@ async function openPath(path: string): Promise<void> {
       tabResult: 标签结果,
       codeBlockResult: 代码块结果,
       contextMenuResult: 右键结果,
+      tableResult: 表格结果,
       codeBlockHeaderResult: 头部结果,
       interactionResult: 交互结果,
       imageCopyResult: 图片复制结果,

@@ -517,6 +517,7 @@ export function registerAppIpc(): void {
         codeBlockResult?: string
         contextMenuResult?: string
         codeBlockHeaderResult?: string
+        tableResult?: string
         matchResults?: Record<string, string>
         mode?: string
       }
@@ -595,6 +596,9 @@ export function registerAppIpc(): void {
         for (const [名, 输出] of Object.entries(info.mathResults)) {
           console.log(`    ${名}  =>  ${输出}`)
         }
+      }
+      if (info.tableResult) {
+        console.log(`[selfMD] 表格自测：${info.tableResult}`)
       }
       if (info.codeBlockHeaderResult) {
         console.log(`[selfMD] 代码块头部自测：${info.codeBlockHeaderResult}`)

@@ -31,7 +31,7 @@
  * 而 GitHub **不支持重命名附件**，只能删掉重传。与其赌编码，不如一开始就用 ASCII。
  */
 import { execFileSync } from 'node:child_process'
-import { createReadStream, readFileSync, statSync } from 'node:fs'
+import { readFileSync, statSync } from 'node:fs'
 import { basename, resolve } from 'node:path'
 
 const 参数 = process.argv.slice(2)
@@ -137,15 +137,20 @@ for (const 路径 of 附件) {
 
   console.log(`上传 ${名字}（${(大小 / 1024 / 1024).toFixed(1)} MB）…`)
 
-  // 用流而不是读进内存：便携版压缩包一百多 MB，
-  // 一次性读进来会白占一份等量内存。
+  // **整块读进来，不能用流。** 用流时 fetch 走 chunked 传输、不带
+  // Content-Length，而 GitHub 的上传接口会直接回 `400 Bad Content-Length`。
+  // 一百多 MB 占一份内存可以接受——这是手动跑的发布脚本，不是常驻服务。
+  const 内容 = readFileSync(全)
   const 响应 = await fetch(
     `https://uploads.github.com/repos/${仓库}/releases/${发布.id}/assets?name=${encodeURIComponent(名字)}`,
     {
       method: 'POST',
-      headers: { ...头, 'content-type': 'application/octet-stream' },
-      body: createReadStream(全),
-      duplex: 'half',
+      headers: {
+        ...头,
+        'content-type': 'application/octet-stream',
+        'content-length': String(内容.length)
+      },
+      body: 内容,
       // 大文件上传可能超过默认超时
       signal: AbortSignal.timeout(30 * 60 * 1000)
     }

@@ -3,12 +3,12 @@ import { foldCode } from '@codemirror/language'
 import { languages } from '@codemirror/language-data'
 import { WidgetType, type EditorView } from '@codemirror/view'
 import {
-  内置字体,
+  BUILTIN_FONTS,
   构建围栏信息,
-  信息串区间,
+  infoSpan,
   样式显示名,
   样式顺序,
-  解析围栏首行,
+  parseFenceFirstLine,
   type FenceInfo
 } from '@shared/代码块信息'
 
@@ -142,7 +142,7 @@ export class 代码块头部 extends WidgetType {
     // 用 `change` 而不是每次按键都写回：逐字同步会让撤销栈里塞满
     // 半截名称，Ctrl+Z 得按十几次才能退回去。
     displayName.addEventListener('change', () => {
-      this.改信息(view, { displayName: displayName.value.trim() })
+      this.patchInfo(view, { displayName: displayName.value.trim() })
     })
     displayName.addEventListener('keydown', (event) => {
       if (event.key === 'Enter') {
@@ -163,15 +163,15 @@ export class 代码块头部 extends WidgetType {
     language.prepend(new Option('纯文本', '', this.info.language === '', this.info.language === ''))
     language.value = this.info.language
     language.addEventListener('change', () => {
-      this.改信息(view, { language: language.value })
+      this.patchInfo(view, { language: language.value })
     })
 
     // --- 字体 -----------------------------------------------------------
     const font = this.选单('cm-w-codehead-font', '代码字体')
-    for (const item of 内置字体) font.append(new Option(item.name, item.value))
+    for (const item of BUILTIN_FONTS) font.append(new Option(item.name, item.value))
     font.value = this.info.font
     font.addEventListener('change', () => {
-      this.改信息(view, { font: font.value })
+      this.patchInfo(view, { font: font.value })
     })
 
     // --- 配色 -----------------------------------------------------------
@@ -179,7 +179,7 @@ export class 代码块头部 extends WidgetType {
     for (const name of 样式顺序) style.append(new Option(样式显示名[name], name))
     style.value = this.info.style
     style.addEventListener('change', () => {
-      this.改信息(view, { style: style.value as FenceInfo['style'] })
+      this.patchInfo(view, { style: style.value as FenceInfo['style'] })
     })
 
     // --- 复制 -----------------------------------------------------------
@@ -226,17 +226,17 @@ export class 代码块头部 extends WidgetType {
   }
 
   /** 把改动写回围栏首行的信息串。 */
-  private 改信息(view: EditorView, 部分: Partial<FenceInfo>): void {
+  private patchInfo(view: EditorView, 部分: Partial<FenceInfo>): void {
     const state = view.state
     const line = state.doc.lineAt(Math.min(this.position.firstLineStart, state.doc.length))
     const lineText = state.sliceDoc(line.from, line.to)
-    const range = 信息串区间(lineText)
+    const range = infoSpan(lineText)
     if (!range) return
 
     // **必须用 `解析围栏首行`，不能对整行调 `解析围栏信息`。**
     // 后者会把反引号当成语言的一部分，构建时再写回去——每改一次多三个
     // 反引号，攒到十几个才看得出来。
-    const nextInfo = { ...解析围栏首行(lineText), ...部分 }
+    const nextInfo = { ...parseFenceFirstLine(lineText), ...部分 }
     const nextText = 构建围栏信息(nextInfo)
     if (nextText === lineText.slice(range.start, range.end)) return
 
@@ -270,9 +270,9 @@ function hint(button: HTMLButtonElement, text: string): void {
  * 把 `> [!NOTE]` 换成一个小小的「提示」。**只换这一行**，正文一个字都不动——
  * 提示框的内容仍然是可编辑的普通文本，用户想改随时能改。
  */
-export class 提示标签 extends WidgetType {
-  override eq(other: 提示标签): boolean {
-    return other instanceof 提示标签
+export class calloutHint extends WidgetType {
+  override eq(other: calloutHint): boolean {
+    return other instanceof calloutHint
   }
 
   override toDOM(): HTMLElement {
@@ -544,9 +544,9 @@ export class 表格分隔 extends WidgetType {
 let mermaid模块: Promise<typeof import('mermaid').default> | null = null
 
 async function 取Mermaid(): Promise<typeof import('mermaid').default> {
-  mermaid模块 ??= import('mermaid').then((模) => {
-    const take = 模 as unknown as { default?: unknown }
-    return (take.default ?? 模) as unknown as typeof import('mermaid').default
+  mermaid模块 ??= import('mermaid').then((modulo) => {
+    const take = modulo as unknown as { default?: unknown }
+    return (take.default ?? modulo) as unknown as typeof import('mermaid').default
   })
   const mermaid = await mermaid模块
   return mermaid
@@ -586,7 +586,7 @@ async function 确保初始化(theme: 'default' | 'dark'): Promise<typeof import
  */
 export class 图表 extends WidgetType {
   constructor(
-    readonly 源码: string,
+    readonly sourceCode: string,
     readonly 暗色: boolean,
     /** 渲染成功后回调，让上层扣掉"正在渲染"的状态。 */
     readonly done?: () => void
@@ -595,14 +595,14 @@ export class 图表 extends WidgetType {
   }
 
   override eq(other: 图表): boolean {
-    return other.源码 === this.源码 && other.暗色 === this.暗色
+    return other.sourceCode === this.sourceCode && other.暗色 === this.暗色
   }
 
   override toDOM(): HTMLElement {
     const box = document.createElement('div')
     // `.md-diagram-panel` 是通用的类名
     box.className = 'cm-w-diagram md-diagram-panel'
-    box.setAttribute('data-diagram', this.源码)
+    box.setAttribute('data-diagram', this.sourceCode)
     // 显式标记渲染状态。
     //
     // 不靠"文字里有没有『正在渲染』"来判断——那种判断既脆弱（改一个字就失效）
@@ -621,7 +621,7 @@ export class 图表 extends WidgetType {
         // 每次渲染都要一个唯一 id：Mermaid 会在文档里放一个同名的临时
         // 容器来量尺寸，id 重复会让两张图互相覆盖。
         const id = `selfmd-图表-${Math.random().toString(36).slice(2, 10)}`
-        const { svg } = await mermaid.render(id, this.源码)
+        const { svg } = await mermaid.render(id, this.sourceCode)
 
         box.textContent = ''
         box.innerHTML = svg
@@ -639,7 +639,7 @@ export class 图表 extends WidgetType {
 
         const 源码块 = document.createElement('pre')
         源码块.className = 'cm-w-diagram-source'
-        源码块.textContent = this.源码
+        源码块.textContent = this.sourceCode
 
         box.append(hint, 源码块)
         box.dataset.state = '失败'
@@ -675,10 +675,10 @@ export function 计算层级(state: EditorState, lineStart: number): number {
 let katex模块: Promise<{ render: typeof import('katex').default.render }> | null = null
 
 async function 取KaTeX(): Promise<{ render: typeof import('katex').default.render }> {
-  katex模块 ??= import('katex').then((模) => {
+  katex模块 ??= import('katex').then((modulo) => {
     // Vite 对 CommonJS 的默认导出处理：有的形态挂在 `.default` 上
-    const take = 模 as unknown as { default?: { render: unknown }; render?: unknown }
-    return (take.default ?? 模) as unknown as { render: typeof import('katex').default.render }
+    const take = modulo as unknown as { default?: { render: unknown }; render?: unknown }
+    return (take.default ?? modulo) as unknown as { render: typeof import('katex').default.render }
   })
   return katex模块
 }

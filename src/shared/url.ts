@@ -60,8 +60,8 @@ export function decodeLocalToken(token: string): string | null {
  * 或在其同名子目录里，所以**主题 CSS 内部的相对 URL 天然可用**；
  * 这个函数用于需要绝对地址的场合。
  */
-export function 主题文件Url(相对路径: string): string {
-  const 安全 = 相对路径
+export function 主题文件Url(relativeTo: string): string {
+  const 安全 = relativeTo
     .split('/')
     .filter((segment) => segment.length > 0 && segment !== '.' && segment !== '..')
     .map((segment) => encodeURIComponent(segment))

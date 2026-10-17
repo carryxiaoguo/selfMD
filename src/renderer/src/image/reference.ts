@@ -25,7 +25,7 @@ export interface 引用选项 {
  * 两者根不同（盘符不一样、一个 UNC 一个本地）时无法表达相对关系，
  * 此时原样返回目标路径——回退成绝对路径永远比给出一个错误相对路径好。
  */
-export function 相对路径(fromSrc: string, toPos: string): string {
+export function relativeTo(fromSrc: string, toPos: string): string {
   const alpha = normalizePath(fromSrc).split('/').filter(Boolean)
   const beta = normalizePath(toPos).split('/').filter(Boolean)
   if (alpha.length === 0 || beta.length === 0) return normalizePath(toPos)
@@ -96,7 +96,7 @@ export function 生成引用地址(
 
   let result = image
   if (options.useRelativePath && docDir && isAbsolute(image)) {
-    const relativePath = 相对路径(docDir, image)
+    const relativePath = relativeTo(docDir, image)
     // 相对路径算不出上行、又不是平级文件时（例如跨盘），回退到绝对路径。
     if (isAbsolute(relativePath) === false) {
       result = relativePath

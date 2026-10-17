@@ -27,7 +27,7 @@ export interface 装饰条目 {
 
 export interface BuildContext {
   /** 光标所在行（1 基）。这些行上的语法标记保持可见。 */
-  活动行: Set<number>
+  activeLines: Set<number>
   /** 已经加过行装饰的位置，避免同一行被重复加类。 */
   行装饰已用: Set<number>
   /**
@@ -38,7 +38,7 @@ export interface BuildContext {
    * 否则 CodeMirror 会因为区间重叠拒绝整份装饰——而它拒绝的方式是
    * 抛异常，被渲染层的降级逻辑吞掉后，界面上只表现为"这个块没渲染出来"。
    */
-  已换头部栏: Set<number>
+  headerReplaced: Set<number>
   entry: 装饰条目[]
 }
 

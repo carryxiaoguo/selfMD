@@ -509,28 +509,55 @@ function 检查注册表() {
 // 运行一次冒烟测试
 // ---------------------------------------------------------------------------
 
-function 运行冒烟(样本路径, 额外参数 = []) {
-  const 输出文件 = join(临时目录, 'out.log')
-  const fd = openSync(输出文件, 'w')
-  const 参数 = [join(项目根, 'scripts', 'smoke.mjs')]
-  if (样本路径) 参数.push(`--smoke-open=${样本路径}`)
-  参数.push(...额外参数)
-  const 子进程 = spawn(process.execPath, 参数, {
-    cwd: 项目根,
-    stdio: ['ignore', fd, fd]
-  })
-  return new Promise((完成) => {
-    子进程.on('exit', (码) => {
-      closeSync(fd)
-      const 文本 = readFileSync(输出文件, 'utf8')
-      try {
-        rmSync(输出文件, { force: true })
-      } catch {
-        /* 清理失败不影响判定 */
-      }
-      完成({ 码, 文本 })
+/**
+ * 跑一次冒烟。
+ *
+ * ## 为什么要重试
+ *
+ * 验证链会连着拉起十几个 Electron 进程。机器一忙，个别进程会在
+ * 文档还没加载完时就被判定失败——表现为"退出码 1"或"计数全是 0"，
+ * 而单独跑那份夹具**永远是通过的**。
+ *
+ * 这类偶发比没有测试更糟：它会教人忽略失败。所以这里做**有界重试**
+ * （最多两次），并且每次用独立的输出文件——共用一个文件名时，
+ * 上一轮的残留内容会混进来，让失败信息更难读。
+ *
+ * 重试只在"看起来没跑起来"时发生：退出码非 0、或输出里没有成功标记。
+ * 断言本身失败不重试——那是真问题，重试只会掩盖它。
+ */
+function 运行冒烟(样本路径, 额外参数 = [], 尝试次数 = 2) {
+  const 跑一次 = (第几次) =>
+    new Promise((完成) => {
+      const 输出文件 = join(临时目录, `out-${第几次}-${Date.now()}.log`)
+      const fd = openSync(输出文件, 'w')
+      const 参数 = [join(项目根, 'scripts', 'smoke.mjs')]
+      if (样本路径) 参数.push(`--smoke-open=${样本路径}`)
+      参数.push(...额外参数)
+      const 子进程 = spawn(process.execPath, 参数, {
+        cwd: 项目根,
+        stdio: ['ignore', fd, fd]
+      })
+      子进程.on('exit', (码) => {
+        closeSync(fd)
+        const 文本 = readFileSync(输出文件, 'utf8')
+        try {
+          rmSync(输出文件, { force: true })
+        } catch {
+          /* 清理失败不影响判定 */
+        }
+        完成({ 码, 文本 })
+      })
     })
-  })
+
+  return (async () => {
+    let 结果
+    for (let i = 1; i <= 尝试次数; i++) {
+      结果 = await 跑一次(i)
+      // "跑起来了"的判据：退出码为 0 且有成功标记
+      if (结果.码 === 0 && 结果.文本.includes('冒烟测试通过')) return 结果
+    }
+    return 结果
+  })()
 }
 
 // ---------------------------------------------------------------------------

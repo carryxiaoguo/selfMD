@@ -21,7 +21,7 @@ export interface 询问选项 {
 }
 
 /** 打开一个输入框；用户取消时返回 null。 */
-export function 询问文本(options: 询问选项): Promise<string | null> {
+export function promptText(options: 询问选项): Promise<string | null> {
   return new Promise((done) => {
     const overlay = document.createElement('div')
     overlay.className = 'selfmd-modal-mask'
@@ -60,7 +60,7 @@ export function 询问文本(options: 询问选项): Promise<string | null> {
 
     /** 收尾：移除 DOM、解绑键盘、回传结果。所有出口都必须走这里。 */
     let closed = false
-    const 收尾 = (value: string | null): void => {
+    const finalize = (value: string | null): void => {
       if (closed) return
       closed = true
       document.removeEventListener('keydown', keyboard, true)
@@ -72,20 +72,20 @@ export function 询问文本(options: 询问选项): Promise<string | null> {
       if (event.key === 'Escape') {
         event.preventDefault()
         event.stopPropagation()
-        收尾(null)
+        finalize(null)
       } else if (event.key === 'Enter' && !event.isComposing) {
         // 输入法正在组字时按回车是"选词"，不能当成确定。
         event.preventDefault()
         event.stopPropagation()
-        收尾(input.value.trim())
+        finalize(input.value.trim())
       }
     }
 
-    cancel.addEventListener('click', () => 收尾(null))
-    确定.addEventListener('click', () => 收尾(input.value.trim()))
+    cancel.addEventListener('click', () => finalize(null))
+    确定.addEventListener('click', () => finalize(input.value.trim()))
     // 点击遮罩空白处等同取消，但不影响点击盒子内部。
     overlay.addEventListener('mousedown', (event) => {
-      if (event.target === overlay) 收尾(null)
+      if (event.target === overlay) finalize(null)
     })
 
     按钮行.append(cancel, 确定)

@@ -93,16 +93,16 @@ export function uniqueFileName(
  * 采用固定宽度的年月日时分秒毫秒，好处是按文件名排序即等于按时间排序，
  * 而且在同一个文件夹里永远不会有重名。
  */
-export function 时间戳图片名(time: Date): string {
-  const 补 = (n: number, width = 2): string => String(n).padStart(width, '0')
+export function timestampImageName(time: Date): string {
+  const fill = (n: number, width = 2): string => String(n).padStart(width, '0')
   return (
-    `image-${time.getFullYear()}${补(time.getMonth() + 1)}${补(time.getDate())}` +
-    `${补(time.getHours())}${补(time.getMinutes())}${补(time.getSeconds())}${补(time.getMilliseconds(), 3)}`
+    `image-${time.getFullYear()}${fill(time.getMonth() + 1)}${fill(time.getDate())}` +
+    `${fill(time.getHours())}${fill(time.getMinutes())}${fill(time.getSeconds())}${fill(time.getMilliseconds(), 3)}`
   )
 }
 
 /** 由 MIME 类型推断扩展名；无法识别时返回 null。 */
-export function 扩展名由类型(kind: string | null | undefined): string | null {
+export function extByKind(kind: string | null | undefined): string | null {
   if (!kind) return null
   const tbl: Record<string, string> = {
     'image/png': '.png',

@@ -59,8 +59,8 @@ function 取替代(node: { from: number; to: number; firstChild: unknown }, stat
     nextSibling: unknown
   } | null
   while (child) {
-    const 间隙 = state.sliceDoc(cursor, child.from)
-    if (collect && 间隙) docText += 间隙
+    const gapPx = state.sliceDoc(cursor, child.from)
+    if (collect && gapPx) docText += gapPx
     const txt = state.sliceDoc(child.from, child.to)
     if (child.name === 'LinkMark') {
       if (txt === '![') collect = true

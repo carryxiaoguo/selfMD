@@ -2,25 +2,25 @@ import { markdown } from '@codemirror/lang-markdown'
 import { EditorSelection, EditorState } from '@codemirror/state'
 import type { EditorView } from '@codemirror/view'
 import { renderMarkdownToHtml } from '@shared/markdown-html'
-import { PrefsSchema, 全部设置项, 校验设置表 } from '@shared/settings-schema'
-import { findBlockMath, 扫描行内公式 } from '@shared/数学'
+import { PrefsSchema, 全部设置项, validateSchema } from '@shared/settings-schema'
+import { findBlockMath, scanInlineMath } from '@shared/数学'
 import { DEFAULT_SETTINGS, type uploaderType } from '@shared/types'
 import { buildUploadCmd, parseUploadResult } from '@shared/upload-parse'
-import { 提取标题, locateHeading } from '../ui/outline'
+import { extractHeadings, locateHeading } from '../ui/outline'
 import {
   toggleList,
-  切换引用,
+  toggleQuote,
   wrapInline,
-  插入表格,
-  插入链接,
+  insertTable,
+  insertLink,
   clearFormat,
-  调整缩进,
+  adjustIndent,
   setHeadingLevel
 } from './commands'
-import { 换引号, 换破折号, 扫描渲染标点 } from './smart-punctuation'
+import { 换引号, 换破折号, scanPunct } from './smart-punctuation'
 import { fuzzyScore, 模糊筛选, pathTail } from '@shared/模糊匹配'
-import { 句子区间, 词区间 } from './selection'
-import { readFrontMatter, setAttr, 移除属性 } from '@shared/front-matter'
+import { sentenceRange, 词区间 } from './selection'
+import { readFrontMatter, setAttr, removeAttr } from '@shared/front-matter'
 import {
   uniqueFileName,
   应当搬运,
@@ -81,12 +81,12 @@ const 用例表: 用例[] = [
   {
     name: '加引用',
     input: '甲',
-    run: (v) => void 切换引用(v)
+    run: (v) => void toggleQuote(v)
   },
   {
     name: '已有引用再执行=取消',
     input: '> 甲',
-    run: (v) => void 切换引用(v)
+    run: (v) => void toggleQuote(v)
   },
   {
     name: '转无序列表',
@@ -112,13 +112,13 @@ const 用例表: 用例[] = [
   {
     name: '缩进',
     input: '甲',
-    run: (v) => void 调整缩进(v, 1)
+    run: (v) => void adjustIndent(v, 1)
   },
   {
     name: '插入链接（有选中文字）',
     input: '甲',
     selection: [0, 1],
-    run: (v) => void 插入链接(v)
+    run: (v) => void insertLink(v)
   },
   {
     name: '清除格式',
@@ -129,7 +129,7 @@ const 用例表: 用例[] = [
   {
     name: '插入表格骨架',
     input: '',
-    run: (v) => void 插入表格(v)
+    run: (v) => void insertTable(v)
   }
 ]
 
@@ -223,7 +223,7 @@ export function 运行纯函数自测(): Record<string, string> {
     ['分号也断句', '甲；乙', 2]
   ]
   for (const [name, docText, offset] of 句子用例) {
-    const { start, end } = 句子区间(docText, offset)
+    const { start, end } = sentenceRange(docText, offset)
     result[`句子·${name}`] = `[${start},${end}) = ${JSON.stringify(docText.slice(start, end))}`
   }
 
@@ -347,12 +347,12 @@ export function 运行图片管线自测(): Record<string, string> {
     readFrontMatter(setAttr(有元数据, 'author', '我')).attr['author'] ?? '(缺失)'
 
   result['元数据·移除一个键后块仍存在'] = readFrontMatter(
-    移除属性(有元数据, 'image-folder')
+    removeAttr(有元数据, 'image-folder')
   ).exists
     ? '存在'
     : '不存在'
 
-  result['元数据·移除唯一键则整块消失'] = 移除属性('---\nonly: 1\n---\n\n正文', 'only').startsWith(
+  result['元数据·移除唯一键则整块消失'] = removeAttr('---\nonly: 1\n---\n\n正文', 'only').startsWith(
     '正文'
   )
     ? '整块消失'
@@ -475,7 +475,7 @@ export function 运行偏好设置自测(): Record<string, string> {
   result['偏好设置·项目数'] = String(items.length)
   result['偏好设置·分区数'] = String(PrefsSchema.length)
 
-  const 坏键 = 校验设置表()
+  const 坏键 = validateSchema()
   result['偏好设置·键名全部有效'] = 坏键.length === 0 ? '有效' : `无效：${坏键.join('、')}`
 
   // 重复键会让两项互相覆盖，界面上表现为"改了一个另一个也变"
@@ -580,7 +580,7 @@ export function 运行上传自测(): Record<string, string> {
 
   // --- 命令行生成 -----------------------------------------------------
   const config = {
-    自定义命令: 'my-uploader --file ${filepath} --name ${filename}',
+    customCommand: 'my-uploader --file ${filepath} --name ${filename}',
     用户数据目录: 'C:/Users/甲/AppData/Roaming/selfmd',
     platform: 'win32' as const
   }
@@ -600,7 +600,7 @@ export function 运行上传自测(): Record<string, string> {
   // 含空格的路径不加引号会被 shell 拆成两个参数
   result['上传·含空格路径加引号'] = buildUploadCmd('custom', 'C:\\我的 文档\\a.png', {
     ...config,
-    自定义命令: 'up ${filepath}'
+    customCommand: 'up ${filepath}'
   })?.includes('"C:/我的 文档/a.png"')
     ? '有引号'
     : '无引号'
@@ -622,7 +622,7 @@ export function 运行上传自测(): Record<string, string> {
 export function 运行数学自测(): Record<string, string> {
   const result: Record<string, string> = {}
   const sweep = (docText: string): string =>
-    扫描行内公式(docText, 0)
+    scanInlineMath(docText, 0)
       .map((range) => `[${range.formula}]`)
       .join('')
 
@@ -655,7 +655,7 @@ export function 运行数学自测(): Record<string, string> {
   result['数学·空块级返回空'] = findBlockMath('$$$$') ?? '（无）'
 
   // --- 关闭开关 -------------------------------------------------------
-  result['数学·关闭后不扫描'] = 扫描行内公式('$x$', 0, false).length === 0 ? '不扫描' : '仍扫描'
+  result['数学·关闭后不扫描'] = scanInlineMath('$x$', 0, false).length === 0 ? '不扫描' : '仍扫描'
 
   return result
 }
@@ -671,7 +671,7 @@ export function 运行数学自测(): Record<string, string> {
 export function 运行渲染标点自测(): Record<string, string> {
   const result: Record<string, string> = {}
   const sweep = (docText: string): string =>
-    扫描渲染标点(docText, 0)
+    scanPunct(docText, 0)
       .map((segment) => `${segment.originalText}→${segment.show}`)
       .join(' ')
 
@@ -698,7 +698,7 @@ export function 运行渲染标点自测(): Record<string, string> {
   result['标点·已是弯引号则不动'] = sweep('“甲”') || '（无）'
 
   // --- 偏移量要对 ---
-  const segment = 扫描渲染标点('甲"乙', 100)
+  const segment = scanPunct('甲"乙', 100)
   result['标点·偏移量含基准'] = segment.length === 1 ? String(segment[0].from) : `段数=${segment.length}`
 
   return result
@@ -795,7 +795,7 @@ export function 运行大纲自测(): Record<string, string> {
   ].join('\n')
 
   const state = EditorState.create({ doc: docModel, extensions: [markdown()] })
-  const headings = 提取标题(state)
+  const headings = extractHeadings(state)
   const result: Record<string, string> = {}
 
   result['大纲·标题数量'] = String(headings.length)

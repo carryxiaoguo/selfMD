@@ -37,7 +37,7 @@ function 是终止符(lineText: string, position: number): boolean {
  * 边界取"上一个终止符之后"到"下一个终止符（含）"；找不到终止符时
  * 整行就是一句——这符合直觉：没有句号的一行本来就是一整句。
  */
-export function 句子区间(lineText: string, offset: number): { start: number; end: number } {
+export function sentenceRange(lineText: string, offset: number): { start: number; end: number } {
   let start = 0
   for (let i = Math.min(offset, lineText.length) - 1; i >= 0; i--) {
     if (是终止符(lineText, i)) {
@@ -65,7 +65,7 @@ export function 句子区间(lineText: string, offset: number): { start: number;
 // ---------------------------------------------------------------------------
 
 const 中日韩 = /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uac00-\ud7af]/
-const 拉丁词字符 = /[A-Za-z0-9_\u00c0-\u024f]/
+const latinWordChar = /[A-Za-z0-9_\u00c0-\u024f]/
 
 /**
  * 找出包含 `偏移` 的那个词，返回行内区间；光标两侧都不是词时返回 null。
@@ -74,21 +74,21 @@ const 拉丁词字符 = /[A-Za-z0-9_\u00c0-\u024f]/
  * 按标点切会把"选中当前词"变成"选中整句"，反而更糟。
  */
 export function 词区间(lineText: string, offset: number): { start: number; end: number } | null {
-  const 光标处 = lineText[offset]
+  const atCursor = lineText[offset]
   const 光标前 = offset > 0 ? lineText[offset - 1] : undefined
 
   // 中日韩：单字
-  if (光标处 !== undefined && 中日韩.test(光标处)) return { start: offset, end: offset + 1 }
+  if (atCursor !== undefined && 中日韩.test(atCursor)) return { start: offset, end: offset + 1 }
   if (光标前 !== undefined && 中日韩.test(光标前)) return { start: offset - 1, end: offset }
 
   // 拉丁词：向两侧扩展到非词字符
-  const fromPos = 光标处 !== undefined && 拉丁词字符.test(光标处) ? offset : offset - 1
-  if (fromPos < 0 || fromPos >= lineText.length || !拉丁词字符.test(lineText[fromPos])) return null
+  const fromPos = atCursor !== undefined && latinWordChar.test(atCursor) ? offset : offset - 1
+  if (fromPos < 0 || fromPos >= lineText.length || !latinWordChar.test(lineText[fromPos])) return null
 
   let start = fromPos
   let end = fromPos + 1
-  while (start > 0 && 拉丁词字符.test(lineText[start - 1])) start -= 1
-  while (end < lineText.length && 拉丁词字符.test(lineText[end])) end += 1
+  while (start > 0 && latinWordChar.test(lineText[start - 1])) start -= 1
+  while (end < lineText.length && latinWordChar.test(lineText[end])) end += 1
   return { start, end }
 }
 
@@ -114,7 +114,7 @@ export function 选中当前行或句(view: EditorView): boolean {
   const state = view.state
   const main = state.selection.main
   const line = state.doc.lineAt(main.head)
-  const range = 句子区间(line.text, main.head - line.from)
+  const range = sentenceRange(line.text, main.head - line.from)
 
   // 整行已经选中时再按一次，扩展为整行（含首尾空白），给用户一个"退路"。
   const 当前已满 = main.from === line.from + range.start && main.to === line.from + range.end
@@ -179,7 +179,7 @@ export function 删除当前行或句(view: EditorView): boolean {
   }
 
   const line = state.doc.lineAt(main.head)
-  const range = 句子区间(line.text, main.head - line.from)
+  const range = sentenceRange(line.text, main.head - line.from)
   const start = line.from + range.start
   const end = line.from + range.end
 

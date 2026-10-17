@@ -19,10 +19,10 @@ export interface frontMatter {
   /** 解析出的顶层标量属性。 */
   attr: Record<string, string>
   /** 元数据块（含首尾 `---`）在文档中的结束偏移；无元数据时为 0。 */
-  结束偏移: number
+  endOffset: number
 }
 
-const 空结果: frontMatter = { exists: false, attr: {}, 结束偏移: 0 }
+const 空结果: frontMatter = { exists: false, attr: {}, endOffset: 0 }
 
 /**
  * 读取前置元数据。
@@ -62,7 +62,7 @@ export function readFrontMatter(docText: string): frontMatter {
   for (let i = 0; i <= endLine; i++) offset += lineList[i].length + 1
   offset = Math.min(offset, docText.length)
 
-  return { exists: true, attr, 结束偏移: offset }
+  return { exists: true, attr, endOffset: offset }
 }
 
 /** 把值序列化成可以安全放进 YAML 的形态。 */
@@ -99,10 +99,10 @@ export function setAttr(docText: string, key: string, value: string): string {
   }
   if (endLine < 0) return docText
 
-  const 目标行 = `^${key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*:`
+  const targetLine = `^${key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*:`
   let 已更新 = false
   for (let i = 1; i < endLine; i++) {
-    if (new RegExp(目标行).test(lineList[i])) {
+    if (new RegExp(targetLine).test(lineList[i])) {
       lineList[i] = newLine
       已更新 = true
       break
@@ -119,7 +119,7 @@ export function setAttr(docText: string, key: string, value: string): string {
  * 键是本块里唯一一个属性时，连整个元数据块一并删掉——留下一个空的
  * `---\n---` 在文档开头既难看，又会被 Markdown 解析器当成 Setext 标题的下划线。
  */
-export function 移除属性(docText: string, key: string): string {
+export function removeAttr(docText: string, key: string): string {
   const meta = readFrontMatter(docText)
   if (!meta.exists) return docText
 
@@ -134,8 +134,8 @@ export function 移除属性(docText: string, key: string): string {
   }
   if (endLine < 0) return docText
 
-  const 目标行 = new RegExp(`^${key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*:`)
-  const 剩余 = lineList.slice(1, endLine).filter((line) => !目标行.test(line))
+  const targetLine = new RegExp(`^${key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*:`)
+  const 剩余 = lineList.slice(1, endLine).filter((line) => !targetLine.test(line))
 
   if (剩余.length === 0) {
     // 整个元数据块都没用了，连同其后可能存在的空行一起去掉。

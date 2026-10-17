@@ -11,16 +11,16 @@
  */
 import { 模糊筛选, pathTail } from '@shared/模糊匹配'
 
-interface 文件项 {
+interface fileRow {
   filePath: string
   nameText: string
-  修改时间: number
-  大小: number
+  mtime: number
+  sizeBytes: number
 }
 
 export interface 快速打开选项 {
   /** 建立索引：返回候选文件。失败时返回空数组。 */
-  取文件: () => Promise<{ file: 文件项[]; truncated: boolean }>
+  取文件: () => Promise<{ file: fileRow[]; truncated: boolean }>
   /** 用户选中某个文件。 */
   open: (filePath: string) => void
 }
@@ -44,18 +44,18 @@ export async function 打开快速打开面板(options: 快速打开选项): Pro
   const list = document.createElement('div')
   list.className = 'quick-open-list'
 
-  const 页脚 = document.createElement('div')
-  页脚.className = 'quick-open-foot'
-  页脚.textContent = '正在建立索引…'
+  const footer = document.createElement('div')
+  footer.className = 'quick-open-foot'
+  footer.textContent = '正在建立索引…'
 
-  panel.append(input, list, 页脚)
+  panel.append(input, list, footer)
   overlay.append(panel)
   document.body.append(overlay)
   input.focus()
 
-  let all: 文件项[] = []
-  let hit: 文件项[] = []
-  let 选中 = 0
+  let all: fileRow[] = []
+  let hit: fileRow[] = []
+  let selected = 0
 
   const close = (): void => {
     overlay.remove()
@@ -77,7 +77,7 @@ export async function 打开快速打开面板(options: 快速打开选项): Pro
     for (const [subscript, item] of hit.entries()) {
       const line = document.createElement('div')
       line.className = 'quick-open-item'
-      if (subscript === 选中) line.classList.add('is-active')
+      if (subscript === selected) line.classList.add('is-active')
 
       const name = document.createElement('div')
       name.className = 'quick-open-name'
@@ -96,7 +96,7 @@ export async function 打开快速打开面板(options: 快速打开选项): Pro
         options.open(item.filePath)
       })
       line.addEventListener('mouseenter', () => {
-        选中 = subscript
+        selected = subscript
         repaint()
       })
       list.append(line)
@@ -114,9 +114,9 @@ export async function 打开快速打开面板(options: 快速打开选项): Pro
       all.map((f) => ({ entry: f, docText: f.filePath })),
       pathTail
     )
-    选中 = 0
+    selected = 0
     repaint()
-    页脚.textContent =
+    footer.textContent =
       `共 ${all.length} 个文件` +
       (query.trim() ? ` · 匹配 ${hit.length} 个` : '') +
       (all.length >= 50 ? ' · ↑↓ 选择，Enter 打开，Esc 关闭' : '')
@@ -134,14 +134,14 @@ export async function 打开快速打开面板(options: 快速打开选项): Pro
       event.preventDefault()
       event.stopPropagation()
       if (hit.length === 0) return
-      选中 = (选中 + (event.key === 'ArrowDown' ? 1 : -1) + hit.length) % hit.length
+      selected = (selected + (event.key === 'ArrowDown' ? 1 : -1) + hit.length) % hit.length
       repaint()
       return
     }
     if (event.key === 'Enter') {
       event.preventDefault()
       event.stopPropagation()
-      const item = hit[选中]
+      const item = hit[selected]
       if (!item) return
       close()
       options.open(item.filePath)
@@ -161,8 +161,8 @@ export async function 打开快速打开面板(options: 快速打开选项): Pro
     // 索引是异步建的，期间用户可能已经打了不少字——这里必须按**当前**输入重算，
     // 而不是用建索引时捕获的旧值
     filterBy()
-    if (result.truncated) 页脚.textContent += ' · 文件太多，只索引了一部分'
+    if (result.truncated) footer.textContent += ' · 文件太多，只索引了一部分'
   } catch {
-    页脚.textContent = '建立索引失败'
+    footer.textContent = '建立索引失败'
   }
 }

@@ -25,7 +25,7 @@ function 计算键(rawPath: string | null): string {
   return `${name}-${哈希}`
 }
 
-function 内容文件(key: string): string {
+function contentFile(key: string): string {
   return join(getAppPaths().drafts, `${key}.md`)
 }
 
@@ -43,7 +43,7 @@ export function writeDraft(rawPath: string | null, content: string): boolean {
   const key = 计算键(rawPath)
   try {
     mkdirSync(getAppPaths().drafts, { recursive: true })
-    writeFileSync(内容文件(key), content, 'utf8')
+    writeFileSync(contentFile(key), content, 'utf8')
     writeFileSync(
       元数据文件(key),
       JSON.stringify({ rawPath, savedAt: Date.now() }, null, 2),
@@ -80,21 +80,21 @@ export function listDrafts(): DraftInfo[] {
         savedAt?: number
       }
       const rawPath = meta.rawPath ?? null
-      let 原文件时间: number | null = null
+      let originalMtime: number | null = null
       if (rawPath && existsSync(rawPath)) {
         try {
-          原文件时间 = statSync(rawPath).mtimeMs
+          originalMtime = statSync(rawPath).mtimeMs
         } catch {
-          原文件时间 = null
+          originalMtime = null
         }
       }
-      const content = 内容文件(key)
+      const content = contentFile(key)
       const draftChars = existsSync(content) ? readFileSync(content, 'utf8').length : 0
       result.push({
         key,
         rawPath,
         savedAt: meta.savedAt ?? 0,
-        原文件时间,
+        originalMtime,
         原文件字符数: 取原文件字符数(rawPath),
         draftChars
       })
@@ -106,9 +106,9 @@ export function listDrafts(): DraftInfo[] {
   return result.sort((a, b) => b.savedAt - a.savedAt)
 }
 
-export function 读草稿(key: string): string | null {
+export function readDraft(key: string): string | null {
   try {
-    const filePath = 内容文件(key)
+    const filePath = contentFile(key)
     return existsSync(filePath) ? readFileSync(filePath, 'utf8') : null
   } catch {
     return null
@@ -116,7 +116,7 @@ export function 读草稿(key: string): string | null {
 }
 
 export function deleteDraft(key: string): void {
-  for (const filePath of [内容文件(key), 元数据文件(key)]) {
+  for (const filePath of [contentFile(key), 元数据文件(key)]) {
     try {
       rmSync(filePath, { force: true })
     } catch {
@@ -126,12 +126,12 @@ export function deleteDraft(key: string): void {
 }
 
 /** 文档保存成功后清掉它的草稿——已经落盘了，草稿就没有意义。 */
-export function 清理该文档的草稿(rawPath: string | null, content: string): void {
+export function clearDocDraft(rawPath: string | null, content: string): void {
   const key = 计算键(rawPath)
   // 只有当草稿内容与刚保存的内容一致时才删：
   // 保存是异步的，期间用户可能又敲了几个字，那部分还没落盘。
-  const 现有 = 读草稿(key)
-  if (现有 !== null && 现有 !== content) return
+  const existing = readDraft(key)
+  if (existing !== null && existing !== content) return
   deleteDraft(key)
 }
 
@@ -151,6 +151,6 @@ export function recoverableDraft(): DraftInfo[] {
     if (!existsSync(draft.rawPath)) return draft.draftChars > 0
     // 内容没变就不提示——纯粹是时间戳造成的差异不值得打扰用户
     if (draft.原文件字符数 !== null && draft.原文件字符数 === draft.draftChars) return false
-    return draft.savedAt > (draft.原文件时间 ?? 0)
+    return draft.savedAt > (draft.originalMtime ?? 0)
   })
 }

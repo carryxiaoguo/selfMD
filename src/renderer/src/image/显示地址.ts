@@ -57,7 +57,7 @@ function concat(dir: string, relativePath: string): string {
  * 解析不了时返回空串——调用方据此显示"图片无法显示"占位，
  * 而不是留一个破图图标让人以为是文件坏了。
  */
-export function 解析图片地址(原始: string): string {
+export function parseImageUrl(原始: string): string {
   const url = 原始.trim()
   if (url.length === 0) return ''
 

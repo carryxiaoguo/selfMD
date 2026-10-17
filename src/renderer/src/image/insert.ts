@@ -3,7 +3,7 @@ import type { EditorView } from '@codemirror/view'
 import { isolateHistory } from '@codemirror/commands'
 import type { Settings } from '@shared/types'
 import { readFrontMatter } from '@shared/front-matter'
-import { takeFileName, 时间戳图片名, isImageFile } from '@shared/image-path'
+import { takeFileName, timestampImageName, isImageFile } from '@shared/image-path'
 import { resolveTargetDir } from './resolve-target'
 import { buildImageSyntax, 生成引用地址, 生成替代文本, type 图片语法 } from './reference'
 
@@ -73,7 +73,7 @@ function 语法(settings: Settings): 图片语法 {
 }
 
 /** 由图片绝对路径生成要写进文档的引用文本。 */
-function 引用文本(图片路径: string, request: InsertRequest): string {
+function quoteText(图片路径: string, request: InsertRequest): string {
   const url = 生成引用地址(图片路径, docDir(request.docPath), {
     useRelativePath: request.settings.useRelativePathForImg,
     addDotPrefix: request.settings.relativePathWithDot,
@@ -134,10 +134,10 @@ function 避开前置元数据(state: EditorState, position: number): number {
   if (position === 0) {
     // 快速路径：文首必然在块内，无需解析全文。
     const meta = readFrontMatter(state.doc.toString())
-    return meta.exists ? meta.结束偏移 : 0
+    return meta.exists ? meta.endOffset : 0
   }
   const meta = readFrontMatter(state.doc.toString())
-  if (meta.exists && position < meta.结束偏移) return meta.结束偏移
+  if (meta.exists && position < meta.endOffset) return meta.endOffset
   return position
 }
 
@@ -179,11 +179,11 @@ export async function 从剪贴板插入(request: InsertRequest): Promise<插入
   }
 
   const dir = target.kind === '目录' ? target.filePath : await 取默认图片目录()
-  const name = `${时间戳图片名(new Date())}.png`
+  const name = `${timestampImageName(new Date())}.png`
   const writeBack = await window.selfmd.image.saveBytes(dir, name, content.data)
   if (!writeBack) return { okCount: 0, error: '写入图片失败。' }
 
-  写入引用(request.view, 引用文本(writeBack.filePath, request))
+  写入引用(request.view, quoteText(writeBack.filePath, request))
   return { okCount: 1, error: null }
 }
 
@@ -197,24 +197,24 @@ export async function insertFromFile(request: InsertRequest, paths: string[]): P
     return { okCount: 0, error: 失败说明(target.kind) }
   }
 
-  const 引用们: string[] = []
+  const quoteList: string[] = []
   let error: string | null = null
 
   for (const origin of images) {
     if (target.kind === '不动') {
       // 策略是"不做特殊处理"：图片留在原地，引用原路径。
-      引用们.push(引用文本(origin, request))
+      quoteList.push(quoteText(origin, request))
       continue
     }
     const writeBack = await window.selfmd.image.import(origin, target.filePath, takeFileName(origin))
-    if (writeBack) 引用们.push(引用文本(writeBack.filePath, request))
+    if (writeBack) quoteList.push(quoteText(writeBack.filePath, request))
     else if (!error) error = `复制失败：${takeFileName(origin)}`
   }
 
-  if (引用们.length === 0) return { okCount: 0, error }
+  if (quoteList.length === 0) return { okCount: 0, error }
   // 多张图之间用空格分隔；整批仍是一个撤销单元。
-  写入引用(request.view, 引用们.join(' '))
-  return { okCount: 引用们.length, error }
+  写入引用(request.view, quoteList.join(' '))
+  return { okCount: quoteList.length, error }
 }
 
 /**
@@ -245,7 +245,7 @@ export async function 从地址插入(request: InsertRequest, url: string): Prom
 
   const target = resolveTargetDir(构造输入(request))
   if (target.kind === '不动') {
-    写入引用(request.view, 引用文本(清理后, request))
+    写入引用(request.view, quoteText(清理后, request))
     return { okCount: 1, error: null }
   }
   // 必须写成 if 语句而不是三元表达式：只有语句形式才能让 TypeScript
@@ -259,6 +259,6 @@ export async function 从地址插入(request: InsertRequest, url: string): Prom
     return { okCount: 0, error: 下载.error ?? '下载失败。' }
   }
 
-  写入引用(request.view, 引用文本(下载.filePath, request))
+  写入引用(request.view, quoteText(下载.filePath, request))
   return { okCount: 1, error: null }
 }

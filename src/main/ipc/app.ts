@@ -4,14 +4,14 @@ import { dirname } from 'node:path'
 import type { AppInfo, AppPaths, TaskProgress } from '@shared/ipc'
 import { CH, EV } from '@shared/ipc'
 import { activeTheme, type Settings } from '@shared/types'
-import { 可用格式, 执行导出, 取Pandoc版本 } from '../export'
+import { 可用格式, runExport, 取Pandoc版本 } from '../export'
 import { 复制为图片 } from '../export/图片'
 import {
   writeDraft,
   listDrafts,
   deleteDraft,
-  清理该文档的草稿,
-  读草稿,
+  clearDocDraft,
+  readDraft,
   recoverableDraft
 } from '../services/drafts'
 import {
@@ -28,8 +28,8 @@ import {
   listThemes,
   readTheme,
   themePath,
-  主题自定义样式路径,
-  全局自定义样式路径
+  themeUserCssPath,
+  baseUserCssPath
 } from '../services/themes'
 import {
   addRecent,
@@ -42,7 +42,7 @@ import {
 import { getAppPaths } from '../util/paths'
 import { closeWindow, createWindow, takePendingPath } from '../window'
 import { rebuildMenu } from '../menu'
-import { 打开默认应用设置, 本程序路径, 取关联状态 } from '../services/文件关联'
+import { 打开默认应用设置, 本程序路径, getAssocStatus } from '../services/文件关联'
 
 /** 向所有渲染进程广播事件。 */
 export function broadcast(channel: string, payload: unknown): void {
@@ -59,8 +59,8 @@ function windowOf(event: Electron.IpcMainInvokeEvent): BrowserWindow | null {
 const readyResolvers = new Set<() => void>()
 
 /** 把计数表格式化成一行，便于在日志里对齐比对。 */
-function 格式化计数(计数: Record<string, number>): string {
-  const entry = Object.entries(计数).filter(([, value]) => value > 0)
+function 格式化计数(tally: Record<string, number>): string {
+  const entry = Object.entries(tally).filter(([, value]) => value > 0)
   if (entry.length === 0) return '（全部为 0）'
   return entry.map(([name, value]) => `${name}=${value}`).join('  ')
 }
@@ -172,7 +172,7 @@ export function registerAppIpc(): void {
   ipcMain.handle(CH.themeOpenCustom, async (_e, rangeBounds: 'base' | 'theme') => {
     const settings = getSettings()
     const target =
-      rangeBounds === 'base' ? 全局自定义样式路径() : 主题自定义样式路径(activeTheme(settings))
+      rangeBounds === 'base' ? baseUserCssPath() : themeUserCssPath(activeTheme(settings))
     if (!target) return { filePath: null }
 
     if (!existsSync(target)) {
@@ -265,7 +265,7 @@ export function registerAppIpc(): void {
         format: string
         source: string
         docPath: string | null
-        默认文件名: string
+        defaultFileName: string
         withOutline?: boolean
         embeddedImage?: boolean
       }
@@ -275,9 +275,9 @@ export function registerAppIpc(): void {
       const { dialog } = await import('electron')
       const options: Electron.SaveDialogOptions = {
         title: `导出为 ${request.format.toUpperCase()}`,
-        defaultPath: request.默认文件名.endsWith(ext)
-          ? request.默认文件名
-          : `${request.默认文件名}${ext}`,
+        defaultPath: request.defaultFileName.endsWith(ext)
+          ? request.defaultFileName
+          : `${request.defaultFileName}${ext}`,
         filters: [{ name: request.format.toUpperCase(), extensions: [ext.replace(/^\./, '')] }]
       }
       const choose = win
@@ -285,7 +285,7 @@ export function registerAppIpc(): void {
         : await dialog.showSaveDialog(options)
       if (choose.canceled || !choose.filePath) return { filePath: null, error: null }
 
-      const result = await 执行导出({
+      const result = await runExport({
         target: choose.filePath,
         source: request.source,
         docPath: request.docPath,
@@ -317,7 +317,7 @@ export function registerAppIpc(): void {
   // 在系统设置里亲自选，任何程序都改不了（UserChoice 带防篡改校验）。
   // 与其给一个注定失败的按钮，不如把当前状态如实报出来，再把人送过去。
   ipcMain.handle(CH.appFileAssoc, () => ({
-    ...取关联状态(),
+    ...getAssocStatus(),
     程序路径: 本程序路径()
   }))
 
@@ -345,11 +345,11 @@ export function registerAppIpc(): void {
     writeDraft(rawPath, content)
   )
   ipcMain.handle(CH.draftList, () => listDrafts())
-  ipcMain.handle(CH.draftRead, (_e, key: string) => 读草稿(key))
+  ipcMain.handle(CH.draftRead, (_e, key: string) => readDraft(key))
   ipcMain.handle(CH.draftDiscard, (_e, key: string) => deleteDraft(key))
   ipcMain.handle(CH.draftPending, () => recoverableDraft())
   ipcMain.handle(CH.draftClearFor, (_e, rawPath: string | null, content: string) =>
-    清理该文档的草稿(rawPath, content)
+    clearDocDraft(rawPath, content)
   )
 
   // --------------------------------------------------------------- 最近 --

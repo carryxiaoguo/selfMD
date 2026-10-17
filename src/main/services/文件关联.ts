@@ -25,7 +25,7 @@ export interface 关联状态 {
   /** 是否就是本程序。 */
   isDefaultFlag: boolean
   /** 是否已注册「新建」菜单项。 */
-  有新建菜单: boolean
+  hasShellNew: boolean
 }
 
 const extension = '.md'
@@ -75,7 +75,7 @@ function 键存在(key: string): boolean {
  * 只看后者会得出错误结论：明明用户在设置里选了别的程序，
  * `Classes\.md` 可能还指着 selfMD。
  */
-export function 取关联状态(): 关联状态 {
+export function getAssocStatus(): 关联状态 {
   const 用户选择 = 读注册表(`HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\FileExts\\${extension}\\UserChoice`, 'ProgId')
   const 类默认 = 读注册表(`HKCU\\Software\\Classes\\${extension}`, '(默认)')
   const current = 用户选择 || 类默认
@@ -83,7 +83,7 @@ export function 取关联状态(): 关联状态 {
   return {
     current,
     isDefaultFlag: current === 本程序ProgId,
-    有新建菜单: 键存在(`HKCU\\Software\\Classes\\${extension}\\ShellNew`)
+    hasShellNew: 键存在(`HKCU\\Software\\Classes\\${extension}\\ShellNew`)
   }
 }
 

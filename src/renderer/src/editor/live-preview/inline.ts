@@ -1,5 +1,5 @@
 import type { EditorState } from '@codemirror/state'
-import { takeDocDir, 解析图片地址 } from '../../image/显示地址'
+import { takeDocDir, parseImageUrl } from '../../image/显示地址'
 import { blockLineStyles, hidden, inlineStyles, replaceWith } from './decorations'
 import { addLineDeco } from './types'
 import { image } from './widgets'
@@ -43,7 +43,7 @@ export function 处理行内(
   context: BuildContext
 ): boolean {
   const lineNo = state.doc.lineAt(node.from).number
-  const onActiveLine = context.活动行.has(lineNo)
+  const onActiveLine = context.activeLines.has(lineNo)
 
   if (是否行内标记(node)) {
     if (!onActiveLine) {
@@ -114,7 +114,7 @@ export function 处理行内(
       if (光标在里面) return true
 
       const { url, substitute } = 取图片信息(node, state)
-      const show = 解析图片地址(url)
+      const show = parseImageUrl(url)
 
       // 图片独占一行时加个行装饰：CSS 据此把它居中并按块显示，
       // 而夹在句子中间的图片仍按行内处理。
@@ -152,23 +152,23 @@ export function 处理行内(
 function 取图片信息(node: SyntaxNode, state: EditorState): { url: string; substitute: string } {
   let url = ''
   let substitute = ''
-  let 收集替代 = false
+  let collectAlt = false
   let cursor = node.from
 
   for (let child = node.firstChild; child; child = child.nextSibling) {
-    const 间隙 = state.sliceDoc(cursor, child.from)
-    if (收集替代 && 间隙) substitute += 间隙
+    const gapPx = state.sliceDoc(cursor, child.from)
+    if (collectAlt && gapPx) substitute += gapPx
 
     const txt = state.sliceDoc(child.from, child.to)
     if (child.name === 'LinkMark') {
-      if (txt === '![') 收集替代 = true
-      else if (txt === ']') 收集替代 = false
+      if (txt === '![') collectAlt = true
+      else if (txt === ']') collectAlt = false
       // `](` 与收尾的 `)` 不改变状态
     } else if (child.name === 'URL') {
       url = txt
     } else if (child.name === 'LinkTitle') {
       // 标题属于目标而不属于替代文字，跳过
-    } else if (收集替代) {
+    } else if (collectAlt) {
       substitute += txt
     }
 

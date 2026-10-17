@@ -382,8 +382,8 @@ function 渲染表格行(行节点: any, context: context, 单元格标签: stri
   let index = 0
   for (let child = 行节点.firstChild; child; child = child.nextSibling) {
     if (child.name !== 'TableCell') continue
-    const 对齐 = 对齐们[index]
-    context.output.push(`<${单元格标签}${对齐 ? ` style="text-align:${对齐}"` : ''}>`)
+    const alignKind = 对齐们[index]
+    context.output.push(`<${单元格标签}${alignKind ? ` style="text-align:${alignKind}"` : ''}>`)
     recursive(child, context)
     context.output.push(`</${单元格标签}>\n`)
     index++

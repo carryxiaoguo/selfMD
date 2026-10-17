@@ -37,10 +37,10 @@ export function themePath(id: string): string | null {
  *   1. 显式拒绝含 `..` 的路径
  *   2. 解析后确认结果仍落在主题目录内（防符号链接绕过）
  */
-export function 主题目录文件(相对路径: string): string | null {
+export function 主题目录文件(relativeTo: string): string | null {
   let normalize: string
   try {
-    normalize = decodeURIComponent(相对路径)
+    normalize = decodeURIComponent(relativeTo)
   } catch {
     return null
   }
@@ -55,12 +55,12 @@ export function 主题目录文件(相对路径: string): string | null {
 }
 
 /** 全局自定义 CSS 的路径（对所有主题生效）。 */
-export function 全局自定义样式路径(): string {
+export function baseUserCssPath(): string {
   return join(getAppPaths().themes, 'base.user.css')
 }
 
 /** 某个主题专属的自定义 CSS 路径。 */
-export function 主题自定义样式路径(id: string): string | null {
+export function themeUserCssPath(id: string): string | null {
   if (!isSafeThemeId(id)) return null
   return join(getAppPaths().themes, `${id}.user.css`)
 }

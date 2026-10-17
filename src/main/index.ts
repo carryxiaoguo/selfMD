@@ -8,14 +8,14 @@ import { registerIpc } from './ipc'
 import { whenDocumentOpened, whenRendererReady } from './ipc/app'
 import { registerPrivilegedSchemes, registerProtocolHandlers } from './protocol'
 import { rebuildMenu, 菜单摘要, 设置Pandoc可用 } from './menu'
-import { 检测Pandoc, 执行导出 } from './export'
-import { 取关联状态 } from './services/文件关联'
+import { detectPandoc, runExport } from './export'
+import { getAssocStatus } from './services/文件关联'
 import {
   writeDraft,
   listDrafts,
   deleteDraft,
-  清理该文档的草稿,
-  读草稿,
+  clearDocDraft,
+  readDraft,
   recoverableDraft
 } from './services/drafts'
 import { ensureAppDirs, getAppPaths } from './util/paths'
@@ -124,7 +124,7 @@ if (!gotLock) {
 
     // Pandoc 探测要跑子进程，会拖慢启动，所以放到窗口创建之后。
     // 结果回来再重建菜单，把 Word 等格式点亮。
-    void 检测Pandoc().then((filePath: string | null) => {
+    void detectPandoc().then((filePath: string | null) => {
       设置Pandoc可用(filePath !== null)
       rebuildMenu()
     })
@@ -172,10 +172,10 @@ function smokeOpen(): { path?: string } {
  */
 function 准备主题素材(): void {
   const dir = getAppPaths().themes
-  const 子目录 = join(dir, '__冒烟__')
-  mkdirSync(子目录, { recursive: true })
+  const subDir = join(dir, '__冒烟__')
+  mkdirSync(subDir, { recursive: true })
   writeFileSync(join(dir, '__冒烟__.css'), '@import "__冒烟__/子样式.css";\n', 'utf8')
-  writeFileSync(join(子目录, '子样式.css'), ':root { --冒烟标记: 1; }\n', 'utf8')
+  writeFileSync(join(subDir, '子样式.css'), ':root { --冒烟标记: 1; }\n', 'utf8')
 }
 
 /** 清掉冒烟测试造的主题素材，避免污染用户真实的主题目录。 */
@@ -224,7 +224,7 @@ async function 运行导出测试(): Promise<boolean> {
   mkdirSync(dir, { recursive: true })
   const target = join(dir, '导出测试.html')
 
-  const result = await 执行导出({
+  const result = await runExport({
     target,
     source: 导出测试文档,
     docPath: null,
@@ -257,7 +257,7 @@ async function 运行导出测试(): Promise<boolean> {
     ['无残留专有指令', !content.includes('@include-when-export')]
   ]
 
-  const failure = check.filter(([, 好]) => !好)
+  const failure = check.filter(([, okFlag]) => !okFlag)
   console.log(
     `[selfMD] 导出端到端：${check.length - failure.length}/${check.length} 项通过` +
       `  文件 ${content.length} 字符  路径=${target}`
@@ -283,8 +283,8 @@ async function 运行草稿测试(): Promise<boolean> {
   writeFileSync(docModel, '磁盘上的旧内容\n', 'utf8')
 
   const check: [string, boolean][] = []
-  const record = (name: string, 好: boolean): void => {
-    check.push([name, 好])
+  const record = (name: string, okFlag: boolean): void => {
+    check.push([name, okFlag])
   }
 
   // 先把历史遗留的无名草稿清掉。
@@ -306,7 +306,7 @@ async function 运行草稿测试(): Promise<boolean> {
   record('能列出草稿', 这条 !== undefined)
 
   // 3) 能读回同样的内容
-  record('读回内容一致', 这条 !== undefined && 读草稿(这条.key) === 草稿内容)
+  record('读回内容一致', 这条 !== undefined && readDraft(这条.key) === 草稿内容)
 
   // 4) 需要恢复：草稿比原文件新，且内容长度不同
   record(
@@ -315,21 +315,21 @@ async function 运行草稿测试(): Promise<boolean> {
   )
 
   // 5) 竞态守卫：内容不一致时**不能**清掉草稿
-  清理该文档的草稿(docModel, '这是另一个内容')
+  clearDocDraft(docModel, '这是另一个内容')
   record('内容不一致时保留草稿', listDrafts().some((c) => c.rawPath === docModel))
 
   // 6) 内容一致时才清掉
-  清理该文档的草稿(docModel, 草稿内容)
+  clearDocDraft(docModel, 草稿内容)
   record('内容一致时清除草稿', !listDrafts().some((c) => c.rawPath === docModel))
 
   // 7) 未命名文档（原路径为 null）也要能存与恢复
   record('未命名文档可写草稿', writeDraft(null, '未命名的内容'))
-  const 未命名 = listDrafts().find((c) => c.rawPath === null)
+  const untitled = listDrafts().find((c) => c.rawPath === null)
   record(
     '未命名文档需要恢复',
-    未命名 !== undefined && recoverableDraft().some((c) => c.key === 未命名.key)
+    untitled !== undefined && recoverableDraft().some((c) => c.key === untitled.key)
   )
-  if (未命名) deleteDraft(未命名.key)
+  if (untitled) deleteDraft(untitled.key)
   record('未命名草稿可删除', !listDrafts().some((c) => c.rawPath === null))
 
   // 8) 原文件已被删除时也要提示恢复——草稿是唯一副本
@@ -342,7 +342,7 @@ async function 运行草稿测试(): Promise<boolean> {
   const 幽灵条目 = listDrafts().find((c) => c.rawPath === 幽灵)
   if (幽灵条目) deleteDraft(幽灵条目.key)
 
-  const failure = check.filter(([, 好]) => !好)
+  const failure = check.filter(([, okFlag]) => !okFlag)
   console.log(`[selfMD] 草稿与恢复：${check.length - failure.length}/${check.length} 项通过`)
   if (failure.length > 0) {
     console.error(`[selfMD] 草稿与恢复：未通过 — ${failure.map(([name]) => name).join('、')}`)
@@ -506,10 +506,10 @@ async function runSmokeTest(): Promise<void> {  const target = smokeOpenPath()
   // 文件关联是可读的状态而不是"设好了没有"的布尔值：
   // 用户以为设好了、其实没有，是这件事上最常见的误会。
   {
-    const association = 取关联状态()
+    const association = getAssocStatus()
     console.log(
       `[selfMD] 文件关联：当前=${association.current || '（未设置）'} ` +
-        `是默认=${association.isDefaultFlag} 有新建菜单=${association.有新建菜单}`
+        `是默认=${association.isDefaultFlag} 有新建菜单=${association.hasShellNew}`
     )
   }
 

@@ -38,15 +38,15 @@ export function fuzzyScore(query: string, docText: string): number | null {
   let 上次匹配 = -1
 
   for (const ch of 低查询) {
-    const 找到 = 低文本.indexOf(ch, 文本位置)
-    if (找到 < 0) return null
+    const found = 低文本.indexOf(ch, 文本位置)
+    if (found < 0) return null
 
-    if (找到 === 上次匹配 + 1) score += 8 // 连续
-    if (是词首(docText, 找到)) score += 6
-    score -= Math.min(找到 - 文本位置, 4) // 跳过的字符越多扣得越多，但有上限
+    if (found === 上次匹配 + 1) score += 8 // 连续
+    if (是词首(docText, found)) score += 6
+    score -= Math.min(found - 文本位置, 4) // 跳过的字符越多扣得越多，但有上限
 
-    上次匹配 = 找到
-    文本位置 = 找到 + 1
+    上次匹配 = found
+    文本位置 = found + 1
   }
 
   // 匹配跨度越短越好

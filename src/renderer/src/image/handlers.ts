@@ -1,6 +1,6 @@
 import type { Extension } from '@codemirror/state'
 import { EditorView } from '@codemirror/view'
-import { 扩展名由类型, 时间戳图片名, isImageFile } from '@shared/image-path'
+import { extByKind, timestampImageName, isImageFile } from '@shared/image-path'
 import {
   type InsertRequest,
   本次目标目录,
@@ -31,14 +31,14 @@ export interface 图片处理依赖 {
 /** 把 File 读成不含前缀的 base64。 */
 function 读为base64(file: File): Promise<string> {
   return new Promise((done, failure) => {
-    const 读者 = new FileReader()
-    读者.onload = () => {
-      const result = String(读者.result ?? '')
+    const reader = new FileReader()
+    reader.onload = () => {
+      const result = String(reader.result ?? '')
       const 逗号 = result.indexOf(',')
       done(逗号 >= 0 ? result.slice(逗号 + 1) : '')
     }
-    读者.onerror = () => failure(读者.error)
-    读者.readAsDataURL(file)
+    reader.onerror = () => failure(reader.error)
+    reader.readAsDataURL(file)
   })
 }
 
@@ -81,8 +81,8 @@ export function 图片粘贴与拖放(deps: 图片处理依赖): Extension {
         deps.hint('无法读取图片数据。')
         return
       }
-      const extension = 扩展名由类型(file.type) ?? '.png'
-      const name = `${时间戳图片名(new Date())}${extension}`
+      const extension = extByKind(file.type) ?? '.png'
+      const name = `${timestampImageName(new Date())}${extension}`
       const dir = await 本次目标目录(request)
       if (!dir) return
       const writeBack = await window.selfmd.image.saveBytes(dir, name, data)

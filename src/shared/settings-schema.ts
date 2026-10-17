@@ -14,7 +14,7 @@ import { DEFAULT_SETTINGS, type Settings } from './types'
 
 export type 设置项类型 = '开关' | '下拉' | '数字' | '文本' | '列表'
 
-export interface 设置项 {
+export interface SettingItem {
   /** 必须是 Settings 的键。 */
   key: keyof Settings
   kind: 设置项类型
@@ -34,7 +34,7 @@ export interface 设置小节 {
   /** 小节标题；同一分区里连续的小节可以省略标题，靠视觉间距分组。 */
   title?: string
   description?: string
-  item: 设置项[]
+  item: SettingItem[]
 }
 
 export interface 设置分区 {
@@ -479,7 +479,7 @@ export const PrefsSchema: 设置分区[] = [
 ]
 
 /** 扁平化后的全部设置项，供校验与遍历使用。 */
-export function 全部设置项(): 设置项[] {
+export function 全部设置项(): SettingItem[] {
   return PrefsSchema.flatMap((section) => section.subsection.flatMap((subsection) => subsection.item))
 }
 
@@ -489,7 +489,7 @@ export function 全部设置项(): 设置项[] {
  * 返回不存在的键名数组；界面渲染前调用，出错时能立刻定位到是哪一项写错了，
  * 而不是让用户点一个永远没反应的开关。
  */
-export function 校验设置表(): string[] {
+export function validateSchema(): string[] {
   const 已知 = new Set(Object.keys(DEFAULT_SETTINGS))
   return 全部设置项()
     .map((item) => item.key as string)

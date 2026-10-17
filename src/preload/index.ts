@@ -103,7 +103,7 @@ const api: SelfMdApi = {
   },
   print: () => invoke<{ success: boolean; error: string | null }>(CH.appPrint),
   fileAssoc: () =>
-    invoke<{ current: string; isDefaultFlag: boolean; 有新建菜单: boolean; 程序路径: string }>(
+    invoke<{ current: string; isDefaultFlag: boolean; hasShellNew: boolean; 程序路径: string }>(
       CH.appFileAssoc
     ),
   openDefaultApps: () => invoke<void>(CH.appOpenDefaultApps),
@@ -199,7 +199,7 @@ const extras = {
     rename: (from: string, to: string) => invoke<void>(CH.fileRename, from, to),
     walk: (root: string, options?: { limit?: number; depth?: number }) =>
       invoke<{
-        file: { filePath: string; nameText: string; 修改时间: number; 大小: number }[]
+        file: { filePath: string; nameText: string; mtime: number; sizeBytes: number }[]
         truncated: boolean
       }>(CH.fileWalk, root, options)
   },

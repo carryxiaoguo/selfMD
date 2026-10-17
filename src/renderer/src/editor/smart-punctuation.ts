@@ -75,8 +75,8 @@ const 开引号前导 = /[\s([{<（【《「『〔〈“‘’”‘’—–-]/
  * @param 前文 光标之前的本行文本
  */
 export function 换引号(ch: '"' | "'", preamble: string): string {
-  const 前一个 = preamble.slice(-1)
-  const 是开头 = preamble.length === 0 || 开引号前导.test(前一个)
+  const previousOne = preamble.slice(-1)
+  const 是开头 = preamble.length === 0 || 开引号前导.test(previousOne)
 
   if (ch === '"') {
     return 是开头 ? '“' : '”'
@@ -84,7 +84,7 @@ export function 换引号(ch: '"' | "'", preamble: string): string {
 
   // 单引号多一种情况：跟在字母或数字后面时是撇号（don't、2020's），
   // 不是引号。中文里也普遍这么用，所以统一处理成右单引号。
-  if (/[A-Za-z0-9\u4e00-\u9fff]/.test(前一个)) return '’'
+  if (/[A-Za-z0-9\u4e00-\u9fff]/.test(previousOne)) return '’'
   return 是开头 ? '‘' : '’'
 }
 
@@ -113,7 +113,7 @@ export interface 渲染标点段 {
  * 扫描是**逐字符推进**而非逐个正则匹配：`---` 必须优先于 `--` 匹配，
  * 用正则轮流试会先命中 `--`，把破折号拆成"连接号 + 连字符"。
  */
-export function 扫描渲染标点(docText: string, baseline: number): 渲染标点段[] {
+export function scanPunct(docText: string, baseline: number): 渲染标点段[] {
   const result: 渲染标点段[] = []
   let i = 0
 
@@ -187,13 +187,13 @@ export interface 破折号替换 {
  * @returns 需要替换时给出方案，否则返回 null 表示按原样插入
  */
 export function 换破折号(preamble: string): 破折号替换 | null {
-  const 前一个 = preamble.slice(-1)
+  const previousOne = preamble.slice(-1)
   const 再前一个 = preamble.slice(-2, -1)
 
   // 已经转换出连接号，再敲一个连字符 → 升格为破折号。
-  if (前一个 === '–') return { fallback: 1, insert: '—' }
+  if (previousOne === '–') return { fallback: 1, insert: '—' }
 
-  if (前一个 !== '-') return null
+  if (previousOne !== '-') return null
   // 文档里本来就存在的连续连字符不动它，避免把既有内容改坏。
   if (再前一个 === '-') return null
 

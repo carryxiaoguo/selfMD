@@ -3,32 +3,32 @@ import { findNext, findPrevious, openSearchPanel } from '@codemirror/search'
 import { syntaxTree } from '@codemirror/language'
 import { Compartment, EditorSelection, EditorState, type Extension } from '@codemirror/state'
 import { EditorView } from '@codemirror/view'
-import { 移除属性, readFrontMatter, setAttr } from '@shared/front-matter'
+import { removeAttr, readFrontMatter, setAttr } from '@shared/front-matter'
 import { renderMarkdownToHtml } from '@shared/markdown-html'
 import { 标签管理器, type label } from './services/标签'
 import { 打开快速打开面板 } from './ui/快速打开'
-import { 侧边栏可见, 侧边栏被锁定, activeTheme, type DraftInfo } from '@shared/types'
+import { sidebarShown, 侧边栏被锁定, activeTheme, type DraftInfo } from '@shared/types'
 import { 解析围栏信息 } from '@shared/代码块信息'
 import type { MenuCommandPayload } from '@shared/ipc'
 import type { ImageStoragePolicy, Settings } from '@shared/types'
 import {
   toggleList,
-  切换引用,
+  toggleQuote,
   wrapInline,
   插入代码围栏,
   插入前置元数据,
   插入水平线,
   插入数学块,
-  插入表格,
-  插入链接,
-  跳出代码块,
+  insertTable,
+  insertLink,
+  exitCodeBlock,
   clearFormat,
   调整标题级别,
-  调整缩进,
+  adjustIndent,
   setHeadingLevel
 } from './editor/commands'
 import { baseExtensions, modeExtensions } from './editor/setup'
-import { 继续代码围栏, 继续引用块 } from './editor/commands'
+import { continueCodeFence, continueQuote } from './editor/commands'
 import {
   在表格里,
   moveToAdjacentCell,
@@ -37,7 +37,7 @@ import {
   表格增行,
   表格删列,
   表格删行,
-  表格对齐
+  tableAlign
 } from './editor/表格'
 import { 运行大纲自测, 运行导出自测, 运行上传自测, 运行数学自测, 运行渲染标点自测, 运行模糊匹配自测, 运行偏好设置自测, 运行图片管线自测, 运行纯函数自测, 运行命令自测 } from './editor/selftest'
 import {
@@ -54,7 +54,7 @@ import { 专注模式扩展, 居中光标行 } from './editor/focus'
 import { setInlineMathEnabled, setPunctuationRenderingEnabled } from './editor/live-preview/types'
 import { 设置图片右键处理器 } from './editor/live-preview/widgets'
 import { 收集文档图片, 上传并回填, type 回填结果, type docImages } from './image/上传'
-import { setDocDir, 解析图片地址, takeDocDir } from './image/显示地址'
+import { setDocDir, parseImageUrl, takeDocDir } from './image/显示地址'
 import {
   取当前图片,
   删除图片文件,
@@ -73,10 +73,10 @@ import {
   insertFromFile,
   本次目标目录
 } from './image/insert'
-import { 询问文本 } from './ui/prompt'
+import { promptText } from './ui/prompt'
 import { 偏好设置面板 } from './ui/preferences'
 import { sidebar as 侧边栏组件 } from './ui/sidebar'
-import { 提取标题, locateHeading, type headingItem } from './ui/outline'
+import { extractHeadings, locateHeading, type headingItem } from './ui/outline'
 import { DocumentService } from './services/document'
 import { StatusBar } from './ui/statusbar'
 // KaTeX 的样式表由 Vite 打包进来，字体文件会作为资源一并产出。
@@ -333,10 +333,10 @@ function applyEditMode(): void {
  */
 const prefsPanel = new 偏好设置面板({
   取设置: () => settings,
-  应用设置: async (补丁) => {
+  应用设置: async (patchResult) => {
     // 走主进程 patch，不直接改本地对象：渲染层的 settings 只是缓存，
     // 任何一次设置广播都会覆盖它。
-    settings = await window.selfmd.settings.patch(补丁)
+    settings = await window.selfmd.settings.patch(patchResult)
     applyTheme(settings)
     applyEditMode()
     刷新模式相关界面()
@@ -454,9 +454,9 @@ async function 检查崩溃恢复(): Promise<void> {
     updateTitle()
     toast(`已恢复「${最新.rawPath.split(/[\\/]/).pop()}」的未保存内容，确认后请保存`)
   } else {
-    tabSet.存当前(view.state)
+    tabSet.saveCurrent(view.state)
     setDocument(content)
-    tabSet.加入(doc.exportStatus(), view.state)
+    tabSet.addTo(doc.exportStatus(), view.state)
     doc.markDirty()
     updateTitle()
     refreshTabUi()
@@ -478,7 +478,7 @@ let 标题缓存: headingItem[] = []
  */
 function refreshOutline(重算: boolean): void {
   if (!sidebar || !view) return
-  if (重算) 标题缓存 = 提取标题(view.state)
+  if (重算) 标题缓存 = extractHeadings(view.state)
   sidebar.setOutline(标题缓存, locateHeading(标题缓存, view.state.selection.main.head))
   if (重算) sidebar.高亮当前文件(doc.current.path)
 }
@@ -533,14 +533,14 @@ async function 运行主题自测(): Promise<string> {
   // 这是被真实反馈逼出来的：主题切换后界面"看起来没变化"，
   // 而协议自测全绿——因为它测的是"能不能取到"，不是"有没有生效"。
   const 根样式 = getComputedStyle(document.documentElement)
-  const 取值 = (name: string): string => 根样式.getPropertyValue(name).trim()
+  const takeValue = (name: string): string => 根样式.getPropertyValue(name).trim()
   const 主题链接 = document.getElementById('theme-css') as HTMLLinkElement | null
   const 生效值 = [
-    `底色=${取值('--bg-color')}`,
-    `文字=${取值('--text-color')}`,
-    `字号=${取值('--font-size')}`,
-    `行高=${取值('--line-height')}`,
-    `版心=${取值('--content-max-width')}`
+    `底色=${takeValue('--bg-color')}`,
+    `文字=${takeValue('--text-color')}`,
+    `字号=${takeValue('--font-size')}`,
+    `行高=${takeValue('--line-height')}`,
+    `版心=${takeValue('--content-max-width')}`
   ].join(' ')
 
   // 样式表是否真的解析出了规则。跨源样式表读 cssRules 会抛，
@@ -632,7 +632,7 @@ async function 运行侧边栏自测(): Promise<string> {
   sidebar.setTab('files')
   await sidebar.refreshFileTree()
   await new Promise((done) => setTimeout(done, 0))
-  const 文件项 = host.querySelectorAll('.file-list-item').length
+  const fileRow = host.querySelectorAll('.file-list-item').length
 
   sidebar.setTab('outline')
 
@@ -651,19 +651,19 @@ async function 运行侧边栏自测(): Promise<string> {
     ['toggle', 原可见]
   ] as const) {
     settings = await window.selfmd.settings.patch({ sidebarMode: 模式 })
-    sidebar.setVisible(侧边栏可见(settings))
+    sidebar.setVisible(sidebarShown(settings))
     await new Promise((done) => setTimeout(done, 40))
-    const 实际 = !host.hidden
-    策略结果.push(`${模式}=${实际 === 期望 ? '对' : `错(${实际})`}`)
+    const actual = !host.hidden
+    策略结果.push(`${模式}=${actual === 期望 ? '对' : `错(${actual})`}`)
   }
 
   // 收尾：把状态恢复原样，免得影响后面的用例
   settings = await window.selfmd.settings.patch({ sidebarMode: 原模式, sidebarVisible: 原可见 })
-  sidebar.setVisible(侧边栏可见(settings))
+  sidebar.setVisible(sidebarShown(settings))
 
   return (
     `标题数=${标题缓存.length} 大纲项=${outlineEntry} 高亮项=${激活项} ` +
-    `文件树根=${sidebar.rootDir ? '已定位' : '无'} 文件项=${文件项} ` +
+    `文件树根=${sidebar.rootDir ? '已定位' : '无'} 文件项=${fileRow} ` +
     `策略=${策略结果.join(' ')}`
   )
 }
@@ -1001,9 +1001,9 @@ function 构建编辑器右键菜单(): menuItem[] {
               { text: '右侧插入列', action: () => void 表格增列(view) },
               { text: '删除本列', 危险: true, action: () => void 表格删列(view) },
               { separator: true },
-              { text: '左对齐', action: () => void 表格对齐(view, 'left') },
-              { text: '居中', action: () => void 表格对齐(view, 'center') },
-              { text: '右对齐', action: () => void 表格对齐(view, 'right') }
+              { text: '左对齐', action: () => void tableAlign(view, 'left') },
+              { text: '居中', action: () => void tableAlign(view, 'center') },
+              { text: '右对齐', action: () => void tableAlign(view, 'right') }
             ]
           }
         ] as menuItem[])
@@ -1166,7 +1166,7 @@ async function 运行表格自测(): Promise<string> {
   // --- 对齐 -----------------------------------------------------------
   await resetDoc()
   view.dispatch({ selection: { anchor: 2 } })
-  表格对齐(view, 'center')
+  tableAlign(view, 'center')
   // 对齐必须改**第二行**（对齐定义行），且改完还得是合法的对齐行
   const 二 = 第(2)
   result.push(
@@ -1332,7 +1332,7 @@ async function 运行代码块头部自测(): Promise<string> {
   // 真的调一次绑定在 Enter 上的那个命令，而不是自己模拟换行。
   // CodeMirror 自带的 `insertNewlineContinueMarkup` 在围栏内直接放弃，
   // 所以这里调的是本项目自己的 `继续代码围栏`。
-  const 换行结果 = 继续代码围栏(view)
+  const 换行结果 = continueCodeFence(view)
   await new Promise((done) => setTimeout(done, 120))
   const docText = view.state.doc.toString()
   const 闭合了 = (docText.match(/```/g) ?? []).length >= 2
@@ -1413,7 +1413,7 @@ async function 运行代码块自测(): Promise<string> {
     await new Promise((done) => setTimeout(done, 60))
 
     // Escape 跳出
-    const success = 跳出代码块(view)
+    const success = exitCodeBlock(view)
     await new Promise((done) => setTimeout(done, 80))
     const 新光标 = view.state.selection.main.head
     跳出后位置 = success && 新光标 > block.to ? '围栏之后' : `否(${新光标} vs ${block.to})`
@@ -1525,7 +1525,7 @@ async function 运行标签自测(): Promise<string> {
   const 起始数量 = tabSet.count
   const 起始文本 = currentText()
   const 起始路径 = doc.current.path
-  const 起始标识 = tabSet.current?.id ?? -1
+  const startMarker = tabSet.current?.id ?? -1
 
   // --- 1) 在甲文档末尾追加一段可识别的标记 ---
   const 甲标记 = `【甲${Date.now() % 100000}】`
@@ -1535,15 +1535,15 @@ async function 运行标签自测(): Promise<string> {
 
   // --- 2) 新建乙文档 ---
   // 顺序：先写回当前标签，再换视图状态。反了就会丢掉甲的改动。
-  tabSet.存当前(view.state)
+  tabSet.saveCurrent(view.state)
   doc.newDocument()
   view.setState(EditorState.create({ doc: '【乙】\n', extensions: editorExtensions() }))
   setDocDir(null)
-  const beta = tabSet.加入(doc.exportStatus(), view.state)
+  const beta = tabSet.addTo(doc.exportStatus(), view.state)
   const 乙标识 = beta.id
   const 新建后数量 = tabSet.count
   // --- 3) 切回甲 ---
-  if (起始标识 >= 0) await switchTab(起始标识)
+  if (startMarker >= 0) await switchTab(startMarker)
   const 切回后文本 = currentText()
   // 这一条就是整个测试的重点
   const 切回后标记还在 = 切回后文本.includes(甲标记)
@@ -1578,8 +1578,8 @@ async function 运行标签自测(): Promise<string> {
   }
 
   // --- 恢复现场 ---
-  if (tabSet.current && tabSet.current.id !== 起始标识 && 起始标识 >= 0) {
-    await switchTab(起始标识)
+  if (tabSet.current && tabSet.current.id !== startMarker && startMarker >= 0) {
+    await switchTab(startMarker)
   }
   // 把甲文档恢复成测试前的样子
   if (currentText() !== 起始文本 && tabSet.current) {
@@ -1837,7 +1837,7 @@ async function 打开图片菜单(event: MouseEvent, el: HTMLElement): Promise<v
       action: () => {
         if (!image) return
         // 本地图片用 selfmd:// 协议地址也能被系统浏览器打开
-        const url = isRemote ? image.url : 解析图片地址(image.url)
+        const url = isRemote ? image.url : parseImageUrl(image.url)
         if (url) void window.selfmd.file.openExternal(url)
       }
     },
@@ -1887,7 +1887,7 @@ async function 执行重命名(image: imageContext | null): Promise<void> {
   if (!image?.localPath) return
 
   const originalName = 建议文件名(image)
-  const newName = await 询问文本({
+  const newName = await promptText({
     title: '重命名图片',
     初值: originalName,
     description: '文件会被移动或重命名，文档里的引用会同步更新。'
@@ -2003,7 +2003,7 @@ async function 运行图片插入自测(docPath: string): Promise<string | undef
  */
 function 改写前置元数据(key: string, value: string | null): void {
   const originalText = view.state.doc.toString()
-  const nextText = value === null ? 移除属性(originalText, key) : setAttr(originalText, key, value)
+  const nextText = value === null ? removeAttr(originalText, key) : setAttr(originalText, key, value)
   if (nextText === originalText) return
   view.dispatch({
     changes: { from: 0, to: view.state.doc.length, insert: nextText },
@@ -2025,11 +2025,11 @@ async function runCommand(payload: MenuCommandPayload): Promise<void> {
     // ------------------------------------------------------------- 文件 ---
     case 'file.new':
       // **先写回，再换视图状态。** 顺序反了就把当前文档未保存的改动丢了。
-      tabSet.存当前(view.state)
+      tabSet.saveCurrent(view.state)
       doc.newDocument()
       view.setState(EditorState.create({ doc: '', extensions: editorExtensions() }))
       setDocDir(null)
-      tabSet.加入(doc.exportStatus(), view.state)
+      tabSet.addTo(doc.exportStatus(), view.state)
       updateTitle()
       refreshTabUi()
       view.focus()
@@ -2040,14 +2040,14 @@ async function runCommand(payload: MenuCommandPayload): Promise<void> {
       //
       // 保存非当前文档时不能走 `doc.save()`——那个写的是"当前文档"的路径。
       // 所以这里直接调底层写盘接口，绕过文档服务。
-      const 待存 = tabSet.list.filter((t) => t.state.dirty)
-      if (待存.length === 0) {
+      const toSave = tabSet.list.filter((t) => t.state.dirty)
+      if (toSave.length === 0) {
         toast('没有需要保存的文档')
         return
       }
       let success = 0
       let failure = 0
-      for (const item of 待存) {
+      for (const item of toSave) {
         const 是当前的 = item.id === tabSet.current?.id
         const content = 是当前的 ? currentText() : item.editorState.doc.toString()
         // 未命名文档没有路径，交给"另存为"；那会弹对话框，
@@ -2098,10 +2098,10 @@ async function runCommand(payload: MenuCommandPayload): Promise<void> {
         }
       }
       setDocDir(recover.state.path ? await window.selfmdExtra.path.dirname(recover.state.path) : null)
-      tabSet.存当前(view.state)
+      tabSet.saveCurrent(view.state)
       doc.采用状态({ ...recover.state, dirty: !exists && recover.content.length > 0 })
       view.setState(EditorState.create({ doc: content, extensions: editorExtensions() }))
-      tabSet.加入(doc.exportStatus(), view.state)
+      tabSet.addTo(doc.exportStatus(), view.state)
       updateTitle()
       refreshTabUi()
       view.focus()
@@ -2165,11 +2165,11 @@ async function runCommand(payload: MenuCommandPayload): Promise<void> {
       try {
         // 保存成功后要清掉草稿——已经落盘了，留着它下次启动会误报"未保存内容"。
         // 先取内容再保存，两边比对的是同一份文本。
-        const 待存 = currentText()
+        const toSave = currentText()
         const 已保存路径 = doc.current.path
-        if (await doc.save(待存)) {
+        if (await doc.save(toSave)) {
           toast('已保存')
-          await window.selfmd.draft.clearFor(已保存路径, 待存)
+          await window.selfmd.draft.clearFor(已保存路径, toSave)
         }
       } catch (err) {
         toastError(err, '保存失败')
@@ -2218,7 +2218,7 @@ async function runCommand(payload: MenuCommandPayload): Promise<void> {
         return
       }
       const originalName = await window.selfmdExtra.path.basename(rawPath)
-      const newName = await 询问文本({
+      const newName = await promptText({
         title: '重命名',
         description: `当前文件名：${originalName}`,
         初值: originalName,
@@ -2430,23 +2430,23 @@ async function runCommand(payload: MenuCommandPayload): Promise<void> {
             ? 'rendering'
             : 'none'
       // 再点一次当前模式 = 关掉。这样三个单选里任意一个都能当开关用。
-      const 新模式 = settings.smartPunctuationMode === target ? 'none' : target
+      const nextMode = settings.smartPunctuationMode === target ? 'none' : target
 
       settings = await window.selfmd.settings.patch({
-        smartPunctuationMode: 新模式,
+        smartPunctuationMode: nextMode,
         // 首次开启时把两个字符开关都打开，否则开了模式却什么都没转换，
         // 用户会以为功能坏了。
-        ...(新模式 !== 'none' && !settings.smartQuotes && !settings.smartDashes
+        ...(nextMode !== 'none' && !settings.smartQuotes && !settings.smartDashes
           ? { smartQuotes: true, smartDashes: true }
           : {})
       })
 
       applyEditMode()
       // 渲染模式的开关决定"装饰怎么建"，改完必须重绘才生效
-      if (新模式 === 'rendering' || target === 'rendering') view.dispatch({})
+      if (nextMode === 'rendering' || target === 'rendering') view.dispatch({})
 
       const displayName =
-        新模式 === 'input' ? '输入时转换' : 新模式 === 'rendering' ? '渲染时转换' : ''
+        nextMode === 'input' ? '输入时转换' : nextMode === 'rendering' ? '渲染时转换' : ''
       toast(displayName ? `智能标点：${displayName}` : '智能标点：已关闭')
       return
     }
@@ -2529,7 +2529,7 @@ async function runCommand(payload: MenuCommandPayload): Promise<void> {
       return
 
     case 'para.quote':
-      切换引用(view)
+      toggleQuote(view)
       afterEdit()
       return
 
@@ -2549,12 +2549,12 @@ async function runCommand(payload: MenuCommandPayload): Promise<void> {
       return
 
     case 'para.indent':
-      调整缩进(view, 1)
+      adjustIndent(view, 1)
       afterEdit()
       return
 
     case 'para.outdent':
-      调整缩进(view, -1)
+      adjustIndent(view, -1)
       afterEdit()
       return
 
@@ -2574,7 +2574,7 @@ async function runCommand(payload: MenuCommandPayload): Promise<void> {
       return
 
     case 'para.table':
-      插入表格(view)
+      insertTable(view)
       afterEdit()
       return
 
@@ -2637,7 +2637,7 @@ async function runCommand(payload: MenuCommandPayload): Promise<void> {
       return
 
     case 'fmt.hyperlink':
-      插入链接(view)
+      insertLink(view)
       afterEdit()
       return
 
@@ -2649,7 +2649,7 @@ async function runCommand(payload: MenuCommandPayload): Promise<void> {
     // ------------------------------------------------------------ 图像 ---
     case 'fmt.image':
     case 'image.insertFromUrl': {
-      const url = await 询问文本({
+      const url = await promptText({
         title: '插入图片',
         placeholder: 'https://example.com/图片.png',
         确定文字: '插入'
@@ -2941,7 +2941,7 @@ async function runCommand(payload: MenuCommandPayload): Promise<void> {
       const 详情 =
         `当前默认程序：${association.current || '（未设置）'}\n` +
         `本程序：${association.程序路径}\n` +
-        `「新建」菜单项：${association.有新建菜单 ? '已注册' : '未注册'}` +
+        `「新建」菜单项：${association.hasShellNew ? '已注册' : '未注册'}` +
         (association.isDefaultFlag
           ? ''
           : '\n\nWindows 不允许程序自己改默认打开方式，需要在系统设置里选一次。' +
@@ -2992,7 +2992,7 @@ async function runCommand(payload: MenuCommandPayload): Promise<void> {
         format,
         source: currentText(),
         docPath: filePath,
-        默认文件名: 默认名,
+        defaultFileName: 默认名,
         // 导出选项来自设置（「导出设置」菜单项与偏好设置面板都能改）。
         // 不传的话主进程会用自己的默认值，于是设置面板改了却没效果——
         // 那种"改了没反应"最难查。
@@ -3062,7 +3062,7 @@ async function runCommand(payload: MenuCommandPayload): Promise<void> {
     }
 
     case 'theme.create': {
-      const name = await 询问文本({
+      const name = await promptText({
         title: '新建主题',
         placeholder: '例如 my-theme（不要带 .css）',
         确定文字: '创建'
@@ -3122,9 +3122,9 @@ async function openPath(path: string): Promise<void> {
     const text = await doc.open(path)
     // **先写回，再换视图状态。** openPath 会替换整个编辑器状态，
     // 不先存的话前一个文档里未保存的改动就没了。
-    tabSet.存当前(view.state)
+    tabSet.saveCurrent(view.state)
     setDocument(text)
-    tabSet.加入(doc.exportStatus(), view.state)
+    tabSet.addTo(doc.exportStatus(), view.state)
     updateTitle()
     refreshTabUi()
     view.focus()
@@ -3309,9 +3309,9 @@ async function openPath(path: string): Promise<void> {
           let 触发 = '否'
           let 仍是 = '否'
           if (目标行号 > 0) {
-            const 目标行 = view.state.doc.line(目标行号)
-            view.dispatch({ selection: { anchor: 目标行.to } })
-            触发 = 继续引用块(view) ? '是' : '否'
+            const targetLine = view.state.doc.line(目标行号)
+            view.dispatch({ selection: { anchor: targetLine.to } })
+            触发 = continueQuote(view) ? '是' : '否'
             // 新行紧跟在**目标行**后面（不是文档末尾——夹具末尾还有一个空行）
             仍是 = /^\s*>/.test(view.state.doc.line(目标行号 + 1).text) ? '是' : '否'
           }
@@ -3355,7 +3355,7 @@ async function openPath(path: string): Promise<void> {
     let 大纲结果: Record<string, string> | undefined
     let exportResult: Record<string, string> | undefined
     let 偏好结果: Record<string, string> | undefined
-    let 上传结果: Record<string, string> | undefined
+    let uploadResult: Record<string, string> | undefined
     let 数学结果: Record<string, string> | undefined
     let 标点结果: Record<string, string> | undefined
     let 交互结果: string | undefined
@@ -3378,7 +3378,7 @@ async function openPath(path: string): Promise<void> {
       大纲结果 = 运行大纲自测()
       exportResult = 运行导出自测()
       偏好结果 = 运行偏好设置自测()
-      上传结果 = 运行上传自测()
+      uploadResult = 运行上传自测()
       数学结果 = 运行数学自测()
       标点结果 = 运行渲染标点自测()
       表格结果 = await 运行表格自测()
@@ -3411,7 +3411,7 @@ async function openPath(path: string): Promise<void> {
       outlineResults: 大纲结果,
       exportResults: exportResult,
       prefsResults: 偏好结果,
-      uploadResults: 上传结果,
+      uploadResults: uploadResult,
       mathResults: 数学结果,
       punctResults: 标点结果,
       matchResults: 匹配结果,
@@ -3561,7 +3561,7 @@ async function boot(): Promise<void> {
     sidebar.setWidth(settings.sidebarWidth)
     // 「文档」标签页已经实现了，不再降级映射到文件树
     sidebar.setTab(settings.sidebarTab)
-    sidebar.setVisible(侧边栏可见(settings))
+    sidebar.setVisible(sidebarShown(settings))
     refreshOutline(true)
   }
 
@@ -3609,7 +3609,7 @@ async function boot(): Promise<void> {
       sidebar.setWidth(settings.sidebarWidth)
       // 用 `侧边栏可见` 而不是直接读 sidebarVisible：
       // 「始终显示/始终隐藏」两档下，后者是被忽略的残留值。
-      sidebar.setVisible(侧边栏可见(settings))
+      sidebar.setVisible(sidebarShown(settings))
       if (settings.sidebarTab !== 'articles') sidebar.setTab(settings.sidebarTab)
     }
     if (modeChanged) applyMode()
@@ -3637,7 +3637,7 @@ async function boot(): Promise<void> {
   // 就先建一个空标签。**这一步不能省**：标签集为空时侧边栏的文档列表
   // 是空的，而用户看不到任何"当前文档"的表示，会以为界面坏了。
   if (tabSet.count === 0) {
-    tabSet.加入(doc.exportStatus(), view.state)
+    tabSet.addTo(doc.exportStatus(), view.state)
   }
   refreshTabUi()
 

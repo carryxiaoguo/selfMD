@@ -19,7 +19,7 @@ import { stripExt, isAbsolute, normalizePath, concat } from '@shared/image-path'
 
 // 路径工具从 shared 转出，方便调用方只 import 一处。
 export { isAbsolute, normalizePath, concat, stripExt } from '@shared/image-path'
-export { takeFileName, 取目录, uniqueFileName, 时间戳图片名 } from '@shared/image-path'
+export { takeFileName, 取目录, uniqueFileName, timestampImageName } from '@shared/image-path'
 
 // ---------------------------------------------------------------------------
 // 解析

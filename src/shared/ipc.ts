@@ -445,7 +445,7 @@ export interface SelfMdApi {
       format: string
       source: string
       docPath: string | null
-      默认文件名: string
+      defaultFileName: string
       /** 导出结果里是否附带侧边目录。省略时用主进程的默认值。 */
       withOutline?: boolean
       /** 是否把本地图片内嵌成 base64。省略时用主进程的默认值。 */
@@ -462,7 +462,7 @@ export interface SelfMdApi {
   fileAssoc(): Promise<{
     current: string
     isDefaultFlag: boolean
-    有新建菜单: boolean
+    hasShellNew: boolean
     程序路径: string
   }>
   /**
@@ -602,7 +602,7 @@ export interface SelfMdExtraApi {
       root: string,
       options?: { limit?: number; depth?: number }
     ): Promise<{
-      file: { filePath: string; nameText: string; 修改时间: number; 大小: number }[]
+      file: { filePath: string; nameText: string; mtime: number; sizeBytes: number }[]
       truncated: boolean
     }>
   }

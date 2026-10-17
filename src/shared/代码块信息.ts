@@ -26,17 +26,17 @@
  */
 
 /** 代码块配色样式。`follow` 表示跟随主题，也是默认值。 */
-export type 代码块样式 = 'follow' | 'light' | 'dark'
+export type codeBlockStyleName = 'follow' | 'light' | 'dark'
 
 /** 样式的显示名。改显示名不用动文档里的值。 */
-export const 样式显示名: Record<代码块样式, string> = {
+export const 样式显示名: Record<codeBlockStyleName, string> = {
   follow: '跟随主题',
   light: '明亮',
   dark: '暗色'
 }
 
 /** 下拉里的顺序：默认项排第一。 */
-export const 样式顺序: 代码块样式[] = ['follow', 'light', 'dark']
+export const 样式顺序: codeBlockStyleName[] = ['follow', 'light', 'dark']
 
 // ---------------------------------------------------------------------------
 // 字体
@@ -58,7 +58,7 @@ export interface 字体项 {
   family: string
 }
 
-export const 内置字体: 字体项[] = [
+export const BUILTIN_FONTS: 字体项[] = [
   { value: 'follow', name: '跟随主题', family: '' },
   { value: 'consolas', name: 'Consolas', family: 'Consolas, "Courier New", monospace' },
   {
@@ -91,12 +91,12 @@ export const 内置字体: 字体项[] = [
   { value: 'courier', name: 'Courier New', family: '"Courier New", monospace' }
 ]
 
-const 字体值表 = new Set(内置字体.map((item) => item.value))
+const 字体值表 = new Set(BUILTIN_FONTS.map((item) => item.value))
 
 export interface FenceInfo {
   language: string
   displayName: string
-  style: 代码块样式
+  style: codeBlockStyleName
   /** 内置字体的标识；`follow` 表示跟随主题。 */
   font: string
 }
@@ -106,7 +106,7 @@ function tidy(docText: string): string {
   return docText.trim().replace(/\s+/g, ' ')
 }
 
-function 是样式名(value: string): value is 代码块样式 {
+function 是样式名(value: string): value is codeBlockStyleName {
   return value === 'follow' || value === 'light' || value === 'dark'
 }
 
@@ -122,7 +122,7 @@ export function 解析围栏信息(原始: string): FenceInfo {
   const language = parts.shift() ?? ''
 
   const 名称片段: string[] = []
-  let style: 代码块样式 = 'follow'
+  let style: codeBlockStyleName = 'follow'
   let font = 'follow'
 
   for (const piece of parts) {
@@ -173,7 +173,7 @@ export function 构建围栏信息(info: FenceInfo): string {
  * @param 首行文本 围栏所在行的完整文本
  * @returns 相对该行行首的偏移区间；不是围栏行时返回 null
  */
-export function 信息串区间(firstLineText: string): { start: number; end: number } | null {
+export function infoSpan(firstLineText: string): { start: number; end: number } | null {
   const match = /^(\s*)(`{3,}|~{3,})([\s\S]*)$/.exec(firstLineText)
   if (!match) return null
   const start = match[1].length + match[2].length
@@ -192,8 +192,8 @@ export function 信息串区间(firstLineText: string): { start: number; end: nu
  * 构建与解析必须作用在同一段文本上（信息串本身，不含围栏标记），
  * 这个函数把"切出信息串"这一步收在一处，避免每个调用点各切一次。
  */
-export function 解析围栏首行(firstLineText: string): FenceInfo {
-  const range = 信息串区间(firstLineText)
+export function parseFenceFirstLine(firstLineText: string): FenceInfo {
+  const range = infoSpan(firstLineText)
   if (!range) return { language: '', displayName: '', style: 'follow', font: 'follow' }
   return 解析围栏信息(firstLineText.slice(range.start, range.end))
 }
@@ -210,7 +210,7 @@ export function 解析围栏首行(firstLineText: string): FenceInfo {
  * 而界面上只表现为"我改了一下语言"。所以这类块照旧显示源码，保持可编辑。
  */
 export function infoRoundTrips(firstLineText: string, info: FenceInfo): boolean {
-  const range = 信息串区间(firstLineText)
+  const range = infoSpan(firstLineText)
   if (!range) return false
   return 构建围栏信息(info) === firstLineText.slice(range.start, range.end).trim()
 }

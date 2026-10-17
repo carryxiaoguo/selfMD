@@ -81,7 +81,7 @@ export class 标签管理器 {
    * @param 状态 文档元信息
    * @param 编辑器状态 该文档的编辑器状态（含历史）
    */
-  加入(state: DocState, editorState: EditorState): label {
+  addTo(state: DocState, editorState: EditorState): label {
     const label: label = { id: this.下一个标识++, state, editorState }
     // 插在当前标签之后，而不是追加到末尾——这样"新建"出来的标签
     // 就在手边，符合浏览器的行为习惯。
@@ -96,7 +96,7 @@ export class 标签管理器 {
    * 在**任何替换视图状态的操作之前**调用。这是整个多文档实现里
    * 唯一一处"顺序写错就静默丢数据"的地方，所以单独给它一个显眼的名字。
    */
-  存当前(state: EditorState): void {
+  saveCurrent(state: EditorState): void {
     const current = this.tabs[this.currentIndex]
     if (current) current.editorState = state
   }
@@ -109,21 +109,21 @@ export class 标签管理器 {
    *
    * @returns 目标标签；标识不存在时返回 null（不做任何改动）
    */
-  toggle(id: number, 落盘当前: (current: label) => void): label | null {
+  toggle(id: number, flushCurrent: (current: label) => void): label | null {
     const targetIndex = this.tabs.findIndex((t) => t.id === id)
     if (targetIndex < 0 || targetIndex === this.currentIndex) return null
     const current = this.tabs[this.currentIndex]
-    if (current) 落盘当前(current)
+    if (current) flushCurrent(current)
     this.currentIndex = targetIndex
     return this.tabs[targetIndex]
   }
 
   /** 按方向循环切换，用于 Ctrl+Tab。 */
-  循环(direction: 1 | -1, 落盘当前: (current: label) => void): label | null {
+  循环(direction: 1 | -1, flushCurrent: (current: label) => void): label | null {
     if (this.tabs.length < 2) return null
     const targetIndex = (this.currentIndex + direction + this.tabs.length) % this.tabs.length
     const current = this.tabs[this.currentIndex]
-    if (current) 落盘当前(current)
+    if (current) flushCurrent(current)
     this.currentIndex = targetIndex
     return this.tabs[targetIndex]
   }
@@ -135,14 +135,14 @@ export class 标签管理器 {
    *             **未保存的改动只有这里有备份**，所以调用方必须传。
    * @returns 关闭后应当切到的标签；关的是最后一个时返回 null
    */
-  close(id: number, content: string, 落盘当前: (current: label) => void): label | null {
+  close(id: number, content: string, flushCurrent: (current: label) => void): label | null {
     const subscript = this.tabs.findIndex((t) => t.id === id)
     if (subscript < 0) return null
     if (this.tabs.length <= 1) return null
 
     const 被关 = this.tabs[subscript]
     // 关闭当前标签前先把编辑器状态写回，否则重新打开时拿到的是上一次切换时的快照
-    if (subscript === this.currentIndex) 落盘当前(被关)
+    if (subscript === this.currentIndex) flushCurrent(被关)
 
     this.closed.push({ state: { ...被关.state }, content })
     // 只留最近 20 个：再多也没人会去翻，而且未保存的内容留在内存里是负担

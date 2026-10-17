@@ -56,9 +56,9 @@ function 计算活动行(state: EditorState): Set<number> {
 function 构建装饰(view: EditorView): DecorationSet {
   const state = view.state
   const context: BuildContext = {
-    活动行: 计算活动行(state),
+    activeLines: 计算活动行(state),
     行装饰已用: new Set<number>(),
-    已换头部栏: new Set<number>(),
+    headerReplaced: new Set<number>(),
     entry: [] as 装饰条目[]
   }
 

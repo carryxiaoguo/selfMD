@@ -30,7 +30,7 @@ const isolatedUndo = isolateHistory.of('full')
 // ---------------------------------------------------------------------------
 
 /** 选区覆盖到的行号区间（1 基，含首尾）。 */
-function 涉及行(state: EditorState): { head: number; tail: number } {
+function affectedLines(state: EditorState): { head: number; tail: number } {
   const main = state.selection.main
   return {
     head: state.doc.lineAt(main.from).number,
@@ -39,11 +39,11 @@ function 涉及行(state: EditorState): { head: number; tail: number } {
 }
 
 /** 生成"整行替换"的变更集，用于块级命令。 */
-function 整行变更(
+function wholeLineChange(
   state: EditorState,
   转换: (lineText: string, lineNo: number) => string
 ): ChangeSpec[] {
-  const { head, tail } = 涉及行(state)
+  const { head, tail } = affectedLines(state)
   const changes: ChangeSpec[] = []
   for (let no = head; no <= tail; no++) {
     const line = state.doc.line(no)
@@ -69,20 +69,20 @@ const 标题正则 = /^(#{1,6})(\s+)/
  */
 export function setHeadingLevel(view: EditorView, level: number): boolean {
   const state = view.state
-  const { head, tail } = 涉及行(state)
+  const { head, tail } = affectedLines(state)
 
   // 判断当前是否全都是目标级别，用于决定是"设置"还是"取消"。
-  let 全是目标 = true
+  let allAreTarget = true
   for (let no = head; no <= tail; no++) {
     const match = 标题正则.exec(state.doc.line(no).text)
     if (!match || match[1].length !== level) {
-      全是目标 = false
+      allAreTarget = false
       break
     }
   }
-  const target = 全是目标 ? 0 : level
+  const target = allAreTarget ? 0 : level
 
-  const changes = 整行变更(state, (docText) => {
+  const changes = wholeLineChange(state, (docText) => {
     const 去标题 = docText.replace(标题正则, '')
     return target === 0 ? 去标题 : '#'.repeat(target) + ' ' + 去标题
   })
@@ -94,7 +94,7 @@ export function setHeadingLevel(view: EditorView, level: number): boolean {
 /** 提升/降低标题级别；普通段落执行"提升"会变成一级标题。 */
 export function 调整标题级别(view: EditorView, direction: 1 | -1): boolean {
   const state = view.state
-  const { head } = 涉及行(state)
+  const { head } = affectedLines(state)
   const match = 标题正则.exec(state.doc.line(head).text)
   const current = match ? match[1].length : 0
   const 下级 = Math.min(6, Math.max(0, current + direction))
@@ -108,9 +108,9 @@ export function 调整标题级别(view: EditorView, direction: 1 | -1): boolean
 
 const 引用正则 = /^>\s?/
 
-export function 切换引用(view: EditorView): boolean {
+export function toggleQuote(view: EditorView): boolean {
   const state = view.state
-  const { head, tail } = 涉及行(state)
+  const { head, tail } = affectedLines(state)
 
   let 全是引用 = true
   for (let no = head; no <= tail; no++) {
@@ -120,7 +120,7 @@ export function 切换引用(view: EditorView): boolean {
     }
   }
 
-  const changes = 整行变更(state, (docText) =>
+  const changes = wholeLineChange(state, (docText) =>
     全是引用 ? docText.replace(引用正则, '') : '> ' + docText
   )
   if (changes.length === 0) return false
@@ -140,27 +140,27 @@ export type 列表类型 = '无序' | '有序' | '任务'
 
 export function toggleList(view: EditorView, kind: 列表类型): boolean {
   const state = view.state
-  const { head, tail } = 涉及行(state)
+  const { head, tail } = affectedLines(state)
 
   // 已经全是该类型则取消。
   const 匹配器 =
     kind === '无序' ? 无序正则 : kind === '有序' ? 有序正则 : 任务正则
-  let 全是目标 = true
+  let allAreTarget = true
   for (let no = head; no <= tail; no++) {
     if (!匹配器.test(state.doc.line(no).text)) {
-      全是目标 = false
+      allAreTarget = false
       break
     }
   }
 
   let index = 1
-  const changes = 整行变更(state, (docText) => {
+  const changes = wholeLineChange(state, (docText) => {
     // 先剥掉任何已有的列表标记，避免 `- 1. 内容` 这种叠加。
     const indent = /^(\s*)/.exec(docText)?.[1] ?? ''
     let body = docText.slice(indent.length)
     body = body.replace(任务正则, '').replace(无序正则, '').replace(有序正则, '')
 
-    if (全是目标) return indent + body
+    if (allAreTarget) return indent + body
 
     switch (kind) {
       case '无序':
@@ -178,10 +178,10 @@ export function toggleList(view: EditorView, kind: 列表类型): boolean {
 }
 
 /** 缩进 / 反缩进：块级命令按 2 个空格一层。 */
-export function 调整缩进(view: EditorView, direction: 1 | -1): boolean {
+export function adjustIndent(view: EditorView, direction: 1 | -1): boolean {
   const state = view.state
   const unit = ' '.repeat(Math.max(1, Math.min(8, state.tabSize)))
-  const changes = 整行变更(state, (docText) => {
+  const changes = wholeLineChange(state, (docText) => {
     if (direction === 1) return unit + docText
     // 反缩进：优先吃掉一个制表符，否则最多吃掉一个单位的空格。
     if (docText.startsWith('\t')) return docText.slice(1)
@@ -199,7 +199,7 @@ export function 调整缩进(view: EditorView, direction: 1 | -1): boolean {
 // ---------------------------------------------------------------------------
 
 /** 在光标处插入一段文本，并把光标放到指定偏移。 */
-function 插入块(view: EditorView, docText: string, 光标偏移: number): boolean {
+function insertBlock(view: EditorView, docText: string, 光标偏移: number): boolean {
   const main = view.state.selection.main
   // 保证块级语法前后各有一个空行，否则会与相邻块粘连。
   const before = main.from > 0 && view.state.sliceDoc(main.from - 1, main.from) !== '\n' ? '\n' : ''
@@ -228,7 +228,7 @@ export function 插入代码围栏(view: EditorView): boolean {
     })
     return true
   }
-  return 插入块(view, '```\n\n```\n', 4)
+  return insertBlock(view, '```\n\n```\n', 4)
 }
 
 export function 插入数学块(view: EditorView): boolean {
@@ -245,15 +245,15 @@ export function 插入数学块(view: EditorView): boolean {
     })
     return true
   }
-  return 插入块(view, '$$\n\n$$\n', 3)
+  return insertBlock(view, '$$\n\n$$\n', 3)
 }
 
 export function 插入水平线(view: EditorView): boolean {
-  return 插入块(view, '---\n', 4)
+  return insertBlock(view, '---\n', 4)
 }
 
 /** 插入一个 3 列 3 行的表格骨架（含表头与对齐定义行）。 */
-export function 插入表格(view: EditorView): boolean {
+export function insertTable(view: EditorView): boolean {
   const 骨架 = [
     '| 列一 | 列二 | 列三 |',
     '| ---- | ---- | ---- |',
@@ -261,7 +261,7 @@ export function 插入表格(view: EditorView): boolean {
     ''
   ].join('\n')
   // 光标落在第一格内容处，方便直接开始输入。
-  return 插入块(view, 骨架, 2)
+  return insertBlock(view, 骨架, 2)
 }
 
 export function 插入前置元数据(view: EditorView): boolean {
@@ -346,7 +346,7 @@ export function wrapInline(view: EditorView, before: string, after: string = bef
 }
 
 /** 插入或编辑链接：选中文字时包裹为 `[文字](地址)` 并选中地址占位。 */
-export function 插入链接(view: EditorView): boolean {
+export function insertLink(view: EditorView): boolean {
   const state = view.state
   const main = state.selection.main
   const text = main.empty ? '' : state.sliceDoc(main.from, main.to)
@@ -423,7 +423,7 @@ export function clearFormat(view: EditorView): boolean {
  *
  * @returns 不在引用行上时返回 false，回车照常交给别的处理器
  */
-export function 继续引用块(view: EditorView): boolean {
+export function continueQuote(view: EditorView): boolean {
   const state = view.state
   const selection = state.selection.main
   if (!selection.empty) return false
@@ -470,7 +470,7 @@ export function 继续引用块(view: EditorView): boolean {
  *
  * @returns 条件不满足时返回 false，把回车让给别的处理器
  */
-export function 继续代码围栏(view: EditorView): boolean {
+export function continueCodeFence(view: EditorView): boolean {
   const state = view.state
   const selection = state.selection.main
   if (!selection.empty) return false
@@ -531,7 +531,7 @@ export function 继续代码围栏(view: EditorView): boolean {
  * @returns 光标不在围栏内时返回 false，把 Escape 让给别的处理器
  *          （关面板、清选区、退出全屏……）。
  */
-export function 跳出代码块(view: EditorView): boolean {
+export function exitCodeBlock(view: EditorView): boolean {
   const state = view.state
   const cursor = state.selection.main
 

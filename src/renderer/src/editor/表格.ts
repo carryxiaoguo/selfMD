@@ -91,12 +91,12 @@ function wholeTable(
  * 新行沿用**原行的竖线位置与缩进**，这样列宽不会因为插入而跳。
  * 直接拼 `| | | |` 会让所有列宽重算，视觉上"跳一下"。
  */
-function makeEmptyRow(模板行文本: string): string {
-  const ranges = cellRanges(模板行文本)
-  if (ranges.length === 0) return 模板行文本
-  const 左缩进 = /^\s*/.exec(模板行文本)?.[0] ?? ''
-  const 前导竖线 = 模板行文本.trimStart().startsWith('|')
-  const 尾部竖线 = 模板行文本.trimEnd().endsWith('|')
+function makeEmptyRow(templateLineText: string): string {
+  const ranges = cellRanges(templateLineText)
+  if (ranges.length === 0) return templateLineText
+  const 左缩进 = /^\s*/.exec(templateLineText)?.[0] ?? ''
+  const 前导竖线 = templateLineText.trimStart().startsWith('|')
+  const 尾部竖线 = templateLineText.trimEnd().endsWith('|')
 
   const 段们: string[] = []
   for (let i = 0; i < ranges.length; i++) {
@@ -203,7 +203,7 @@ export function 表格增列(view: EditorView): boolean {
 
   const ranges = cellRanges(line.text)
   if (ranges.length === 0) return false
-  const 列 = Math.max(0, currentCellIndex(line.text, state.selection.main.head - line.from))
+  const col = Math.max(0, currentCellIndex(line.text, state.selection.main.head - line.from))
 
   const changes: { from: number; to: number; insert: string }[] = []
   for (let n = tbl.head; n <= tbl.tail; n++) {
@@ -211,7 +211,7 @@ export function 表格增列(view: EditorView): boolean {
     const thisRange = cellRanges(thisLine.text)
     if (thisRange.length === 0) continue
     // 插在目标列单元格的**前面**：竖线位置对齐，视觉上不会错位
-    const target = thisRange[Math.min(列, thisRange.length - 1)]
+    const target = thisRange[Math.min(col, thisRange.length - 1)]
     const insertAt = thisLine.from + target.start
     // 对齐行插 `---`，其余插空格，宽度与本列一致
     const width = Math.max(3, target.end - target.start)
@@ -233,14 +233,14 @@ export function 表格删列(view: EditorView): boolean {
 
   const ranges = cellRanges(line.text)
   if (ranges.length <= 1) return false
-  const 列 = Math.max(0, currentCellIndex(line.text, state.selection.main.head - line.from))
+  const col = Math.max(0, currentCellIndex(line.text, state.selection.main.head - line.from))
 
   const changes: { from: number; to: number }[] = []
   for (let n = tbl.head; n <= tbl.tail; n++) {
     const thisLine = state.doc.line(n)
     const thisRange = cellRanges(thisLine.text)
     if (thisRange.length === 0) continue
-    const target = thisRange[Math.min(列, thisRange.length - 1)]
+    const target = thisRange[Math.min(col, thisRange.length - 1)]
     // 连同前面那条竖线一起删，否则会留下 `||`
     let start = thisLine.from + target.start
     if (start > thisLine.from && thisLine.text[target.start - 1] === '|') start--
@@ -252,7 +252,7 @@ export function 表格删列(view: EditorView): boolean {
 }
 
 /** 设置列对齐。`对齐` 取 `left` / `center` / `right`。 */
-export function 表格对齐(view: EditorView, 对齐: 'left' | 'center' | 'right'): boolean {
+export function tableAlign(view: EditorView, alignKind: 'left' | 'center' | 'right'): boolean {
   const state = view.state
   const line = state.doc.lineAt(state.selection.main.head)
   if (!isTableRow(line.text)) return false
@@ -266,11 +266,11 @@ export function 表格对齐(view: EditorView, 对齐: 'left' | 'center' | 'righ
   if (!isAlignRow(定义行.text)) return false
 
   const ranges = cellRanges(定义行.text)
-  const 列 = Math.max(0, currentCellIndex(line.text, state.selection.main.head - line.from))
-  const target = ranges[Math.min(列, ranges.length - 1)]
+  const col = Math.max(0, currentCellIndex(line.text, state.selection.main.head - line.from))
+  const target = ranges[Math.min(col, ranges.length - 1)]
   if (!target) return false
 
-  const mark = 对齐 === 'left' ? ':---' : 对齐 === 'center' ? ':---:' : '---:'
+  const mark = alignKind === 'left' ? ':---' : alignKind === 'center' ? ':---:' : '---:'
   // 用标记填满该格原来的宽度，列宽不变
   const width = Math.max(3, target.end - target.start)
   const content = mark.padEnd(width, '-')

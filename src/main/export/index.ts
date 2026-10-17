@@ -7,7 +7,7 @@ import { 提取大纲, renderMarkdownToHtml } from '@shared/markdown-html'
 import { activeTheme } from '@shared/types'
 import { getAppPaths } from '../util/paths'
 import { getSettings } from '../services/settings'
-import { themePath, 主题自定义样式路径, 全局自定义样式路径 } from '../services/themes'
+import { themePath, themeUserCssPath, baseUserCssPath } from '../services/themes'
 import { 处理样式表 } from './css'
 
 /**
@@ -227,16 +227,16 @@ function tempDir(): string {
 async function 收集样式(): Promise<string> {
   const settings = getSettings()
   const id = activeTheme(settings)
-  const 部件: string[] = []
+  const partEl: string[] = []
 
   // 基础样式：带上设计变量与排版规则，否则导出的 HTML 无样式可依。
   // 它同时定义了两层变量契约（通用变量层 + 本项目层）。
   const variable = 读基础样式()
-  if (variable) 部件.push(variable)
+  if (variable) partEl.push(variable)
 
   const theme = themePath(id)
   if (theme && existsSync(theme)) {
-    部件.push(
+    partEl.push(
       await 处理样式表(readFileSync(theme, 'utf8'), {
         baseDir: getAppPaths().themes,
         导出模式: true
@@ -244,10 +244,10 @@ async function 收集样式(): Promise<string> {
     )
   }
 
-  for (const 自定义 of [全局自定义样式路径(), 主题自定义样式路径(id)]) {
+  for (const 自定义 of [baseUserCssPath(), themeUserCssPath(id)]) {
     if (自定义 && existsSync(自定义)) {
       // 用户自定义样式同样要处理：里面可能有 @import
-      部件.push(
+      partEl.push(
         await 处理样式表(readFileSync(自定义, 'utf8'), {
           baseDir: getAppPaths().themes,
           导出模式: true
@@ -256,7 +256,7 @@ async function 收集样式(): Promise<string> {
     }
   }
 
-  return 部件.join('\n')
+  return partEl.join('\n')
 }
 
 /** 基础样式表：优先读打包产物，开发时读源码目录。 */
@@ -361,14 +361,14 @@ async function 导出PDF(options: ExportOptions): Promise<exportResult> {
     // 等一帧，让字体与布局稳定下来；否则首行有时会挤出页面。
     await new Promise((done) => setTimeout(done, 120))
 
-    const 缓冲 = await win.webContents.printToPDF({
+    const buffer = await win.webContents.printToPDF({
       printBackground: true, // 与 print-color-adjust 同等重要
       margins: { top: 0.6, bottom: 0.6, left: 0.6, right: 0.6 },
       pageSize: 'A4'
     })
 
     mkdirSync(dirname(options.target), { recursive: true })
-    writeFileSync(options.target, 缓冲)
+    writeFileSync(options.target, buffer)
     return { success: true, filePath: options.target, error: null }
   } catch (error) {
     return {
@@ -385,14 +385,14 @@ async function 导出PDF(options: ExportOptions): Promise<exportResult> {
 // Pandoc
 // ---------------------------------------------------------------------------
 
-let 缓存的Pandoc路径: string | null | undefined
+let cachedPandocPath: string | null | undefined
 
 /** 探测 Pandoc 是否可用。结果缓存，避免每次导出都跑一次进程。 */
-export async function 检测Pandoc(): Promise<string | null> {
-  if (缓存的Pandoc路径 !== undefined) return 缓存的Pandoc路径
+export async function detectPandoc(): Promise<string | null> {
+  if (cachedPandocPath !== undefined) return cachedPandocPath
 
   const candidate = getSettings().pandocPath || 'pandoc'
-  缓存的Pandoc路径 = await new Promise<string | null>((done) => {
+  cachedPandocPath = await new Promise<string | null>((done) => {
     let childProc: ReturnType<typeof spawn>
     try {
       childProc = spawn(candidate, ['--version'], { windowsHide: true })
@@ -405,8 +405,8 @@ export async function 检测Pandoc(): Promise<string | null> {
       output += String(block)
     })
     childProc.on('error', () => done(null))
-    childProc.on('close', (码) => {
-      if (码 !== 0) {
+    childProc.on('close', (codePx) => {
+      if (codePx !== 0) {
         done(null)
         return
       }
@@ -416,12 +416,12 @@ export async function 检测Pandoc(): Promise<string | null> {
     })
   })
 
-  return 缓存的Pandoc路径
+  return cachedPandocPath
 }
 
 /** 取 Pandoc 的版本号字符串，供界面显示。 */
 export async function 取Pandoc版本(): Promise<string | null> {
-  const filePath = await 检测Pandoc()
+  const filePath = await detectPandoc()
   if (!filePath) return null
   return new Promise((done) => {
     const childProc = spawn(filePath, ['--version'], { windowsHide: true })
@@ -446,7 +446,7 @@ const PANDOC格式: Record<string, string> = {
 }
 
 async function 导出经Pandoc(options: ExportOptions): Promise<exportResult> {
-  const program = await 检测Pandoc()
+  const program = await detectPandoc()
   if (!program) {
     return {
       success: false,
@@ -500,13 +500,13 @@ async function 导出经Pandoc(options: ExportOptions): Promise<exportResult> {
     childProc.on('error', (error) => {
       done({ success: false, filePath: null, error: `Pandoc 执行失败：${error.message}` })
     })
-    childProc.on('close', (码) => {
-      if (码 === 0) done({ success: true, filePath: options.target, error: null })
+    childProc.on('close', (codePx) => {
+      if (codePx === 0) done({ success: true, filePath: options.target, error: null })
       else {
         done({
           success: false,
           filePath: null,
-          error: `Pandoc 返回错误码 ${码}：${错误输出.trim().slice(0, 400) || '（无输出）'}`
+          error: `Pandoc 返回错误码 ${codePx}：${错误输出.trim().slice(0, 400) || '（无输出）'}`
         })
       }
     })
@@ -519,7 +519,7 @@ async function 导出经Pandoc(options: ExportOptions): Promise<exportResult> {
 
 /** 各格式是否可用（供菜单决定是否置灰）。 */
 export async function 可用格式(): Promise<Record<导出格式, boolean>> {
-  const hasPandoc = (await 检测Pandoc()) !== null
+  const hasPandoc = (await detectPandoc()) !== null
   return {
     html: true,
     'html-plain': true,
@@ -532,7 +532,7 @@ export async function 可用格式(): Promise<Record<导出格式, boolean>> {
   }
 }
 
-export async function 执行导出(options: ExportOptions): Promise<exportResult> {
+export async function runExport(options: ExportOptions): Promise<exportResult> {
   try {
     if (options.format === 'pdf') return await 导出PDF(options)
 

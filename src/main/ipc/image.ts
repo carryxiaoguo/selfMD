@@ -7,7 +7,7 @@ import {
   stripExt,
   takeFileName,
   uniqueFileName,
-  扩展名由类型,
+  extByKind,
   normalizePath,
   isImageFile,
   类型由扩展名
@@ -49,12 +49,12 @@ function 读剪贴板(): ClipboardContent {
       if (paths.length > 0) return { kind: '文件', filePath: paths }
     }
 
-    const 位图 = clipboard.readImage()
-    if (位图 && !位图.isEmpty()) {
-      const size = 位图.getSize()
+    const bitmap = clipboard.readImage()
+    if (bitmap && !bitmap.isEmpty()) {
+      const size = bitmap.getSize()
       return {
         kind: '位图',
-        data: 位图.toPNG().toString('base64'),
+        data: bitmap.toPNG().toString('base64'),
         width: size.width,
         height: size.height
       }
@@ -83,11 +83,11 @@ function 安排路径(dir: string, expectedName: string): string {
  * 没有后缀的路径上，也有些把 `.jpg` 实际返回 PNG 内容。有类型就按类型走。
  */
 function 校正扩展名(displayName: string, kind: string | null): string {
-  const 应由类型 = 扩展名由类型(kind)
-  if (!应由类型) return displayName
-  const 现有 = 类型由扩展名(displayName)
-  if (!现有) return displayName + 应由类型
-  return 现有 === 应由类型 ? displayName : stripExt(displayName) + 应由类型
+  const shouldByKind = extByKind(kind)
+  if (!shouldByKind) return displayName
+  const existing = 类型由扩展名(displayName)
+  if (!existing) return displayName + shouldByKind
+  return existing === shouldByKind ? displayName : stripExt(displayName) + shouldByKind
 }
 
 export function registerImageIpc(): void {
@@ -156,12 +156,12 @@ export function registerImageIpc(): void {
         }
 
         const kind = response.headers.get('content-type')
-        const 缓冲 = Buffer.from(await response.arrayBuffer())
-        if (缓冲.length === 0) return failure('下载内容为空')
-        if (缓冲.length > 下载上限字节) return failure('图片过大')
+        const buffer = Buffer.from(await response.arrayBuffer())
+        if (buffer.length === 0) return failure('下载内容为空')
+        if (buffer.length > 下载上限字节) return failure('图片过大')
 
         const filePath = 安排路径(dir, 校正扩展名(displayName, kind))
-        writeFileSync(filePath, 缓冲)
+        writeFileSync(filePath, buffer)
         return { success: true, filePath: normalizePath(filePath), kind, error: null }      } catch (error) {
         return failure(error instanceof Error ? error.message : String(error))
       }

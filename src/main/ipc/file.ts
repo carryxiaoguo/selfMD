@@ -201,7 +201,7 @@ export function registerFileIpc(): void {
       'target'
     ])
 
-    const result: { filePath: string; nameText: string; 修改时间: number; 大小: number }[] = []
+    const result: { filePath: string; nameText: string; mtime: number; sizeBytes: number }[] = []
     let truncated = false
 
     const 走 = (dir: string, depth: number): void => {
@@ -236,8 +236,8 @@ export function registerFileIpc(): void {
         result.push({
           filePath: 全路径,
           nameText: item.name,
-          修改时间: info.mtimeMs,
-          大小: info.size
+          mtime: info.mtimeMs,
+          sizeBytes: info.size
         })
       }
     }

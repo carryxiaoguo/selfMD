@@ -165,7 +165,7 @@ export async function 上传并回填(
     changes: diffCount,
     // 光标位置按"它前面插入了多少字符"平移，否则大批替换后光标会跳回文首
     selection: EditorSelection.cursor(
-      cursor + diffCount.filter((改) => 改.from < cursor).reduce((和, 改) => 和 + (改.insert.length - (改.to - 改.from)), 0)
+      cursor + diffCount.filter((amend) => amend.from < cursor).reduce((和, amend) => 和 + (amend.insert.length - (amend.to - amend.from)), 0)
     ),
     annotations: isolatedUndo,
     userEvent: 'input.uploadImage'

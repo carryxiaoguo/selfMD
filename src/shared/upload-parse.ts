@@ -141,7 +141,7 @@ export function buildUploadCmd(
   uploader: uploaderType,
   文件路径: string,
   config: {
-    自定义命令: string
+    customCommand: string
     用户数据目录: string
     platform: 'win32' | 'darwin' | 'linux'
   }
@@ -160,14 +160,14 @@ export function buildUploadCmd(
     case 'picgo-cli': {
       // Windows 下必须先切到 UTF-8 代码页，否则 PicGo 输出的中文路径会乱码
       const prefixText = config.platform === 'win32' ? 'chcp 65001>nul && ' : ''
-      const 子目录 =
+      const subDir =
         config.platform === 'win32' ? 'win64' : config.platform === 'darwin' ? 'mac' : 'linux'
       const extension = config.platform === 'win32' ? '.exe' : ''
-      const program = `${config.用户数据目录}/picgo/${子目录}/picgo${extension}`
+      const program = `${config.用户数据目录}/picgo/${subDir}/picgo${extension}`
       return `${prefixText}${quoteChar(program)} u ${quoteChar(filePath)}`
     }
     case 'custom': {
-      const template = config.自定义命令.trim()
+      const template = config.customCommand.trim()
       if (template.length === 0) return null
       // 占位符按 的规格：`${filepath}` 与 `${filename}`。
       // 文件名单独给一份，许多图床脚本只吃文件名。

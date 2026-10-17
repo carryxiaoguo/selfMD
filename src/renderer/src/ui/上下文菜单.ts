@@ -34,12 +34,12 @@ export interface menuItem {
 }
 
 let 当前菜单: HTMLElement | null = null
-let 当前子菜单: HTMLElement | null = null
+let activeSubmenu: HTMLElement | null = null
 let 清理函数: (() => void) | null = null
 
 /** 关掉当前菜单；没有菜单时什么也不做。 */
 export function closeMenu(): void {
-  收起子菜单()
+  closeSubmenu()
   清理函数?.()
   清理函数 = null
   当前菜单?.remove()
@@ -51,9 +51,9 @@ export function isMenuOpen(): boolean {
   return 当前菜单 !== null
 }
 
-function 收起子菜单(): void {
-  当前子菜单?.remove()
-  当前子菜单 = null
+function closeSubmenu(): void {
+  activeSubmenu?.remove()
+  activeSubmenu = null
 }
 
 /**
@@ -121,8 +121,8 @@ function 建立菜单(items: menuItem[], 是子菜单 = false): HTMLElement {
       // 否则指针一离开行、还没进子菜单，子菜单就没了，永远点不到。
       line.addEventListener('mouseleave', (event) => {
         const related = event.relatedTarget as Node | null
-        if (related && 当前子菜单?.contains(related)) return
-        收起子菜单()
+        if (related && activeSubmenu?.contains(related)) return
+        closeSubmenu()
       })
 
       menu.append(line)
@@ -131,7 +131,7 @@ function 建立菜单(items: menuItem[], 是子菜单 = false): HTMLElement {
 
     // 鼠标扫过任何一行都收起子菜单——同层的兄弟行展开新子菜单前，
     // 旧的那个必须先消失，否则屏幕上会同时挂两层。
-    line.addEventListener('mouseenter', 收起子菜单)
+    line.addEventListener('mouseenter', closeSubmenu)
 
     if (可点) {
       line.addEventListener('click', (event) => {
@@ -150,7 +150,7 @@ function 建立菜单(items: menuItem[], 是子菜单 = false): HTMLElement {
 
 /** 在某一行右侧展开子菜单；右边放不下就翻到左侧。 */
 function 展开子菜单(宿主行: HTMLElement, items: menuItem[]): void {
-  收起子菜单()
+  closeSubmenu()
 
   const child = 建立菜单(items, true)
   document.body.append(child)
@@ -168,10 +168,10 @@ function 展开子菜单(宿主行: HTMLElement, items: menuItem[]): void {
   child.addEventListener('mouseleave', (event) => {
     const related = event.relatedTarget as Node | null
     if (related && (child.contains(related) || 宿主行.contains(related))) return
-    收起子菜单()
+    closeSubmenu()
   })
 
-  当前子菜单 = child
+  activeSubmenu = child
 }
 
 /**
@@ -201,7 +201,7 @@ export function popupMenu(position: { x: number; y: number }, items: menuItem[])
     const target = event.target as Node
     // 子菜单挂在 body 上，不在父菜单的 contains 里，
     // 漏掉它会让"点子菜单里的项"先触发关闭、动作再也执行不到。
-    if (menu.contains(target) || 当前子菜单?.contains(target)) return
+    if (menu.contains(target) || activeSubmenu?.contains(target)) return
     closeMenu()
   }
   const 按键 = (event: KeyboardEvent): void => {

@@ -1,6 +1,6 @@
 import type { EditorState } from '@codemirror/state'
-import { 扫描行内公式 } from '@shared/数学'
-import { 扫描渲染标点 } from '../smart-punctuation'
+import { scanInlineMath } from '@shared/数学'
+import { scanPunct } from '../smart-punctuation'
 import {
   blockLineStyles,
   代码块行装饰,
@@ -20,10 +20,10 @@ import {
   任务框,
   语言标签,
   代码块头部,
-  提示标签,
+  calloutHint,
   计算层级
 } from './widgets'
-import { 内置字体, infoRoundTrips, 解析围栏首行 } from '@shared/代码块信息'
+import { BUILTIN_FONTS, infoRoundTrips, parseFenceFirstLine } from '@shared/代码块信息'
 
 /**
  * 块级装饰。
@@ -99,13 +99,13 @@ export function 检测数学块(state: EditorState): manualBlock[] {
       result.push({ from: line.from, to: line.to, lineNoSet: new Set([no]) })
       continue
     }
-    for (let 终号 = no + 1; 终号 <= state.doc.lines; 终号++) {
-      const 终行 = state.doc.line(终号)
+    for (let endNo = no + 1; endNo <= state.doc.lines; endNo++) {
+      const 终行 = state.doc.line(endNo)
       if (!终行.text.trim().endsWith('$$')) continue
       const lineNoSet = new Set<number>()
-      for (let n = no; n <= 终号; n++) lineNoSet.add(n)
+      for (let n = no; n <= endNo; n++) lineNoSet.add(n)
       result.push({ from: line.from, to: 终行.to, lineNoSet })
-      no = 终号
+      no = endNo
       break
     }
   }
@@ -126,7 +126,7 @@ function 落在手工块内(position: number, 手工块列表: manualBlock[]): b
 export interface 手工扫描结果 {
   frontMatter: manualBlock | null
   mathBlock: manualBlock[]
-  全部块: manualBlock[]
+  allBlocks: manualBlock[]
 }
 
 /** 第一遍：处理语法树里不存在的两类块，并把它们占用的行登记好。 */
@@ -134,9 +134,9 @@ export function 扫描手工块(state: EditorState, context: BuildContext): 手�
   const frontMatter = 检测前置元数据(state)
   const mathBlock = 检测数学块(state)
 
-  const 全部块: manualBlock[] = []
-  if (frontMatter) 全部块.push(frontMatter)
-  全部块.push(...mathBlock)
+  const allBlocks: manualBlock[] = []
+  if (frontMatter) allBlocks.push(frontMatter)
+  allBlocks.push(...mathBlock)
 
   for (const no of frontMatter?.lineNoSet ?? []) {
     addLineDeco(context, state.doc.line(no).from, blockLineStyles.frontMatter)
@@ -155,7 +155,7 @@ export function 扫描手工块(state: EditorState, context: BuildContext): 手�
     // 这里保留行装饰：它对插件是合法的，且与替换装饰互不冲突。
   }
 
-  return { frontMatter, mathBlock, 全部块 }
+  return { frontMatter, mathBlock, allBlocks }
 }
 
 /** 第二遍：按语法树节点名分派块级装饰。返回是否已处理该节点。 */
@@ -166,10 +166,10 @@ export function 处理块级(
   手工: 手工扫描结果
 ): boolean {
   // 落在手工块内部的节点交给手工扫描处理（主要是别把 `---` 画成水平线）。
-  if (落在手工块内(node.from, 手工.全部块)) return true
+  if (落在手工块内(node.from, 手工.allBlocks)) return true
 
   const lineNo = state.doc.lineAt(node.from).number
-  const onActiveLine = context.活动行.has(lineNo)
+  const onActiveLine = context.activeLines.has(lineNo)
 
   switch (node.name) {
     // ---------------------------------------------------------- 段落 ----
@@ -181,7 +181,7 @@ export function 处理块级(
       const 段落起 = node.from
       const originalText = state.sliceDoc(node.from, node.to)
       if (originalText.includes('$')) {
-        for (const range of 扫描行内公式(originalText, 段落起, 行内公式已启用())) {
+        for (const range of scanInlineMath(originalText, 段落起, 行内公式已启用())) {
           // 光标落在公式内部时露出源码，方便修改
           if (cursor.from >= range.from && cursor.to <= range.to + 1) continue
           context.entry.push({
@@ -200,7 +200,7 @@ export function 处理块级(
       // 这与行内标记"活动行露出源码"是同一条规则。
       if (渲染标点已启用() && !onActiveLine) {
         const 代码区间 = 收集行内代码区间(node)
-        for (const segment of 扫描渲染标点(originalText, 段落起)) {
+        for (const segment of scanPunct(originalText, 段落起)) {
           // 行内代码里的引号与连字符是内容，不能替换
           if (代码区间.some((sel) => segment.from >= sel.from && segment.to <= sel.to)) continue
           context.entry.push({
@@ -264,11 +264,11 @@ export function 处理块级(
       }
 
       // 首行的标记换成一个小标签；光标停在这一行时露源码，方便改回普通引用
-      if (mark && !context.活动行.has(firstLine.number)) {
+      if (mark && !context.activeLines.has(firstLine.number)) {
         context.entry.push({
           from: firstLine.from,
           to: firstLine.to,
-          deco: replaceWith(new 提示标签()),
+          deco: replaceWith(new calloutHint()),
           rank: 2
         })
       }
@@ -334,8 +334,8 @@ export function 处理块级(
       const lastLine = state.doc.lineAt(Math.max(node.from, node.to - 1))
       // 配色与字体都取自该块自己的信息串（`style=dark font=consolas` 之类），
       // 不是全局设置——同一篇文档里不同代码块用不同外观是合理需求
-      const blockInfo = 解析围栏首行(state.sliceDoc(firstLine.from, firstLine.to))
-      const fontStack = 内置字体.find((item) => item.value === blockInfo.font)?.family ?? ''
+      const blockInfo = parseFenceFirstLine(state.sliceDoc(firstLine.from, firstLine.to))
+      const fontStack = BUILTIN_FONTS.find((item) => item.value === blockInfo.font)?.family ?? ''
       // 行号只编正文行：首尾围栏不是代码，给它们编号会让人以为
       // "第 1 行"是反引号那一行
       let bodyIndex = 0
@@ -381,7 +381,7 @@ export function 处理块级(
         })
         // 记下来，让下面处理 ``` 与语言标识时跳过——同一段文本不能被两条
         // 替换装饰覆盖，CodeMirror 会因区间重叠拒绝整份装饰。
-        context.已换头部栏.add(firstLine.from)
+        context.headerReplaced.add(firstLine.from)
       }
 
       return false
@@ -405,7 +405,7 @@ export function 处理块级(
       const parent = node.parent
       if (parent?.name !== 'FencedCode') return true
       // 首行整行已经是头部栏了，这里的 ``` 不能再推一条重叠的替换装饰
-      if (context.已换头部栏.has(state.doc.lineAt(node.from).from)) return true
+      if (context.headerReplaced.has(state.doc.lineAt(node.from).from)) return true
       context.entry.push({ from: node.from, to: node.to, deco: hidden, rank: 1 })
       return true
     }
@@ -414,8 +414,8 @@ export function 处理块级(
       // 语言标识由头部栏里的下拉呈现，这里折叠掉。可见性规则同上。
       const parent = node.parent
       if (parent?.name !== 'FencedCode') return true
-      if (context.已换头部栏.has(state.doc.lineAt(node.from).from)) return true
-      if (!context.活动行.has(state.doc.lineAt(node.from).number)) {
+      if (context.headerReplaced.has(state.doc.lineAt(node.from).from)) return true
+      if (!context.activeLines.has(state.doc.lineAt(node.from).number)) {
         context.entry.push({ from: node.from, to: node.to, deco: hidden, rank: 1 })
       }
       return true
@@ -429,7 +429,7 @@ export function 处理块级(
       // 语言此时已经在下拉里显示，不再需要行尾的标签。
       const parent = node.parent
       if (!parent) return true
-      if (context.已换头部栏.has(state.doc.lineAt(parent.from).from)) return true
+      if (context.headerReplaced.has(state.doc.lineAt(parent.from).from)) return true
 
       const 语言节点 = 找子节点(parent, 'CodeInfo')
       const language = 语言节点 ? state.sliceDoc(语言节点.from, 语言节点.to).trim() : ''

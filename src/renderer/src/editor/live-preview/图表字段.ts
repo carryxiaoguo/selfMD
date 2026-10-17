@@ -75,12 +75,12 @@ export function 建立图表字段(options: 图表字段选项): Extension {
 
       const language = 取围栏语言(state, node)
       if (!图表语言.has(language)) return
-      const 源码 = 取围栏正文(state, node).trim()
-      if (源码.length === 0) return
+      const sourceCode = 取围栏正文(state, node).trim()
+      if (sourceCode.length === 0) return
 
       range.push(
         Decoration.replace({
-          widget: new 图表(源码, 暗色),
+          widget: new 图表(sourceCode, 暗色),
           block: true
         }).range(node.from, node.to)
       )

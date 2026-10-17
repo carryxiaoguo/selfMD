@@ -1,4 +1,4 @@
-import { PrefsSchema, 校验设置表, type 设置项 } from '@shared/settings-schema'
+import { PrefsSchema, validateSchema, type SettingItem } from '@shared/settings-schema'
 import type { Settings } from '@shared/types'
 
 /**
@@ -14,7 +14,7 @@ import type { Settings } from '@shared/types'
 export interface 偏好设置依赖 {
   取设置: () => Settings
   /** 改一项设置。返回更新后的完整设置。 */
-  应用设置: (补丁: Partial<Settings>) => Promise<Settings>
+  应用设置: (patchResult: Partial<Settings>) => Promise<Settings>
   /** 只读项（例如当前主题）要显示的值。 */
   取只读值?: (key: keyof Settings) => string | null
 }
@@ -41,7 +41,7 @@ export class 偏好设置面板 {
    *                 还得自己往下找，等于没定位。
    */
   open(定位分区?: string): void {
-    const 问题 = 校验设置表()
+    const 问题 = validateSchema()
     if (问题.length > 0) {
       // 表里写了不存在的键：这是开发期错误，必须响亮地报出来。
       // 静默渲染的后果是"这一项点了没反应"，极难排查。
@@ -65,12 +65,12 @@ export class 偏好设置面板 {
     const panel = document.createElement('div')
     panel.className = 'selfmd-prefs'
 
-    const 左栏 = document.createElement('div')
-    左栏.className = 'prefs-side'
+    const leftPane = document.createElement('div')
+    leftPane.className = 'prefs-side'
     const title = document.createElement('div')
     title.className = 'prefs-title'
     title.textContent = '偏好设置'
-    左栏.append(title)
+    leftPane.append(title)
 
     PrefsSchema.forEach((section, subscript) => {
       const label = document.createElement('button')
@@ -85,7 +85,7 @@ export class 偏好设置面板 {
         if (input) input.value = ''
         this.repaint()
       })
-      左栏.append(label)
+      leftPane.append(label)
     })
 
     const 右栏 = document.createElement('div')
@@ -101,24 +101,24 @@ export class 偏好设置面板 {
       this.searchTerm = search.value.trim()
       this.repaint()
     })
-    const 关闭钮 = document.createElement('button')
-    关闭钮.className = 'selfmd-btn'
-    关闭钮.type = 'button'
-    关闭钮.textContent = '关闭'
-    关闭钮.addEventListener('click', () => this.close())
-    搜索行.append(search, 关闭钮)
+    const closeBtn = document.createElement('button')
+    closeBtn.className = 'selfmd-btn'
+    closeBtn.type = 'button'
+    closeBtn.textContent = '关闭'
+    closeBtn.addEventListener('click', () => this.close())
+    搜索行.append(search, closeBtn)
 
     const content = document.createElement('div')
     content.className = 'prefs-body'
 
     右栏.append(搜索行, content)
-    panel.append(左栏, 右栏)
+    panel.append(leftPane, 右栏)
     overlay.append(panel)
     document.body.append(overlay)
 
     this.overlay = overlay
     this.contentArea = content
-    this.左栏区 = 左栏
+    this.左栏区 = leftPane
 
     // Esc 关闭；捕获阶段监听，避免编辑器抢先处理
     document.addEventListener('keydown', this.keyboard, true)
@@ -221,57 +221,57 @@ export class 偏好设置面板 {
       emptyText.textContent = `没有匹配「${this.searchTerm}」的设置项`
       block.append(emptyText)
     } else {
-      const 计数 = document.createElement('p')
-      计数.className = 'prefs-note'
-      计数.textContent = `找到 ${hit} 项`
-      block.prepend(计数)
+      const tally = document.createElement('p')
+      tally.className = 'prefs-note'
+      tally.textContent = `找到 ${hit} 项`
+      block.prepend(tally)
     }
 
     content.append(block)
   }
 
-  private 渲染一行(item: 设置项, 来源分区?: string): HTMLElement {
+  private 渲染一行(item: SettingItem, 来源分区?: string): HTMLElement {
     const line = document.createElement('div')
     line.className = 'prefs-row'
     line.dataset.key = String(item.key)
 
-    const 标签区 = document.createElement('div')
-    标签区.className = 'prefs-label'
+    const tabArea = document.createElement('div')
+    tabArea.className = 'prefs-label'
     const name = document.createElement('div')
     name.className = 'prefs-name'
     name.textContent = item.label
-    标签区.append(name)
+    tabArea.append(name)
     if (来源分区) {
       const origin = document.createElement('div')
       origin.className = 'prefs-source'
       origin.textContent = 来源分区
-      标签区.append(origin)
+      tabArea.append(origin)
     }
     if (item.description) {
       const description = document.createElement('div')
       description.className = 'prefs-hint'
       description.textContent = item.description
-      标签区.append(description)
+      tabArea.append(description)
     }
 
     const 控件区 = document.createElement('div')
     控件区.className = 'prefs-control'
     控件区.append(this.渲染控件(item))
 
-    line.append(标签区, 控件区)
+    line.append(tabArea, 控件区)
     return line
   }
 
-  private 渲染控件(item: 设置项): HTMLElement {
+  private 渲染控件(item: SettingItem): HTMLElement {
     const settings = this.deps.取设置()
     const currentValue = settings[item.key]
 
     if (item.kind === '开关') {
-      const 框 = document.createElement('input')
-      框.type = 'checkbox'
-      框.checked = Boolean(currentValue)
-      框.addEventListener('change', () => void this.提交(item.key, 框.checked))
-      return 框
+      const frame = document.createElement('input')
+      frame.type = 'checkbox'
+      frame.checked = Boolean(currentValue)
+      frame.addEventListener('change', () => void this.commitIt(item.key, frame.checked))
+      return frame
     }
 
     if (item.kind === '下拉') {
@@ -283,7 +283,7 @@ export class 偏好设置面板 {
         pick.append(条)
       }
       pick.value = String(currentValue ?? '')
-      pick.addEventListener('change', () => void this.提交(item.key, pick.value))
+      pick.addEventListener('change', () => void this.commitIt(item.key, pick.value))
       return pick
     }
 
@@ -303,7 +303,7 @@ export class 偏好设置面板 {
         if (!Number.isFinite(value)) return
         const 夹紧 = Math.min(item.maxValue ?? value, Math.max(item.minValue ?? value, value))
         if (夹紧 !== value) numItems.value = String(夹紧)
-        void this.提交(item.key, 夹紧)
+        void this.commitIt(item.key, 夹紧)
       })
       box.append(numItems)
       if (item.unit) {
@@ -335,7 +335,7 @@ export class 偏好设置面板 {
         ]
         // 回写规范化后的文本，让用户看到实际存下来的样子
         inputText.value = entry.join(', ')
-        void this.提交(item.key, entry)
+        void this.commitIt(item.key, entry)
       })
       return inputText
     }
@@ -351,11 +351,11 @@ export class 偏好设置面板 {
       inputText.readOnly = true
       inputText.classList.add('prefs-readonly')
     }
-    inputText.addEventListener('change', () => void this.提交(item.key, inputText.value))
+    inputText.addEventListener('change', () => void this.commitIt(item.key, inputText.value))
     return inputText
   }
 
-  private async 提交(key: keyof Settings, value: unknown): Promise<void> {
+  private async commitIt(key: keyof Settings, value: unknown): Promise<void> {
     try {
       await this.deps.应用设置({ [key]: value } as Partial<Settings>)
     } catch (error) {

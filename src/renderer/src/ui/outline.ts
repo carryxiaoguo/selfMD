@@ -34,7 +34,7 @@ const 标题节点 = /^(?:ATX|Setext)Heading(\d)$/
  * 大纲，重新解析在大文档上是明显的浪费。标题正文的清洗逻辑与导出侧共用
  * `清理标题文本`，避免两边对"收尾井号算不算正文"产生分歧。
  */
-export function 提取标题(state: EditorState): headingItem[] {
+export function extractHeadings(state: EditorState): headingItem[] {
   const result: headingItem[] = []
   const tree = syntaxTree(state)
 

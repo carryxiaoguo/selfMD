@@ -61,7 +61,7 @@ export function findBlockMath(docText: string): string | null {
  * @param 基准 文本在文档中的起始偏移（返回的区间是文档坐标）
  * @param 启用 设置里是否开启了行内公式；关闭时直接返回空数组
  */
-export function 扫描行内公式(docText: string, baseline: number, enable = true): 数学区间[] {
+export function scanInlineMath(docText: string, baseline: number, enable = true): 数学区间[] {
   if (!enable) return []
   const result: 数学区间[] = []
 

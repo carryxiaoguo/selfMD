@@ -46,7 +46,7 @@ export interface 上传失败项 {
   reason: string
 }
 
-export interface 上传结果 {
+export interface uploadResult {
   success: 上传成功项[]
   failure: 上传失败项[]
 }
@@ -141,7 +141,7 @@ async function 命令行上传(
   // 这也让"部分失败"成为可能——某一张图挂了不该让整批都失败。
   for (const filePath of paths) {
     const command = buildUploadCmd(uploader, filePath, {
-      自定义命令: settings.customImageUploader,
+      customCommand: settings.customImageUploader,
       用户数据目录: getAppPaths().userData.replace(/\\/g, '/'),
       platform: process.platform === 'win32' ? 'win32' : process.platform === 'darwin' ? 'darwin' : 'linux'
     })
@@ -175,7 +175,7 @@ async function 命令行上传(
  *
  * 返回一一对应的「原路径 → 远程地址」。上层据此改写文档里的引用。
  */
-export async function 上传图片(文件路径们: string[]): Promise<上传结果> {
+export async function 上传图片(文件路径们: string[]): Promise<uploadResult> {
   const settings = getSettings()
   const pendingUpload = 文件路径们.filter((filePath) => filePath.length > 0)
 

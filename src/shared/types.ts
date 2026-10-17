@@ -334,7 +334,7 @@ export function activeTheme(settings: Settings): string {
  * 任何一处漏掉模式判断，就会出现"设了始终显示、某个入口还是能关掉它"
  * 这种自相矛盾的状态。所有需要判断的地方都调这个函数。
  */
-export function 侧边栏可见(settings: Settings): boolean {
+export function sidebarShown(settings: Settings): boolean {
   if (settings.sidebarMode === 'always') return true
   if (settings.sidebarMode === 'never') return false
   return settings.sidebarVisible
@@ -359,7 +359,7 @@ export interface DraftInfo {
   /** 草稿写入时间（毫秒）。 */
   savedAt: number
   /** 原文件最后修改时间；文件不存在时为 null。 */
-  原文件时间: number | null
+  originalMtime: number | null
   /** 原文件的字符数；读不到时为 null。 */
   原文件字符数: number | null
   /** 草稿内容的字符数。 */

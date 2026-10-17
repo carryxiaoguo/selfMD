@@ -13,7 +13,7 @@ import type { headingItem } from './outline'
  * 每次启动都回到默认值很烦人。
  */
 
-export type 侧边栏标签 = 'outline' | 'files' | 'articles'
+export type sidebarTabName = 'outline' | 'files' | 'articles'
 
 /** 文档列表里的一项。 */
 export interface 文档列表项 {
@@ -35,7 +35,7 @@ export interface 侧边栏依赖 {
   /** 点击文档列表项的关闭按钮。 */
   关闭文档: (id: number) => void
   /** 折叠 / 展开大纲某一段（当前不做折叠，保留接口）。 */
-  保存状态: (state: { visibleNow: boolean; label: 侧边栏标签; widthPx: number }) => void
+  保存状态: (state: { visibleNow: boolean; label: sidebarTabName; widthPx: number }) => void
 }
 
 const 最小宽度 = 160
@@ -44,7 +44,7 @@ const 最大宽度 = 520
 export class sidebar {
   private host: HTMLElement
   private deps: 侧边栏依赖
-  private label: 侧边栏标签 = 'outline'
+  private label: sidebarTabName = 'outline'
   private widthPx = 260
   private visibleNow = false
   private outlinePanel!: HTMLElement
@@ -52,10 +52,10 @@ export class sidebar {
   private docsPanel!: HTMLElement
   /** 已打开的文档列表。由外层在多文档变化时推送。 */
   private 文档列表: 文档列表项[] = []
-  private 标签按钮 = new Map<侧边栏标签, HTMLButtonElement>()
+  private 标签按钮 = new Map<sidebarTabName, HTMLButtonElement>()
   private 当前高亮下标 = -1
   /** 已展开的目录路径。文件树每次重绘都读它，折叠状态才不会丢。 */
-  private 已展开 = new Set<string>()
+  private expanded = new Set<string>()
 
   constructor(host: HTMLElement, deps: 侧边栏依赖) {
     this.host = host
@@ -160,7 +160,7 @@ export class sidebar {
   }
 
   /** 在显示 / 隐藏之间切换，返回切换后的可见状态。 */
-  toggle(label?: 侧边栏标签): boolean {
+  toggle(label?: sidebarTabName): boolean {
     // 已经显示且点的是同一个标签 → 收起；否则切到该标签并显示。
     // 这是通行行为：再点一次「大纲」是收起侧边栏。
     if (this.visibleNow && (!label || label === this.label)) {
@@ -173,7 +173,7 @@ export class sidebar {
     return true
   }
 
-  setTab(label: 侧边栏标签): void {
+  setTab(label: sidebarTabName): void {
     this.label = label
     this.应用标签()
     this.deps.保存状态({ visibleNow: this.visibleNow, label, widthPx: this.widthPx })
@@ -425,9 +425,9 @@ export class sidebar {
       line.style.setProperty('--tree-depth', String(depth))
       if (item.isDirectory) line.classList.add('file-list-dir')
 
-      const 展开箭头 = document.createElement('span')
-      展开箭头.className = 'file-node-expander'
-      if (item.isDirectory) 展开箭头.textContent = this.已展开.has(item.path) ? '▾' : '▸'
+      const expandArrow = document.createElement('span')
+      expandArrow.className = 'file-node-expander'
+      if (item.isDirectory) expandArrow.textContent = this.expanded.has(item.path) ? '▾' : '▸'
 
       const icon = document.createElement('span')
       icon.className = 'file-node-icon'
@@ -441,7 +441,7 @@ export class sidebar {
       content.className = 'file-node-content'
       content.append(icon, title)
 
-      line.append(展开箭头, content)
+      line.append(expandArrow, content)
       container.append(line)
 
       if (item.isDirectory) {
@@ -449,18 +449,18 @@ export class sidebar {
         subContainer.className = 'file-tree-children'
         container.append(subContainer)
 
-        if (this.已展开.has(item.path)) {
+        if (this.expanded.has(item.path)) {
           await this.展开目录(item.path, subContainer, depth + 1)
         }
 
         line.addEventListener('click', async () => {
-          if (this.已展开.has(item.path)) {
-            this.已展开.delete(item.path)
+          if (this.expanded.has(item.path)) {
+            this.expanded.delete(item.path)
             subContainer.textContent = ''
-            展开箭头.textContent = '▸'
+            expandArrow.textContent = '▸'
           } else {
-            this.已展开.add(item.path)
-            展开箭头.textContent = '▾'
+            this.expanded.add(item.path)
+            expandArrow.textContent = '▾'
             subContainer.textContent = ''
             await this.展开目录(item.path, subContainer, depth + 1)
           }

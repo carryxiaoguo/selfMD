@@ -21,7 +21,13 @@
  *   node scripts/改英文标识符.mjs           只看统计（dry run）
  *   node scripts/改英文标识符.mjs --应用     真的改
  */
-import { readFileSync, writeFileSync, readdirSync, statSync } from 'node:fs'
+import {
+  readFileSync,
+  writeFileSync,
+  readdirSync,
+  statSync,
+  existsSync
+} from 'node:fs'
 import { join, dirname } from 'node:path'
 import ts from 'typescript'
 
@@ -73,6 +79,56 @@ for (const 名 of Object.keys(排除)) {
     delete 对照[名]
     被排除数++
   }
+}
+
+/**
+ * 从**计数对象自动生成**排除项。
+ *
+ * `main.ts` 里那个 `待统计` 对象的属性名最终会进日志
+ * （`渲染 DOM 计数：标题行=1 …`），而 `verify.mjs` 按中文正则匹配这些键。
+ * 手工维护排除清单迟早会漏——上一轮就漏了 `图表`：它同时是 widget 类名
+ * 和计数键，改完之后图表好端端渲染着，计数却全是 0。
+ *
+ * 所以直接从源码里把 `待统计` 的键抓出来，一律不参与改名。
+ * 这样以后往计数表里加项，不写任何配置也是安全的。
+ */
+function 收集计数键() {
+  const 目标 = join(根, 'src/renderer/src/main.ts')
+  if (!existsSync(目标)) return []
+  const 源 = readFileSync(目标, 'utf8')
+  const 树 = ts.createSourceFile(目标, 源, ts.ScriptTarget.Latest, true)
+  const 键 = []
+  const 访问 = (节点) => {
+    if (
+      ts.isVariableDeclaration(节点) &&
+      ts.isIdentifier(节点.name) &&
+      节点.name.text === '待统计' &&
+      节点.initializer &&
+      ts.isObjectLiteralExpression(节点.initializer)
+    ) {
+      for (const 属性 of 节点.initializer.properties) {
+        if (ts.isPropertyAssignment(属性)) {
+          if (ts.isIdentifier(属性.name)) 键.push(属性.name.text)
+          else if (ts.isStringLiteral(属性.name)) 键.push(属性.name.text)
+        }
+      }
+    }
+    ts.forEachChild(节点, 访问)
+  }
+  访问(树)
+  return 键
+}
+
+const 自动排除 = 收集计数键()
+let 自动数 = 0
+for (const 名 of 自动排除) {
+  if (对照[名]) {
+    delete 对照[名]
+    自动数++
+  }
+}
+if (自动排除.length > 0) {
+  console.log(`计数键自动排除：${自动数} 个（共 ${自动排除.length} 个计数键）`)
 }
 console.log(`表文件：${表文件们.join(', ')}  排除：${被排除数} 个`)
 

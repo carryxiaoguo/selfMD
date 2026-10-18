@@ -76,16 +76,29 @@ function parseMeta(css: string): { name: string | null; isDark: boolean } {
 }
 
 /**
- * 补齐缺失的内置主题。
+ * 同步内置主题到用户目录。
  *
  * **每次启动都跑，而不是只在首次启动时写一次。**
  * 早先用了一个标记文件做"写过就跳过"，结果是：后来新增内置主题时，
  * 已有用户的目录里永远不会有它们——而界面上只表现为"下拉框里少一项"，
  * 不报任何错，也就没人会发现。
  *
- * 已经存在的文件**不覆盖**：用户很可能改过内置主题的配色，
- * 覆盖等于悄悄丢掉他的改动。代价是内置主题日后的修改不会自动送达
- * 到老用户那里——这个取舍是有意的，改主题前请先确认值不值得。
+ * ## 这一步原来是"存在就不覆盖"，已经改成"内容不同就覆盖"
+ *
+ * 原来的顾虑是：用户可能直接改过内置主题的配色，覆盖等于悄悄丢掉他的改动。
+ *
+ * 但那个顾虑**不成立**——自定义有专门的落点：同目录下的
+ * `<主题>.user.css` 与 `base.user.css`，加载顺序保证它们覆盖内置规则。
+ * 于是"存在就不覆盖"不但没有保护到谁，反而造成一个更糟的后果：
+ * **内置主题的修改永远送不到老用户那里。**
+ *
+ * 这不是假设。黄皮纸的标题居中就是这么来的：源码里删掉了
+ * `text-align: center`，用户目录里那份 10-15 写下的 `parchment.css`
+ * 却一直带着它，重装、重启、清理缓存都不管用——因为文件一直在，
+ * 代码就一直跳过它。表现是"改了没用"，最难查的一类。
+ *
+ * 所以：内置主题以程序内的版本为准，内容不同就覆盖；
+ * 想改配色请写 `<主题>.user.css`。
  */
 export function seedBuiltinThemes(): void {
   const dir = getAppPaths().themes
@@ -93,13 +106,17 @@ export function seedBuiltinThemes(): void {
     mkdirSync(dir, { recursive: true })
 
     let freshlyWritten = 0
+    let updated = 0
     for (const theme of BUILTIN_THEMES) {
       const target = join(dir, `${theme.id}.css`)
-      if (existsSync(target)) continue
+      const 已有 = existsSync(target) ? readFileSync(target, 'utf8') : null
+      if (已有 === theme.css) continue
       writeFileSync(target, theme.css, 'utf8')
-      freshlyWritten += 1
+      if (已有 === null) freshlyWritten += 1
+      else updated += 1
     }
     if (freshlyWritten > 0) console.log(`[themes] 已补齐 ${freshlyWritten} 款内置主题`)
+    if (updated > 0) console.log(`[themes] 已更新 ${updated} 款内置主题`)
   } catch (err) {
     console.error('[themes] seeding failed:', err)
   }

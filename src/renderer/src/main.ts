@@ -535,12 +535,22 @@ async function runThemeSelfTest(): Promise<string> {
   const rootStyle = getComputedStyle(document.documentElement)
   const takeValue = (name: string): string => rootStyle.getPropertyValue(name).trim()
   const themeLinkEl = document.getElementById('theme-css') as HTMLLinkElement | null
+
+  // 标题必须**左对齐**。
+  // 黄皮纸里曾有一句 `text-align: center`，本意是"章题居中"的书籍排法，
+  // 但 `.cm-lp-heading` 匹配全部六级标题，正文里的每级小标题都被居中了；
+  // 而且编辑器里居中会让光标落点与右侧留白对不上，写着觉得字在飘。
+  // 这条断言就是防它回来。
+  const headingLineEl = document.querySelector('.cm-lp-heading') as HTMLElement | null
+  const headingAlign = headingLineEl ? getComputedStyle(headingLineEl).textAlign : '（无标题行）'
+
   const effectiveValues = [
     `底色=${takeValue('--bg-color')}`,
     `文字=${takeValue('--text-color')}`,
     `字号=${takeValue('--font-size')}`,
     `行高=${takeValue('--line-height')}`,
-    `版心=${takeValue('--content-max-width')}`
+    `版心=${takeValue('--content-max-width')}`,
+    `标题对齐=${headingAlign}`
   ].join(' ')
 
   // 样式表是否真的解析出了规则。跨源样式表读 cssRules 会抛，

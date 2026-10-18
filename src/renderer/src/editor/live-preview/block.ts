@@ -386,16 +386,25 @@ export function handleBlock(
 
       // --- 首行换成代码块头部栏 -------------------------------------------
       //
-      // **始终替换**，不再看光标在哪一行。原先的规则是"光标停在首行时露源码"，
-      // 但那样一来光标一进这个块，头部栏就消失、变成一行裸反引号，
-      // 块就"散"了——用户要的是**从头到尾一个整体**。
-      // 改语言本来就有下拉，不需要去改那串文本。
+      // **光标停在这一行时不换**，露出原文。
       //
-      // 唯一的例外是**信息串不能原样还原**的时候（比如手写的
-      // ```` ```{.python .numberLines} ````）。这种块照旧露源码：
-      // 用下拉去改它会把认不出的部分吃掉，那是**静默改坏用户的文档**。
+      // 这里原来是"始终替换"，理由是"光标一进这块头部栏就消失、块会散"。
+      // 那个理由对**已经写好的块**成立，但把**正在新建的块**毁了：
+      // 敲下三个反引号的那一瞬间，这一行就变成了头部栏，
+      // 用户再打 `python` 是打不进去的——他正对着一排下拉框。
+      // 于是"```语言 再回车"这条路彻底断了，只能事后去下拉里选，
+      // 而下拉里只有内置语言，写别的语言就没办法。
+      //
+      // 现在跟 Typora 一致：光标在这一行 → 看到 ```` ```python ```` 原文，随便打；
+      // 回车（或点到别处）→ 光标离开这一行 → 变成头部栏，块合成一个整体。
+      //
+      // 另一个例外仍然是**信息串不能原样还原**的时候（手写的
+      // ```` ```{.python .numberLines} ````）：那种块永远露源码，
+      // 用下拉去改会把认不出的部分吃掉，那是**静默改坏用户的文档**。
+      const selection = state.selection.main
+      const cursorOnFenceLine = selection.from >= firstLine.from && selection.to <= firstLine.to
       const rawInfo = state.sliceDoc(firstLine.from, firstLine.to)
-      if (infoRoundTrips(rawInfo, blockInfo)) {
+      if (!cursorOnFenceLine && infoRoundTrips(rawInfo, blockInfo)) {
         const info = blockInfo
         context.entry.push({
           from: firstLine.from,
@@ -436,6 +445,14 @@ export function handleBlock(
       if (parent?.name !== 'FencedCode') return true
       // 首行整行已经是头部栏了，这里的 ``` 不能再推一条重叠的替换装饰
       if (context.headerReplaced.has(state.doc.lineAt(node.from).from)) return true
+      // **光标正停在这一行时不要折叠。**
+      //
+      // 上面那段"任何情况下都别看到 ```"说的是**写完之后**的阅读状态；
+      // 但正在新建一个块时，光标就在这一行上，此时把反引号藏掉，
+      // 用户看到的是一行莫名其妙的内容，也没法确认自己打的是 ``` 还是 ````。
+      // Typora 在这一行显示的就是原文。折叠与否跟着"是不是活动行"走，
+      // 离开这一行立刻收起。
+      if (context.activeLines.has(state.doc.lineAt(node.from).number)) return true
       context.entry.push({ from: node.from, to: node.to, deco: hidden, rank: 1 })
       return true
     }

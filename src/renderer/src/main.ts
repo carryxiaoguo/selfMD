@@ -1352,6 +1352,27 @@ async function runCodeHeaderSelfTest(): Promise<string> {
     `回车出块=${newlineResult && isClosed ? '对' : `错(${JSON.stringify(docText)})`} 出现头部栏=${headerAppeared ? '对' : '错'}`
   )
 
+  // --- 光标回到围栏那一行时必须露出原文 -------------------------------
+  //
+  // 这条覆盖"```语言 再回车"这条路：敲下三个反引号后光标还在那一行，
+  // 若此时就换成头部栏，用户没法把语言打进去——下拉里只有内置语言，
+  // 写别的语言就彻底没办法了。所以光标在围栏行时**必须**是原文。
+  {
+    const 首行 = view.state.doc.line(1)
+    view.dispatch({ selection: { anchor: 首行.to } })
+    await new Promise((done) => setTimeout(done, 80))
+    const 光标在围栏行有头部 = document.querySelectorAll('.cm-w-codehead').length > 0
+    const 原文可见 = /\`\`\`py/.test(view.contentDOM.textContent ?? '')
+    // 再把光标移到正文行，头部栏应当回来
+    const 正文行 = view.state.doc.line(2)
+    view.dispatch({ selection: { anchor: 正文行.from } })
+    await new Promise((done) => setTimeout(done, 80))
+    const 移开后头部回来 = document.querySelectorAll('.cm-w-codehead').length > 0
+    result.push(
+      `围栏行露原文=${!光标在围栏行有头部 && 原文可见 ? '对' : '错'} 移开后出头部=${移开后头部回来 ? '对' : '错'}`
+    )
+  }
+
   view.setState(backup)
   await new Promise((done) => setTimeout(done, 60))
   return result.join(' ')

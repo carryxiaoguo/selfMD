@@ -717,19 +717,42 @@ body.live-preview .cm-md-marker-hidden {
 
 /* --- 表格 --------------------------------------------------------------- */
 
-.cm-lp-table {
+/* ## 表格必须用等宽字体
+ *
+ * 表格在实时预览里显示的是**源码本身**（`|` 换成 `│`、对齐定义行折叠成一条线），
+ * 而 Markdown 表格的列对齐完全依赖源文件里用空格补齐的宽度。
+ *
+ * 比例字体下每个字符宽度不同，那些空格就白补了——列会参差不齐，
+ * 一张十几行的表看起来就是"糊成一片"。这不是渲染 bug，是字体选错了：
+ * **空格对齐只在等宽字体里成立**。
+ *
+ * 表格里没有中文标点的排版需求，等宽不影响可读性；字号略小一点，
+ * 让它在正文里显得是一块"数据"而不是又一段话。
+ * 缩进与字距一起给足，保证 `│ 甲 │ 乙 │` 的竖线上下对得齐。
+ */
+.cm-editor .cm-line.cm-lp-table,
+.cm-editor .cm-line.cm-lp-table-head {
+  font-family: var(--font-mono);
+  font-size: 0.92em;
   font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+}
+
+/* 对齐定义行的字号必须是 0（它要折叠成一条线）。
+   注意不能再写进上面那条合并规则里——同一层级里后面的 font-size 会把这里压掉，
+   而 `.cm-lp-table-sep {}` 这种一级选择器又压不过 `.cm-editor .cm-line`。
+   所以只能同样用两级选择器单独写。这个陷阱本文件里已经踩到第三次。 */
+.cm-editor .cm-line.cm-lp-table-sep {
+  font-family: var(--font-mono);
+  font-size: 0;
+  line-height: 0.35;
+  letter-spacing: 0;
+  border-bottom: 2px solid var(--border);
 }
 
 .cm-lp-table-head {
   font-weight: 600;
-}
-
-.cm-lp-table-sep {
-  /* 对齐定义行被折叠成零宽，用底边框充当表头分隔线 */
-  border-bottom: 2px solid var(--border);
-  font-size: 0.5em;
-  line-height: 0.5;
+  color: var(--text-primary);
 }
 
 /* --- 水平线 ------------------------------------------------------------- */

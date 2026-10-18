@@ -17,7 +17,16 @@ import { fileURLToPath } from 'node:url'
 const 项目根 = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 
 /** 不参与检查的目录：第三方依赖、构建产物、外部证据（含二进制）。 */
-const 跳过目录 = ['node_modules', 'out', 'dist', 'release', '.git', 'evidence']
+const 跳过目录 = ['node_modules', 'out', 'dist', '.git', 'evidence']
+
+/**
+ * 按前缀跳过的目录。
+ *
+ * 构建产物的目录名是 electron-builder 决定的，换一次输出目录就多一个
+ * （`release2` 就漏过一次，结果一整个 Chromium 的 LICENSE 文件被当成本项目
+ * 的源码来检查，报了 78 个"乱码"）。用前缀匹配，以后换名字也不会漏。
+ */
+const 跳过前缀 = ['release']
 
 /** 参与检查的文本扩展名。 */
 const 文本扩展 = /\.(ts|tsx|js|mjs|cjs|md|css|json|html|yaml|yml|txt)$/
@@ -26,6 +35,7 @@ const 文件列表 = []
 function 遍历(目录) {
   for (const 项 of readdirSync(目录, { withFileTypes: true })) {
     if (跳过目录.includes(项.name)) continue
+    if (跳过前缀.some((pre) => 项.name.startsWith(pre))) continue
     const 全 = join(目录, 项.name)
     if (项.isDirectory()) 遍历(全)
     else if (文本扩展.test(项.name) || 项.name === '.gitignore') 文件列表.push(全)

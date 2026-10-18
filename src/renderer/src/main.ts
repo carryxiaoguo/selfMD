@@ -3428,6 +3428,25 @@ async function openPath(path: string): Promise<void> {
         })
         console.log(`[selfMD] 排版诊断（前 ${行们.length} 行，格式 序|类|字号|行高|上下距|Y|高|文本）：`)
         for (const s of 摘要) console.log(`[selfMD] LY ${s}`)
+
+        // 版心与左右留白：直接量，别推。
+        const 编辑 = document.querySelector('.cm-editor') as HTMLElement | null
+        const 内容 = document.querySelector('.cm-content') as HTMLElement | null
+        const 行首 = document.querySelector('.cm-line') as HTMLElement | null
+        if (编辑 && 内容 && 行首) {
+          const 编框 = 编辑.getBoundingClientRect()
+          const 内框 = 内容.getBoundingClientRect()
+          const 首框 = 行首.getBoundingClientRect()
+          const 内样式 = getComputedStyle(内容)
+          const 主题名 = document.getElementById('theme-css')?.getAttribute('href') ?? '?'
+          console.log(
+            `[selfMD] WIDTH 编辑区=${Math.round(编框.width)} 内容区=${Math.round(内框.width)} ` +
+              `行=${Math.round(首框.width)} 左留白=${Math.round(首框.left - 编框.left)} ` +
+              `右留白=${Math.round(编框.right - 首框.right)} 内边距=${内样式.paddingLeft}/${内样式.paddingRight} ` +
+              `版心=${getComputedStyle(document.documentElement).getPropertyValue('--content-max-width').trim()} ` +
+              `主题=${主题名}`
+          )
+        }
       }
 
       commandResults = runCommandSelfTest(view, view.state)

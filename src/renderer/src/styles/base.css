@@ -96,7 +96,7 @@
   --font-mono: var(--monospace);
   --font-size: 16px;
   --line-height: 1.65;
-  --content-max-width: 900px;
+  --content-max-width: 1400px;
 
   --radius: 6px;
   --shadow: 0 1px 3px rgba(31, 35, 40, 0.12);
@@ -224,7 +224,7 @@ body {
   /* 左右留白放在**容器**上而不是每一行上。
      放在行上的话，行的背景会连内边距一起涂满——代码块、引用块的色块
      就顶到了编辑器边缘。放在容器上，行的宽度只剩内容区，色块自然两侧留白。 */
-  padding: 3rem 3rem 40vh;
+  padding: 3rem 2rem 40vh;
   box-sizing: border-box;
   caret-color: var(--accent);
   max-width: var(--content-max-width);

@@ -102,7 +102,7 @@ export const BUILTIN_THEMES: BuiltinTheme[] = [
   --font-size: 17px;
   --line-height: 1.8;
   /* 一行 30 到 40 个汉字最省眼力，所以版心比默认窄 */
-  --content-max-width: 720px;
+  --content-max-width: 1100px;
   /* 书页是方的，圆角一大就不像纸了 */
   --radius: 3px;
   --shadow: 0 1px 2px rgba(58, 49, 38, 0.1);
@@ -227,7 +227,7 @@ export const BUILTIN_THEMES: BuiltinTheme[] = [
 
   --font-size: 16px;
   --line-height: 1.7;
-  --content-max-width: 800px;
+  --content-max-width: 1400px;
   --radius: 8px;
   --shadow: 0 1px 3px rgba(42, 49, 80, 0.1);
 
@@ -299,7 +299,7 @@ export const BUILTIN_THEMES: BuiltinTheme[] = [
 
   --font-size: 16px;
   --line-height: 1.75;
-  --content-max-width: 800px;
+  --content-max-width: 1400px;
   --radius: 8px;
   /* 深色下的阴影要更重才看得出层次，浅色的那点阴影在这里等于没有 */
   --shadow: 0 2px 8px rgba(0, 0, 0, 0.45);

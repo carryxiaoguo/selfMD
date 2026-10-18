@@ -69,7 +69,7 @@ const 样本断言 = [
       tableSeparatorRow: 1,
       htmlBlockRow: 1,
       codeHeader: 1,
-      bulletDot: 3,
+      bulletDot: 1,
       taskCheckboxEl: 2,
       horizontalRuleEl: 1,
       tablePipeEl: 6

@@ -1,4 +1,5 @@
 import type { EditorState } from '@codemirror/state'
+import { Decoration } from '@codemirror/view'
 import { scanInlineMath } from '@shared/math'
 import { scanPunct } from '../smart-punctuation'
 import {
@@ -314,13 +315,42 @@ export function handleBlock(
     // ------------------------------------------------------------- 列表 --
     case 'ListMark': {
       const grandparent = node.parent?.parent?.name
+      // **列表必须按层级缩进。**
+      //
+      // 层级本来就算出来了（`computeLevel` 用来选 •/◦/▪），但只换了符号、
+      // 没有平移文字。结果一级、二级、三级列表全部从同一个 x 起排，
+      // 看起来就是"一堆圆点挤在左边"，嵌套关系完全丢失——这是排版混乱
+      // 最主要的来源，比字号问题严重得多。
+      //
+      // 行装饰用类名而不是内联样式：层级有上限（这里封到 6），
+      // 类名可以被 CSS 与自测同时利用。
+      const level = computeLevel(state, node.from)
+      const lineStart = state.doc.lineAt(node.from).from
+      context.entry.push({
+        from: lineStart,
+        to: lineStart,
+        deco: Decoration.line({
+          class: `cm-lp-list cm-lp-depth-${Math.min(level, 6)}`
+        }),
+        rank: 0
+      })
       if (grandparent === 'BulletList') {
+        // **任务项不要再画圆点。**
+        // `- [ ] 待办` 的 `-` 也是 ListMark，照常替换就会变成
+        // "• ☐ 待办"——两个标记叠在一行，看着就乱。
+        // 任务项前面的方块本身就是它的标记，圆点是多余的。
+        //
+        // 判断直接看行文本而不是语法树：ListItem 的第一个孩子就是 ListMark
+        // 自己，`firstChild` 拿不到 Task；而本地 SyntaxNode 类型上也没有
+        // `getChild`。一行正则比绕开这两点都省事，且对 `- [ ]` `* [x]` 都成立。
+        const lineText = state.sliceDoc(lineStart, state.doc.lineAt(node.from).to)
+        const isTaskItem = /^\s*[-*+]\s+\[[ xX]\]/.test(lineText)
         // 无序列表：把 `-` 换成圆点。活动行保留原字符，方便看清语法。
         if (!onActiveLine) {
           context.entry.push({
             from: node.from,
             to: node.to,
-            deco: replaceWith(new bulletDot(computeLevel(state, node.from))),
+            deco: isTaskItem ? hidden : replaceWith(new bulletDot(level)),
             rank: 1
           })
         }

@@ -3403,6 +3403,33 @@ async function openPath(path: string): Promise<void> {
     let prefsUiResult: string | undefined
     let imageMenuResult: string | undefined
     if (info.smokeTest) {
+      // 排版诊断：把每一行的高度、字号、上下外边距和纵向位置打出来。
+      // 我看不到界面，只能靠这些数字判断"排版乱不乱"——
+      // 比如两个块之间的实际间隙是 0 还是 40px、标题字号是否真的比正文大，
+      // 这些只有量得出来。
+      {
+        const 行们 = Array.from(document.querySelectorAll('.cm-line')).slice(0, 60)
+        const 摘要 = 行们.map((el, i) => {
+          const e = el as HTMLElement
+          const st = getComputedStyle(e)
+          const 盒 = e.getBoundingClientRect()
+          // 量**文字**的起点，不是行盒的左边：缩进通常用 padding-left 实现，
+          // 行盒位置不变、文字右移，只看行盒会把"没缩进"和"缩进了"看成一样。
+          const 范围 = document.createRange()
+          范围.selectNodeContents(e)
+          const 文 = 范围.getBoundingClientRect()
+          const r = { top: 盒.top, height: 盒.height, left: 文.left || 盒.left }
+          const 类 = Array.from(e.classList)
+            .filter((c) => c !== 'cm-line')
+            .map((c) => c.replace('cm-lp-', '').replace('cm-', ''))
+            .join('.')
+          const 文本 = (e.textContent ?? '').trim().slice(0, 10)
+          return `${i}|${类 || 'plain'}|${parseFloat(st.fontSize)}|${st.lineHeight}|${st.marginTop}/${st.marginBottom}|${Math.round(r.top)}|${Math.round(r.height)}|左${Math.round(r.left)}|${文本}`
+        })
+        console.log(`[selfMD] 排版诊断（前 ${行们.length} 行，格式 序|类|字号|行高|上下距|Y|高|文本）：`)
+        for (const s of 摘要) console.log(`[selfMD] LY ${s}`)
+      }
+
       commandResults = runCommandSelfTest(view, view.state)
       // 纯函数自测不碰编辑器，放在最后以免影响上面的状态恢复。
       pureResults = runPureSelfTest()
